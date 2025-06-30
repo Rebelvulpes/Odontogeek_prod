@@ -49,7 +49,7 @@ export default function HomePage() {
       <header className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            <img src="/images/odontogeek-logo.png" alt="OdontoGeek" className="h-8 w-auto" />
+            <img src="/images/odontogeek-logo.png" alt="OdontoGeek" className="h-10 w-auto" />
           </div>
           <nav className="hidden md:flex items-center space-x-6">
             <Link href="/courses" className="text-gray-600 hover:text-blue-600 transition-colors">
@@ -178,7 +178,7 @@ export default function HomePage() {
           <div className="grid md:grid-cols-4 gap-8">
             <div>
               <div className="flex items-center space-x-2 mb-4">
-                <img src="/images/odontogeek-logo.png" alt="OdontoGeek" className="h-8 w-auto brightness-0 invert" />
+                <img src="/images/odontogeek-logo.png" alt="OdontoGeek" className="h-10 w-auto brightness-0 invert" />
               </div>
               <p className="text-gray-400">La plataforma líder en actualización continua odontológica</p>
               <p className="text-sm text-gray-500 mt-2">Actualización continua.</p>
