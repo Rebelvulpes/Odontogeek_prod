@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Award, Eye, EyeOff } from "lucide-react"
+import { Eye, EyeOff } from "lucide-react"
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
@@ -32,13 +32,10 @@ export default function LoginPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex items-center justify-center space-x-2 mb-4">
-            <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
-              <Award className="w-6 h-6 text-white" />
-            </div>
-            <span className="text-2xl font-bold text-gray-900">DentalAcademy</span>
+            <img src="/images/odontogeek-logo.png" alt="OdontoGeek" className="h-10 w-auto" />
           </div>
           <CardTitle className="text-2xl">Iniciar Sesión</CardTitle>
-          <CardDescription>Accede a tu cuenta para continuar aprendiendo</CardDescription>
+          <CardDescription>Accede a tu cuenta de OdontoGeek para continuar aprendiendo</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">

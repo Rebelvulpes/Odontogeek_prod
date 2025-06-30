@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Play, Clock, CheckCircle, BookOpen, Award, TrendingUp, User } from "lucide-react"
+import { Play, Clock, CheckCircle, BookOpen, TrendingUp, User } from "lucide-react"
 
 const enrolledCourses = [
   {
@@ -68,10 +68,7 @@ export default function DashboardPage() {
       <header className="bg-white border-b">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-              <Award className="w-5 h-5 text-white" />
-            </div>
-            <span className="text-xl font-bold text-gray-900">DentalAcademy</span>
+            <img src="/images/odontogeek-logo.png" alt="OdontoGeek" className="h-8 w-auto" />
           </div>
           <nav className="hidden md:flex items-center space-x-6">
             <Link href="/dashboard" className="text-blue-600 font-medium">
@@ -97,7 +94,7 @@ export default function DashboardPage() {
         {/* Welcome Section */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">¡Bienvenido de vuelta, {user.name}!</h1>
-          <p className="text-gray-600">Continúa tu formación profesional donde lo dejaste</p>
+          <p className="text-gray-600">Continúa tu actualización continua donde lo dejaste</p>
         </div>
 
         {/* Stats Cards */}
@@ -230,7 +227,7 @@ export default function DashboardPage() {
                       >
                         {activity.type === "completed" && <CheckCircle className="w-4 h-4 text-green-600" />}
                         {activity.type === "started" && <Play className="w-4 h-4 text-blue-600" />}
-                        {activity.type === "certificate" && <Award className="w-4 h-4 text-yellow-600" />}
+                        {activity.type === "certificate" && <CheckCircle className="w-4 h-4 text-yellow-600" />}
                       </div>
                       <div className="flex-1">
                         <p className="font-medium text-gray-900">{activity.title}</p>

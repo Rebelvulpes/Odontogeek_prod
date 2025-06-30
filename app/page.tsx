@@ -2,7 +2,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { CheckCircle, Play, Users, Award, Star } from "lucide-react"
+import { CheckCircle, Play, Users, Star } from "lucide-react"
 import { HeroCarousel } from "@/components/hero-carousel"
 import { NewsTicker } from "@/components/news-ticker"
 
@@ -49,10 +49,7 @@ export default function HomePage() {
       <header className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-              <Award className="w-5 h-5 text-white" />
-            </div>
-            <span className="text-xl font-bold text-gray-900">DentalAcademy</span>
+            <img src="/images/odontogeek-logo.png" alt="OdontoGeek" className="h-8 w-auto" />
           </div>
           <nav className="hidden md:flex items-center space-x-6">
             <Link href="/courses" className="text-gray-600 hover:text-blue-600 transition-colors">
@@ -87,7 +84,7 @@ export default function HomePage() {
       {/* Features */}
       <section className="py-16 px-4 bg-white">
         <div className="container mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-12">¿Por qué elegir DentalAcademy?</h2>
+          <h2 className="text-3xl font-bold text-center mb-12">¿Por qué elegir OdontoGeek?</h2>
           <div className="grid md:grid-cols-3 gap-8">
             <div className="text-center">
               <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -163,9 +160,9 @@ export default function HomePage() {
       {/* CTA Section */}
       <section className="py-20 px-4 bg-blue-600 text-white">
         <div className="container mx-auto text-center">
-          <h2 className="text-4xl font-bold mb-6">Comienza tu Formación Hoy</h2>
+          <h2 className="text-4xl font-bold mb-6">Comienza tu Actualización Continua Hoy</h2>
           <p className="text-xl mb-8 opacity-90 max-w-2xl mx-auto">
-            Únete a más de 5,000 profesionales que ya han mejorado sus habilidades con nuestros cursos
+            Únete a más de 10,000 profesionales que ya han mejorado sus habilidades con OdontoGeek
           </p>
           <Link href="/auth/register">
             <Button size="lg" variant="secondary" className="text-lg px-8 py-3">
@@ -181,12 +178,10 @@ export default function HomePage() {
           <div className="grid md:grid-cols-4 gap-8">
             <div>
               <div className="flex items-center space-x-2 mb-4">
-                <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-                  <Award className="w-5 h-5 text-white" />
-                </div>
-                <span className="text-xl font-bold">DentalAcademy</span>
+                <img src="/images/odontogeek-logo.png" alt="OdontoGeek" className="h-8 w-auto brightness-0 invert" />
               </div>
-              <p className="text-gray-400">La plataforma líder en formación odontológica online</p>
+              <p className="text-gray-400">La plataforma líder en actualización continua odontológica</p>
+              <p className="text-sm text-gray-500 mt-2">Actualización continua.</p>
             </div>
             <div>
               <h3 className="font-semibold mb-4">Cursos</h3>
@@ -260,7 +255,7 @@ export default function HomePage() {
             </div>
           </div>
           <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
-            <p>&copy; 2024 DentalAcademy. Todos los derechos reservados.</p>
+            <p>&copy; 2024 OdontoGeek. Todos los derechos reservados.</p>
           </div>
         </div>
       </footer>

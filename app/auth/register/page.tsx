@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Award, Eye, EyeOff } from "lucide-react"
+import { Eye, EyeOff } from "lucide-react"
 
 export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false)
@@ -33,13 +33,10 @@ export default function RegisterPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex items-center justify-center space-x-2 mb-4">
-            <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
-              <Award className="w-6 h-6 text-white" />
-            </div>
-            <span className="text-2xl font-bold text-gray-900">DentalAcademy</span>
+            <img src="/images/odontogeek-logo.png" alt="OdontoGeek" className="h-10 w-auto" />
           </div>
           <CardTitle className="text-2xl">Crear Cuenta</CardTitle>
-          <CardDescription>Únete a la comunidad de profesionales dentales</CardDescription>
+          <CardDescription>Únete a la comunidad de profesionales de OdontoGeek</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">

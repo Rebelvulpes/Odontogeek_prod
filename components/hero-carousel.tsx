@@ -13,7 +13,7 @@ const slides = [
     title: "Nuevo Curso: Implantología Avanzada",
     subtitle: "Técnicas Revolucionarias en Implantes Dentales",
     description:
-      "Aprende las últimas técnicas en implantología con casos clínicos reales y protocolos actualizados. Más de 12 horas de contenido premium.",
+      "Aprende las últimas técnicas en implantología con casos clínicos reales y protocolos actualizados. Más de 12 horas de contenido premium en OdontoGeek.",
     image: "/placeholder.svg?height=600&width=800",
     badge: "Nuevo Curso",
     badgeColor: "bg-green-500",
@@ -31,7 +31,7 @@ const slides = [
     title: "Congreso Internacional de Odontología 2024",
     subtitle: "Participa en el Evento Dental del Año",
     description:
-      "Únete a más de 5,000 profesionales dentales en el congreso más importante de Latinoamérica. Conferencias magistrales y talleres prácticos.",
+      "Únete a más de 5,000 profesionales dentales en el congreso más importante de Latinoamérica. OdontoGeek te mantiene actualizado con los mejores eventos.",
     image: "/placeholder.svg?height=600&width=800",
     badge: "Evento Especial",
     badgeColor: "bg-blue-500",
@@ -49,7 +49,7 @@ const slides = [
     title: "Oferta Especial: 40% de Descuento",
     subtitle: "Acceso Completo a Todos los Cursos",
     description:
-      "Por tiempo limitado, obtén acceso a nuestra biblioteca completa de cursos dentales con un descuento exclusivo. Más de 50 horas de contenido.",
+      "Por tiempo limitado, obtén acceso a nuestra biblioteca completa de cursos dentales con un descuento exclusivo. Más de 50 horas de actualización continua.",
     image: "/placeholder.svg?height=600&width=800",
     badge: "Oferta Limitada",
     badgeColor: "bg-red-500",
@@ -65,9 +65,9 @@ const slides = [
     id: 4,
     type: "success",
     title: "Más de 10,000 Profesionales Capacitados",
-    subtitle: "Únete a la Comunidad Dental Líder",
+    subtitle: "Únete a la Comunidad OdontoGeek",
     description:
-      "Miles de dentistas ya han mejorado sus habilidades con nuestros cursos. Forma parte de la comunidad de profesionales más grande de habla hispana.",
+      "Miles de dentistas ya han mejorado sus habilidades con nuestros cursos. Forma parte de la comunidad de actualización continua más grande de habla hispana.",
     image: "/placeholder.svg?height=600&width=800",
     badge: "Comunidad",
     badgeColor: "bg-purple-500",
@@ -182,10 +182,14 @@ export function HeroCarousel() {
                 <div className="h-full bg-gradient-to-br from-white/20 to-white/5 rounded-xl flex items-center justify-center">
                   <div className="text-center text-white">
                     <div className="w-24 h-24 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <Award className="w-12 h-12" />
+                      <img
+                        src="/images/odontogeek-logo.png"
+                        alt="OdontoGeek"
+                        className="w-16 h-16 brightness-0 invert"
+                      />
                     </div>
-                    <h3 className="text-2xl font-bold mb-2">DentalAcademy</h3>
-                    <p className="text-blue-100">Formación de Excelencia</p>
+                    <h3 className="text-2xl font-bold mb-2">OdontoGeek</h3>
+                    <p className="text-blue-100">Actualización continua</p>
                   </div>
                 </div>
               </div>
