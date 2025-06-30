@@ -185,7 +185,7 @@ export function HeroCarousel() {
                       <img
                         src="/images/odontogeek-logo.png"
                         alt="OdontoGeek"
-                        className="w-16 h-16 brightness-0 invert"
+                        className="max-w-md max-h-56 -m-64 brightness-0 invert"
                       />
                     </div>
                     <h3 className="text-2xl font-bold mb-2">OdontoGeek</h3>

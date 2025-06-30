@@ -68,7 +68,7 @@ export default function DashboardPage() {
       <header className="bg-white border-b">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            <img src="/images/odontogeek-logo.png" alt="OdontoGeek" className="h-10 w-auto" />
+            <img src="/images/odontogeek-logo.png" alt="OdontoGeek" className="max-w-md max-h-56 -m-64" />
           </div>
           <nav className="hidden md:flex items-center space-x-6">
             <Link href="/dashboard" className="text-blue-600 font-medium">

@@ -32,7 +32,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex items-center justify-center space-x-2 mb-4">
-            <img src="/images/odontogeek-logo.png" alt="OdontoGeek" className="h-12 w-auto" />
+            <img src="/images/odontogeek-logo.png" alt="OdontoGeek" className="max-w-md max-h-56 -m-64" />
           </div>
           <CardTitle className="text-2xl">Iniciar Sesión</CardTitle>
           <CardDescription>Accede a tu cuenta de OdontoGeek para continuar aprendiendo</CardDescription>

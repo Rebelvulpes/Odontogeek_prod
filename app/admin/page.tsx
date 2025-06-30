@@ -151,7 +151,10 @@ export default function AdminPage() {
       <header className="bg-white border-b">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-gray-900">Panel de Administración - OdontoGeek</h1>
+            <div className="flex items-center space-x-4">
+              <img src="/images/odontogeek-logo.png" alt="OdontoGeek" className="max-w-md max-h-56 -m-64" />
+              <h1 className="text-2xl font-bold text-gray-900">Panel de Administración</h1>
+            </div>
             <div className="flex items-center space-x-3">
               <Badge variant="secondary">Administrador</Badge>
               <Button variant="outline" size="sm">
