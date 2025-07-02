@@ -178,7 +178,7 @@ export default function HomePage() {
           <div className="grid md:grid-cols-4 gap-8">
             <div>
               <div className="flex items-center space-x-2 mb-4">
-                <img src="/images/odontogeek-logo.png" alt="OdontoGeek" className="h-10 w-auto brightness-0 invert p-40" />
+                <img src="/images/odontogeek-logo.png" alt="OdontoGeek" className="h-10 w-auto brightness-0 invert py-40" />
               </div>
               <p className="text-gray-400">La plataforma líder en actualización continua odontológica</p>
               <p className="text-sm text-gray-500 mt-2">Actualización continua.</p>
