@@ -47,9 +47,9 @@ export default function HomePage() {
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
       {/* Header */}
       <header className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-center">
-          <div className="flex items-center space-x-2">
-            <img src="/images/odontogeek-logo.png" alt="OdontoGeek" className="max-w-md max-h-56" />
+        <div className="container mx-auto px-4 py-4 flex items-center justify-evenly">
+          <div className="flex px-[1p-] px-[0-] px-[-11] my-0 leading-3 py-2.5 flex-col items-stretch space-y-60">
+            <img src="/images/odontogeek-logo.png" alt="OdontoGeek" className="max-w-md max-h-56 m-48" />
           </div>
           <nav className="hidden md:flex items-center space-x-6">
             <Link href="/courses" className="text-gray-600 hover:text-blue-600 transition-colors">
