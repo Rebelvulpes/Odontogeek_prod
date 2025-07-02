@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // Hash de la contraseña
+    // Hash de la contraseña (sin JWT, usamos solo bcrypt)
     const saltRounds = 12
     const passwordHash = await bcrypt.hash(password, saltRounds)
 
@@ -66,19 +66,23 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // Log de auditoría
-    await supabase.from("admin_logs").insert([
-      {
-        admin_id: newUser[0].id,
-        action: "admin_created",
-        details: `Administrador principal creado: ${firstName} ${lastName} (${email})`,
-        ip_address: req.headers.get("x-forwarded-for") || "unknown",
-      },
-    ])
+    // Log de auditoría (intentar, pero no fallar si no existe la tabla)
+    try {
+      await supabase.from("admin_logs").insert([
+        {
+          admin_id: newUser[0].id,
+          action: "admin_created",
+          details: `Administrador principal creado: ${firstName} ${lastName} (${email})`,
+          ip_address: req.headers.get("x-forwarded-for") || "unknown",
+        },
+      ])
+    } catch (logError) {
+      console.log("No se pudo crear log (tabla puede no existir aún):", logError)
+    }
 
     return NextResponse.json({
       success: true,
-      message: "Cuenta de administrador creada exitosamente",
+      message: "🎉 Cuenta de administrador creada exitosamente",
       data: {
         id: newUser[0].id,
         email: newUser[0].email,

@@ -1,11 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import bcrypt from "bcryptjs"
-import jwt from "jsonwebtoken"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
-const jwtSecret = process.env.JWT_SECRET || "your-secret-key"
 
 export async function POST(req: NextRequest) {
   try {
@@ -47,31 +45,26 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // Crear JWT token
-    const token = jwt.sign(
-      {
-        userId: user.id,
-        email: user.email,
-        role: user.role,
-        name: `${user.first_name} ${user.last_name}`,
-      },
-      jwtSecret,
-      { expiresIn: "7d" },
-    )
+    // Crear una sesión simple (sin JWT por ahora)
+    const sessionId = crypto.randomUUID()
 
-    // Log de auditoría para admins
+    // Log de auditoría para admins (intentar, pero no fallar si no existe la tabla)
     if (user.role === "admin") {
-      await supabase.from("admin_logs").insert([
-        {
-          admin_id: user.id,
-          action: "login",
-          details: `Administrador ${user.first_name} ${user.last_name} inició sesión`,
-          ip_address: req.headers.get("x-forwarded-for") || "unknown",
-        },
-      ])
+      try {
+        await supabase.from("admin_logs").insert([
+          {
+            admin_id: user.id,
+            action: "login",
+            details: `Administrador ${user.first_name} ${user.last_name} inició sesión`,
+            ip_address: req.headers.get("x-forwarded-for") || "unknown",
+          },
+        ])
+      } catch (logError) {
+        console.log("No se pudo crear log:", logError)
+      }
     }
 
-    // Crear respuesta con cookie
+    // Crear respuesta con cookie simple
     const response = NextResponse.json({
       success: true,
       message: "Login exitoso",
@@ -84,13 +77,22 @@ export async function POST(req: NextRequest) {
       redirectTo: user.role === "admin" ? "/admin" : "/dashboard",
     })
 
-    // Configurar cookie segura
-    response.cookies.set("auth-token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60, // 7 días
-    })
+    // Configurar cookie simple con información del usuario
+    response.cookies.set(
+      "user-session",
+      JSON.stringify({
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        sessionId,
+      }),
+      {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 7 * 24 * 60 * 60, // 7 días
+      },
+    )
 
     return response
   } catch (error) {
