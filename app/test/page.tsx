@@ -147,6 +147,55 @@ export default function TestPage() {
     checkEnvVars()
   }, [])
 
+  // Agregar función para corregir la base de datos y mejorar las pruebas
+  const fixDatabase = async () => {
+    setLoading(true)
+    try {
+      const response = await fetch("/api/setup/fix-database", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      })
+
+      const result = await response.json()
+      setSupabaseStatus({
+        success: result.success,
+        message: result.success
+          ? "Base de datos corregida exitosamente"
+          : "Error corrigiendo base de datos: " + result.error,
+        data: result.results,
+      })
+    } catch (error) {
+      setSupabaseStatus({
+        success: false,
+        message: "Error corrigiendo base de datos: " + (error as Error).message,
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // También agregar una función para limpiar usuarios de prueba:
+  const cleanTestUsers = async () => {
+    setLoading(true)
+    try {
+      const response = await fetch("/api/test/supabase", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "clean_test_users" }),
+      })
+
+      const result = await response.json()
+      setSupabaseStatus(result)
+    } catch (error) {
+      setSupabaseStatus({
+        success: false,
+        message: "Error limpiando usuarios de prueba: " + (error as Error).message,
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="container mx-auto px-4 max-w-4xl">
@@ -182,6 +231,11 @@ export default function TestPage() {
                 <Button onClick={testSupabase} disabled={loading} className="w-full">
                   {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
                   Probar Conexión
+                </Button>
+
+                <Button onClick={fixDatabase} disabled={loading} variant="outline" className="w-full bg-transparent">
+                  {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                  Corregir Base de Datos
                 </Button>
 
                 {supabaseStatus && (

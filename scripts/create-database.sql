@@ -12,6 +12,18 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Actualizar la tabla de usuarios para hacer password_hash opcional para usuarios de prueba
+-- y agregar un campo para distinguir usuarios de prueba
+
+-- Modificar la tabla de usuarios
+ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;
+
+-- Agregar campo para usuarios de prueba
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_test_user BOOLEAN DEFAULT FALSE;
+
+-- Agregar índice para usuarios de prueba
+CREATE INDEX IF NOT EXISTS idx_users_test ON users(is_test_user) WHERE is_test_user = true;
+
 -- Tabla de cursos
 CREATE TABLE IF NOT EXISTS courses (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,

@@ -37,7 +37,9 @@ export async function POST(req: NextRequest) {
         })
 
       case "create_user":
-        // Test creating a user
+        // Test creating a user with proper password hash for test users
+        const testPasswordHash = "$2b$10$test.hash.for.testing.purposes.only.not.for.production.use"
+
         const { data: userData, error: userError } = await supabase
           .from("users")
           .insert([
@@ -46,11 +48,40 @@ export async function POST(req: NextRequest) {
               first_name: firstName,
               last_name: lastName,
               role: "student",
+              password_hash: testPasswordHash,
+              is_test_user: true, // Marcar como usuario de prueba
             },
           ])
           .select()
 
         if (userError) {
+          // Si el usuario ya existe, intentar actualizarlo
+          if (userError.code === "23505") {
+            // Unique violation
+            const { data: updateData, error: updateError } = await supabase
+              .from("users")
+              .update({
+                first_name: firstName,
+                last_name: lastName,
+                is_test_user: true,
+              })
+              .eq("email", email)
+              .select()
+
+            if (updateError) {
+              return NextResponse.json({
+                success: false,
+                message: `Error actualizando usuario existente: ${updateError.message}`,
+              })
+            }
+
+            return NextResponse.json({
+              success: true,
+              message: "Usuario de prueba actualizado exitosamente (ya existía)",
+              data: updateData,
+            })
+          }
+
           return NextResponse.json({
             success: false,
             message: `Error creando usuario: ${userError.message}`,
@@ -78,6 +109,23 @@ export async function POST(req: NextRequest) {
           success: true,
           message: `Se encontraron ${coursesData.length} cursos`,
           data: coursesData,
+        })
+
+      case "clean_test_users":
+        // Clean test users
+        const { data: cleanData, error: cleanError } = await supabase.from("users").delete().eq("is_test_user", true)
+
+        if (cleanError) {
+          return NextResponse.json({
+            success: false,
+            message: `Error limpiando usuarios de prueba: ${cleanError.message}`,
+          })
+        }
+
+        return NextResponse.json({
+          success: true,
+          message: "Usuarios de prueba eliminados exitosamente",
+          data: { deletedCount: cleanData?.length || 0 },
         })
 
       default:
