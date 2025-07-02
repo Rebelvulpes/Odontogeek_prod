@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Eye, EyeOff, Shield, User, Mail, Lock, CheckCircle, Database, Settings } from "lucide-react"
+import { Eye, EyeOff, Shield, User, Mail, Lock, CheckCircle, Database, Settings, AlertTriangle } from "lucide-react"
 
 export default function SetupAdminPage() {
   const [showPassword, setShowPassword] = useState(false)
@@ -19,6 +19,7 @@ export default function SetupAdminPage() {
   const [error, setError] = useState("")
   const [setupStep, setSetupStep] = useState(1)
   const [dbConfigured, setDbConfigured] = useState(false)
+  const [dbDetails, setDbDetails] = useState<any>(null)
   const router = useRouter()
 
   const [formData, setFormData] = useState({
@@ -29,7 +30,7 @@ export default function SetupAdminPage() {
     confirmPassword: "",
   })
 
-  // Paso 1: Configurar base de datos
+  // Paso 1: Verificar y configurar base de datos
   const setupDatabase = async () => {
     setLoading(true)
     setError("")
@@ -46,12 +47,18 @@ export default function SetupAdminPage() {
 
       if (result.success) {
         setDbConfigured(true)
+        setDbDetails(result.details)
         setSetupStep(2)
       } else {
         setError(result.message || "Error configurando base de datos")
+
+        // Mostrar sugerencia si está disponible
+        if (result.suggestion) {
+          setError(`${result.message}\n\n💡 Sugerencia: ${result.suggestion}`)
+        }
       }
     } catch (err) {
-      setError("Error de conexión. Verifica que Supabase esté configurado correctamente.")
+      setError("Error de conexión. Verifica que las variables de entorno de Supabase estén configuradas correctamente.")
     } finally {
       setLoading(false)
     }
@@ -115,7 +122,7 @@ export default function SetupAdminPage() {
             <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-gray-900 mb-2">¡Todo Listo! 🎉</h2>
             <p className="text-gray-600 mb-4">
-              Tu cuenta de administrador ha sido creada exitosamente y la base de datos está configurada.
+              Tu cuenta de administrador ha sido creada exitosamente y la plataforma está lista para usar.
             </p>
             <p className="text-sm text-gray-500 mb-4">Serás redirigido al login de administrador en unos segundos...</p>
             <div className="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full mx-auto"></div>
@@ -143,7 +150,7 @@ export default function SetupAdminPage() {
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="1" disabled={setupStep < 1}>
                 <Database className="w-4 h-4 mr-2" />
-                Base de Datos
+                Verificar Sistema
               </TabsTrigger>
               <TabsTrigger value="2" disabled={setupStep < 2}>
                 <User className="w-4 h-4 mr-2" />
@@ -154,25 +161,42 @@ export default function SetupAdminPage() {
             <TabsContent value="1" className="space-y-6 mt-6">
               <div className="text-center space-y-4">
                 <Database className="w-16 h-16 text-blue-500 mx-auto" />
-                <h3 className="text-xl font-semibold">Configurar Base de Datos</h3>
+                <h3 className="text-xl font-semibold">Verificar Base de Datos</h3>
                 <p className="text-gray-600">
-                  Primero necesitamos configurar las tablas de administración en tu base de datos de Supabase.
+                  Vamos a verificar que tu base de datos de Supabase esté configurada correctamente para OdontoGeek.
                 </p>
               </div>
 
               <div className="bg-blue-50 p-4 rounded-lg">
-                <h4 className="font-medium text-blue-900 mb-2">¿Qué se va a crear?</h4>
+                <h4 className="font-medium text-blue-900 mb-2">¿Qué se va a verificar?</h4>
                 <ul className="text-sm text-blue-800 space-y-1">
-                  <li>✓ Tabla de logs de administración (para auditoría)</li>
-                  <li>✓ Tabla de sesiones de administrador (para seguridad)</li>
-                  <li>✓ Tabla de permisos (para control de acceso)</li>
-                  <li>✓ Índices para optimizar el rendimiento</li>
+                  <li>✓ Conexión con Supabase</li>
+                  <li>✓ Estructura de tablas (users, courses, enrollments)</li>
+                  <li>✓ Permisos para crear administradores</li>
+                  <li>✓ Datos de ejemplo (cursos iniciales)</li>
                 </ul>
               </div>
 
               {error && (
                 <Alert className="border-red-200 bg-red-50">
-                  <AlertDescription className="text-red-800">{error}</AlertDescription>
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription className="text-red-800 whitespace-pre-line">{error}</AlertDescription>
+                </Alert>
+              )}
+
+              {dbDetails && (
+                <Alert className="border-green-200 bg-green-50">
+                  <CheckCircle className="h-4 w-4" />
+                  <AlertDescription className="text-green-800">
+                    <div className="space-y-1">
+                      <p className="font-medium">✅ Sistema verificado exitosamente:</p>
+                      <ul className="text-sm space-y-1 ml-4">
+                        <li>• Tablas verificadas: {dbDetails.tablesVerified?.join(", ")}</li>
+                        <li>• Cursos de ejemplo: {dbDetails.sampleCoursesCreated ? "Creados" : "Ya existían"}</li>
+                        <li>• Listo para crear administradores: {dbDetails.adminCreationReady ? "Sí" : "No"}</li>
+                      </ul>
+                    </div>
+                  </AlertDescription>
                 </Alert>
               )}
 
@@ -180,17 +204,17 @@ export default function SetupAdminPage() {
                 {loading ? (
                   <>
                     <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>
-                    Configurando Base de Datos...
+                    Verificando Sistema...
                   </>
                 ) : dbConfigured ? (
                   <>
                     <CheckCircle className="w-4 h-4 mr-2" />
-                    Base de Datos Configurada
+                    Sistema Verificado ✅
                   </>
                 ) : (
                   <>
                     <Settings className="w-4 h-4 mr-2" />
-                    Configurar Base de Datos
+                    Verificar Sistema
                   </>
                 )}
               </Button>
