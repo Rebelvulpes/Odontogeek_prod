@@ -58,7 +58,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex items-center justify-center space-x-2 mb-4">
-            <img src="/images/odontogeek-logo-new.png" alt="OdontoGeek" className="h-12 w-auto" />
+            <img src="/images/odontogeek-logo-new.png" alt="OdontoGeek" className="h-16 w-auto max-w-[200px]" />
           </div>
           <div className="flex items-center justify-center space-x-2">
             {isAdminLogin && <Shield className="w-5 h-5 text-blue-600" />}
