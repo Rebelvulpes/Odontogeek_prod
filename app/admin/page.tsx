@@ -34,6 +34,7 @@ import {
 const AdminPage = () => {
   const [courses, setCourses] = useState([])
   const [users, setUsers] = useState([])
+  const [loading, setLoading] = useState(true)
   const [newCourse, setNewCourse] = useState({
     title: "",
     description: "",
@@ -56,20 +57,31 @@ const AdminPage = () => {
 
   const loadCourses = async () => {
     try {
+      setLoading(true)
       const response = await fetch("/api/admin/courses")
       const result = await response.json()
+
+      console.log("Respuesta de la API:", result) // Debug
+
       if (result.success) {
-        // Ensure lessons array exists for each course
-        const coursesWithLessons = result.data.map((course) => ({
-          ...course,
-          lessons: course.lessons || [],
-        }))
+        // Ensure lessons array exists for each course and log the structure
+        const coursesWithLessons = result.data.map((course) => {
+          console.log(`Curso ${course.title}:`, course.lessons) // Debug
+          return {
+            ...course,
+            lessons: course.lessons || [],
+          }
+        })
         setCourses(coursesWithLessons)
       } else {
         console.error("Error loading courses:", result.message)
+        alert(`Error cargando cursos: ${result.message}`)
       }
     } catch (error) {
       console.error("Error cargando cursos:", error)
+      alert("Error de conexión al cargar cursos")
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -129,6 +141,8 @@ const AdminPage = () => {
   }
 
   const openLessonDialog = (courseId: number, lesson?: any) => {
+    console.log("Abriendo diálogo para curso:", courseId, "lección:", lesson) // Debug
+
     setSelectedCourse(courseId)
     if (lesson) {
       setEditingLesson(lesson)
@@ -155,8 +169,11 @@ const AdminPage = () => {
   }
 
   const handleArchiveLesson = async (lessonId: string) => {
-    if (!lessonId || lessonId === "undefined") {
+    console.log("Intentando archivar lección con ID:", lessonId) // Debug
+
+    if (!lessonId || lessonId === "undefined" || lessonId === "null") {
       alert("Error: ID de lección no válido")
+      console.error("ID de lección inválido:", lessonId)
       return
     }
 
@@ -175,14 +192,18 @@ const AdminPage = () => {
           alert(result.message)
         }
       } catch (error) {
+        console.error("Error archivando lección:", error)
         alert("Error archivando lección")
       }
     }
   }
 
   const handleDeleteLesson = async (lessonId: string) => {
-    if (!lessonId || lessonId === "undefined") {
+    console.log("Intentando eliminar lección con ID:", lessonId) // Debug
+
+    if (!lessonId || lessonId === "undefined" || lessonId === "null") {
       alert("Error: ID de lección no válido")
+      console.error("ID de lección inválido:", lessonId)
       return
     }
 
@@ -201,6 +222,7 @@ const AdminPage = () => {
           alert(result.message)
         }
       } catch (error) {
+        console.error("Error eliminando lección:", error)
         alert("Error eliminando lección")
       }
     }
@@ -217,6 +239,17 @@ const AdminPage = () => {
     { icon: DollarSign, label: "Pagos", href: "/admin/payments" },
     { icon: Settings, label: "Configuración", href: "/admin/settings" },
   ]
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p className="text-gray-600">Cargando panel de administración...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -476,69 +509,79 @@ const AdminPage = () => {
                   <CardContent className="p-4 sm:p-6 pt-0">
                     {course.lessons && course.lessons.length > 0 ? (
                       <div className="space-y-3">
-                        {course.lessons.map((lesson) => (
-                          <div
-                            key={lesson.id}
-                            className="flex flex-col sm:flex-row sm:items-center justify-between p-3 border rounded-lg gap-3"
-                          >
-                            <div className="flex items-center space-x-3">
-                              <div className="w-6 h-6 sm:w-8 sm:h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                                <span className="text-xs sm:text-sm font-medium text-blue-600">
-                                  {lesson.order_index}
-                                </span>
-                              </div>
-                              <div className="min-w-0">
-                                <p className="font-medium text-sm sm:text-base truncate">{lesson.title}</p>
-                                <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-500">
-                                  <div className="flex items-center space-x-1">
-                                    <Clock className="w-3 h-3" />
-                                    <span>{lesson.duration_minutes} min</span>
+                        {course.lessons.map((lesson) => {
+                          console.log("Renderizando lección:", lesson) // Debug
+                          return (
+                            <div
+                              key={lesson.id}
+                              className="flex flex-col sm:flex-row sm:items-center justify-between p-3 border rounded-lg gap-3"
+                            >
+                              <div className="flex items-center space-x-3">
+                                <div className="w-6 h-6 sm:w-8 sm:h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                  <span className="text-xs sm:text-sm font-medium text-blue-600">
+                                    {lesson.order_index}
+                                  </span>
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="font-medium text-sm sm:text-base truncate">{lesson.title}</p>
+                                  <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-500">
+                                    <div className="flex items-center space-x-1">
+                                      <Clock className="w-3 h-3" />
+                                      <span>{lesson.duration_minutes} min</span>
+                                    </div>
+                                    <div className="flex items-center space-x-1">
+                                      <LinkIcon className="w-3 h-3" />
+                                      <span>Bunny.net</span>
+                                    </div>
+                                    {lesson.is_free && (
+                                      <Badge variant="secondary" className="text-xs">
+                                        Gratis
+                                      </Badge>
+                                    )}
+                                    <div className="text-xs text-gray-400">ID: {lesson.id}</div>
                                   </div>
-                                  <div className="flex items-center space-x-1">
-                                    <LinkIcon className="w-3 h-3" />
-                                    <span>Bunny.net</span>
-                                  </div>
-                                  {lesson.is_free && (
-                                    <Badge variant="secondary" className="text-xs">
-                                      Gratis
-                                    </Badge>
-                                  )}
                                 </div>
                               </div>
+                              <div className="flex items-center space-x-2 self-end sm:self-center">
+                                <Button variant="ghost" size="sm" onClick={() => openLessonDialog(course.id, lesson)}>
+                                  <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    if (lesson.id) {
+                                      handleArchiveLesson(lesson.id)
+                                    } else {
+                                      alert("Error: ID de lección no disponible")
+                                      console.error("Lección sin ID:", lesson)
+                                    }
+                                  }}
+                                  className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                                  title="Archivar lección"
+                                >
+                                  <Eye className="w-3 h-3 sm:w-4 sm:h-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    if (lesson.id) {
+                                      handleDeleteLesson(lesson.id)
+                                    } else {
+                                      alert("Error: ID de lección no disponible")
+                                      console.error("Lección sin ID:", lesson)
+                                    }
+                                  }}
+                                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                  title="Eliminar definitivamente"
+                                >
+                                  <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
+                                </Button>
+                              </div>
                             </div>
-                            <div className="flex items-center space-x-2 self-end sm:self-center">
-                              <Button variant="ghost" size="sm" onClick={() => openLessonDialog(course.id, lesson)}>
-                                <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() =>
-                                  lesson.id
-                                    ? handleArchiveLesson(lesson.id)
-                                    : alert("Error: ID de lección no disponible")
-                                }
-                                className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
-                                title="Archivar lección"
-                              >
-                                <Eye className="w-3 h-3 sm:w-4 sm:h-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() =>
-                                  lesson.id
-                                    ? handleDeleteLesson(lesson.id)
-                                    : alert("Error: ID de lección no disponible")
-                                }
-                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                title="Eliminar definitivamente"
-                              >
-                                <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        ))}
+                          )
+                        })}
                       </div>
                     ) : (
                       <div className="text-center py-6 sm:py-8 text-gray-500">

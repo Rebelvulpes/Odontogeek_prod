@@ -8,24 +8,33 @@ export async function GET() {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    const { data: courses, error } = await supabase
+    // Primero obtener todos los cursos
+    const { data: courses, error: coursesError } = await supabase
       .from("courses")
-      .select(`
-        *,
-        lessons:lessons(count)
-      `)
+      .select("*")
       .order("created_at", { ascending: false })
 
-    if (error) {
+    if (coursesError) {
       return NextResponse.json({
         success: false,
-        message: `Error obteniendo cursos: ${error.message}`,
+        message: `Error obteniendo cursos: ${coursesError.message}`,
       })
     }
 
-    // Calcular estadísticas para cada curso
+    // Luego obtener las lecciones para cada curso
     const coursesWithStats = await Promise.all(
       courses.map(async (course) => {
+        // Obtener lecciones del curso
+        const { data: lessons, error: lessonsError } = await supabase
+          .from("lessons")
+          .select("*")
+          .eq("course_id", course.id)
+          .order("order_index", { ascending: true })
+
+        if (lessonsError) {
+          console.error(`Error obteniendo lecciones para curso ${course.id}:`, lessonsError)
+        }
+
         // Obtener número de estudiantes inscritos
         const { count: studentsCount } = await supabase
           .from("enrollments")
@@ -41,17 +50,12 @@ export async function GET() {
 
         const totalRevenue = payments?.reduce((sum, payment) => sum + payment.amount, 0) || 0
 
-        // Obtener número de lecciones
-        const { count: lessonsCount } = await supabase
-          .from("lessons")
-          .select("*", { count: "exact", head: true })
-          .eq("course_id", course.id)
-
         return {
           ...course,
+          lessons: lessons || [],
           students: studentsCount || 0,
           revenue: totalRevenue,
-          lessonsCount: lessonsCount || 0,
+          lessonsCount: lessons?.length || 0,
         }
       }),
     )
@@ -61,6 +65,7 @@ export async function GET() {
       data: coursesWithStats,
     })
   } catch (error) {
+    console.error("Error interno en GET /api/admin/courses:", error)
     return NextResponse.json({
       success: false,
       message: `Error interno: ${(error as Error).message}`,
