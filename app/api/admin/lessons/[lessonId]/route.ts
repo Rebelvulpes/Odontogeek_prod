@@ -6,10 +6,34 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 export async function PUT(req: NextRequest, { params }: { params: { lessonId: string } }) {
   try {
-    const { title, description, video_url, duration_minutes, order_index, is_free } = await req.json()
+    const body = await req.json()
+    const { title, description, video_url, duration_minutes, order_index, is_free, archived } = body
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
+    // Si es una operación de archivado
+    if (archived !== undefined) {
+      const { data: updatedLesson, error } = await supabase
+        .from("lessons")
+        .update({ archived: archived })
+        .eq("id", params.lessonId)
+        .select()
+
+      if (error) {
+        return NextResponse.json({
+          success: false,
+          message: `Error archivando lección: ${error.message}`,
+        })
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: archived ? "Lección archivada exitosamente" : "Lección restaurada exitosamente",
+        data: updatedLesson[0],
+      })
+    }
+
+    // Operación de actualización normal
     const { data: updatedLesson, error } = await supabase
       .from("lessons")
       .update({

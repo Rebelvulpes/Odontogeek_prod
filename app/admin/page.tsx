@@ -155,6 +155,11 @@ const AdminPage = () => {
   }
 
   const handleArchiveLesson = async (lessonId: string) => {
+    if (!lessonId || lessonId === "undefined") {
+      alert("Error: ID de lección no válido")
+      return
+    }
+
     if (confirm("¿Estás seguro de que quieres archivar esta lección? Se ocultará pero no se eliminará.")) {
       try {
         const response = await fetch(`/api/admin/lessons/${lessonId}`, {
@@ -176,6 +181,11 @@ const AdminPage = () => {
   }
 
   const handleDeleteLesson = async (lessonId: string) => {
+    if (!lessonId || lessonId === "undefined") {
+      alert("Error: ID de lección no válido")
+      return
+    }
+
     if (
       confirm("¿Estás seguro de que quieres ELIMINAR DEFINITIVAMENTE esta lección? Esta acción no se puede deshacer.")
     ) {
@@ -503,16 +513,26 @@ const AdminPage = () => {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => handleArchiveLesson(lesson.id)}
+                                onClick={() =>
+                                  lesson.id
+                                    ? handleArchiveLesson(lesson.id)
+                                    : alert("Error: ID de lección no disponible")
+                                }
                                 className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                                title="Archivar lección"
                               >
                                 <Eye className="w-3 h-3 sm:w-4 sm:h-4" />
                               </Button>
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => handleDeleteLesson(lesson.id)}
+                                onClick={() =>
+                                  lesson.id
+                                    ? handleDeleteLesson(lesson.id)
+                                    : alert("Error: ID de lección no disponible")
+                                }
                                 className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                title="Eliminar definitivamente"
                               >
                                 <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
                               </Button>
