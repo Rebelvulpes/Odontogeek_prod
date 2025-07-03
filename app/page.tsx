@@ -52,7 +52,7 @@ export default function HomePage() {
             {/* Logo - Mobile optimized */}
             <div className="flex-shrink-0">
               <img
-                src="/images/odontogeek-logo.png"
+                src="/images/odontogeek-logo-new.png"
                 alt="OdontoGeek"
                 className="h-8 sm:h-10 md:h-12 w-auto max-w-[120px] sm:max-w-[150px] md:max-w-[200px]"
               />
@@ -198,7 +198,7 @@ export default function HomePage() {
             <div className="col-span-2 md:col-span-1">
               <div className="flex items-center space-x-2 mb-4">
                 <img
-                  src="/images/odontogeek-logo.png"
+                  src="/images/odontogeek-logo-new.png"
                   alt="OdontoGeek"
                   className="h-8 sm:h-10 w-auto brightness-0 invert"
                 />

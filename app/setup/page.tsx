@@ -43,6 +43,7 @@ export default function SetupPage() {
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="container mx-auto px-4 max-w-2xl">
         <div className="text-center mb-8">
+          <img src="/images/odontogeek-logo-new.png" alt="OdontoGeek" className="h-12 w-auto mx-auto mb-2" />
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Configuración de DentalAcademy</h1>
           <p className="text-gray-600">Completa estos pasos para configurar tu plataforma</p>
         </div>

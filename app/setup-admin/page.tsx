@@ -195,7 +195,7 @@ export default function SetupAdminPage() {
       <Card className="w-full max-w-2xl">
         <CardHeader className="text-center">
           <div className="flex items-center justify-center space-x-2 mb-4">
-            <img src="/images/odontogeek-logo.png" alt="OdontoGeek" className="max-w-md max-h-56 -m-64" />
+            <img src="/images/odontogeek-logo-new.png" alt="OdontoGeek" className="h-12 w-auto" />
           </div>
           <div className="flex items-center justify-center space-x-2 mb-2">
             <Shield className="w-6 h-6 text-blue-600" />

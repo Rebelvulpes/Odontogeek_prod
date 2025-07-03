@@ -33,7 +33,7 @@ export default function RegisterPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex items-center justify-center space-x-2 mb-4">
-            <img src="/images/odontogeek-logo.png" alt="OdontoGeek" className="max-w-md max-h-56 -m-64" />
+            <img src="/images/odontogeek-logo-new.png" alt="OdontoGeek" className="h-12 w-auto" />
           </div>
           <CardTitle className="text-2xl">Crear Cuenta</CardTitle>
           <CardDescription>Únete a la comunidad de profesionales de OdontoGeek</CardDescription>

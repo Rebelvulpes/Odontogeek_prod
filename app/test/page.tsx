@@ -201,6 +201,7 @@ export default function TestPage() {
       <div className="container mx-auto px-4 max-w-4xl">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Verificación de Servicios - OdontoGeek</h1>
+          <img src="/images/odontogeek-logo-new.png" alt="OdontoGeek" className="h-8 w-auto" />
           <p className="text-gray-600">Prueba las conexiones con Supabase y Stripe</p>
         </div>
 

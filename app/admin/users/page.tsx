@@ -178,7 +178,7 @@ export default function AdminUsersPage() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <img src="/images/odontogeek-logo.png" alt="OdontoGeek" className="max-w-md max-h-56 -m-64" />
+              <img src="/images/odontogeek-logo-new.png" alt="OdontoGeek" className="h-8 w-auto" />
               <h1 className="text-2xl font-bold text-gray-900">Gestión de Usuarios</h1>
             </div>
             <Button onClick={() => openDialog()}>

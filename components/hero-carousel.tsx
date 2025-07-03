@@ -192,9 +192,9 @@ export function HeroCarousel() {
                   <div className="text-center text-white">
                     <div className="w-20 h-20 xl:w-24 xl:h-24 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
                       <img
-                        src="/images/odontogeek-logo.png"
+                        src="/images/odontogeek-logo-new.png"
                         alt="OdontoGeek"
-                        className="max-w-md max-h-56 -m-64 brightness-0 invert"
+                        className="w-16 h-8 brightness-0 invert"
                       />
                     </div>
                     <h3 className="text-xl xl:text-2xl font-bold mb-2">OdontoGeek</h3>

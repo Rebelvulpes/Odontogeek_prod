@@ -190,7 +190,7 @@ export default function AdminPage() {
                 <SheetContent side="left" className="w-64 p-0">
                   <SheetHeader className="p-4 border-b">
                     <SheetTitle className="flex items-center space-x-2">
-                      <img src="/images/odontogeek-logo.png" alt="OdontoGeek" className="h-8 w-auto" />
+                      <img src="/images/odontogeek-logo-new.png" alt="OdontoGeek" className="h-8 w-auto" />
                     </SheetTitle>
                     <SheetDescription>Panel de Administración</SheetDescription>
                   </SheetHeader>
@@ -226,13 +226,13 @@ export default function AdminPage() {
 
               {/* Logo - Desktop */}
               <div className="hidden lg:flex items-center space-x-4">
-                <img src="/images/odontogeek-logo.png" alt="OdontoGeek" className="h-8 sm:h-10 w-auto" />
+                <img src="/images/odontogeek-logo-new.png" alt="OdontoGeek" className="h-8 sm:h-10 w-auto" />
                 <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">Panel de Administración</h1>
               </div>
 
               {/* Logo - Mobile */}
               <div className="lg:hidden">
-                <img src="/images/odontogeek-logo.png" alt="OdontoGeek" className="h-6 sm:h-8 w-auto" />
+                <img src="/images/odontogeek-logo-new.png" alt="OdontoGeek" className="h-6 sm:h-8 w-auto" />
               </div>
             </div>
 
