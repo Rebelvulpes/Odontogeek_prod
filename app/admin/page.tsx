@@ -311,11 +311,11 @@ const AdminPage = () => {
             <TabsList className="grid w-full grid-cols-4 min-w-[400px] sm:min-w-0">
               <TabsTrigger value="courses" className="text-xs sm:text-sm">
                 <BookOpen className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                <span className="hidden sm:inline">Gestión de </span>Cursos
+                <span className="hidden sm:inline">Gestión de </span> Cursos
               </TabsTrigger>
               <TabsTrigger value="lessons" className="text-xs sm:text-sm">
                 <Video className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                <span className="hidden sm:inline">Gestión de </span>Lecciones
+                <span className="hidden sm:inline">Gestión de </span> Lecciones
               </TabsTrigger>
               <TabsTrigger value="users" className="text-xs sm:text-sm">
                 <Users className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
@@ -323,7 +323,7 @@ const AdminPage = () => {
               </TabsTrigger>
               <TabsTrigger value="create" className="text-xs sm:text-sm">
                 <Plus className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                <span className="hidden sm:inline">Crear </span>Contenido
+                <span className="hidden sm:inline">Crear </span> Contenido
               </TabsTrigger>
             </TabsList>
           </div>
