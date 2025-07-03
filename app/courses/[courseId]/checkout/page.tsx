@@ -31,7 +31,7 @@ const courseData = {
 
 export default function CheckoutPage() {
   const params = useParams()
-  const courseId = params.id as string
+  const courseId = params.courseId as string
   const course = courseData[courseId as keyof typeof courseData]
   const [isProcessing, setIsProcessing] = useState(false)
 
