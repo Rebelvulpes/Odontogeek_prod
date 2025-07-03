@@ -53,20 +53,22 @@ export function NewsTicker() {
   const currentItem = newsItems[currentNews]
 
   return (
-    <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3 overflow-hidden">
+    <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-2 sm:py-3 overflow-hidden">
       <div className="container mx-auto px-4">
-        <div className="flex items-center justify-center space-x-4 animate-fade-in">
-          <Badge className={`${currentItem.badgeColor} text-white border-0 text-xs px-2 py-1`}>
+        <div className="flex items-center justify-center space-x-2 sm:space-x-4 animate-fade-in">
+          <Badge className={`${currentItem.badgeColor} text-white border-0 text-xs px-2 py-1 flex-shrink-0`}>
             {currentItem.badge}
           </Badge>
 
-          <div className="flex items-center space-x-2">
-            <currentItem.icon className="w-4 h-4" />
-            <span className="text-sm md:text-base font-medium">{currentItem.text}</span>
+          <div className="flex items-center space-x-2 min-w-0">
+            <currentItem.icon className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+            <span className="text-xs sm:text-sm md:text-base font-medium truncate sm:whitespace-normal">
+              {currentItem.text}
+            </span>
           </div>
 
-          {/* Progress dots */}
-          <div className="hidden md:flex space-x-1">
+          {/* Progress dots - Hidden on mobile */}
+          <div className="hidden md:flex space-x-1 flex-shrink-0">
             {newsItems.map((_, index) => (
               <div
                 key={index}

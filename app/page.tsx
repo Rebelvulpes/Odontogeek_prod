@@ -45,30 +45,45 @@ const featuredCourses = [
 export default function HomePage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
-      {/* Header */}
+      {/* Header - Mobile optimized */}
       <header className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-evenly">
-          <div className="flex px-[1p-] px-[0-] px-[-11] my-0 leading-3 py-2.5 flex-col items-stretch space-y-60">
-            <img src="/images/odontogeek-logo.png" alt="OdontoGeek" className="lg max-w-md max-h-56 -m-24" />
-          </div>
-          <nav className="hidden md:flex items-center space-x-6">
-            <Link href="/courses" className="text-gray-600 hover:text-blue-600 transition-colors">
-              Cursos
-            </Link>
-            <Link href="/about" className="text-gray-600 hover:text-blue-600 transition-colors">
-              Nosotros
-            </Link>
-            <Link href="/contact" className="text-gray-600 hover:text-blue-600 transition-colors">
-              Contacto
-            </Link>
-          </nav>
-          <div className="flex items-center space-x-3">
-            <Link href="/auth/login">
-              <Button variant="ghost">Iniciar Sesión</Button>
-            </Link>
-            <Link href="/auth/register">
-              <Button>Registrarse</Button>
-            </Link>
+        <div className="container mx-auto px-4 py-3 sm:py-4">
+          <div className="flex items-center justify-between">
+            {/* Logo - Mobile optimized */}
+            <div className="flex-shrink-0">
+              <img
+                src="/images/odontogeek-logo.png"
+                alt="OdontoGeek"
+                className="h-8 sm:h-10 md:h-12 w-auto max-w-[120px] sm:max-w-[150px] md:max-w-[200px]"
+              />
+            </div>
+
+            {/* Desktop Navigation */}
+            <nav className="hidden lg:flex items-center space-x-6">
+              <Link href="/courses" className="text-gray-600 hover:text-blue-600 transition-colors">
+                Cursos
+              </Link>
+              <Link href="/about" className="text-gray-600 hover:text-blue-600 transition-colors">
+                Nosotros
+              </Link>
+              <Link href="/contact" className="text-gray-600 hover:text-blue-600 transition-colors">
+                Contacto
+              </Link>
+            </nav>
+
+            {/* Auth Buttons - Mobile optimized */}
+            <div className="flex items-center space-x-2 sm:space-x-3">
+              <Link href="/auth/login">
+                <Button variant="ghost" size="sm" className="text-xs sm:text-sm px-2 sm:px-3">
+                  Iniciar Sesión
+                </Button>
+              </Link>
+              <Link href="/auth/register">
+                <Button size="sm" className="text-xs sm:text-sm px-2 sm:px-3">
+                  Registrarse
+                </Button>
+              </Link>
+            </div>
           </div>
         </div>
       </header>
@@ -81,35 +96,35 @@ export default function HomePage() {
         <HeroCarousel />
       </section>
 
-      {/* Features */}
-      <section className="py-16 px-4 bg-white">
+      {/* Features - Mobile optimized */}
+      <section className="py-12 sm:py-16 px-4 bg-white">
         <div className="container mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-12">¿Por qué elegir OdontoGeek?</h2>
-          <div className="grid md:grid-cols-3 gap-8">
+          <h2 className="text-2xl sm:text-3xl font-bold text-center mb-8 sm:mb-12">¿Por qué elegir OdontoGeek?</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
             <div className="text-center">
-              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Users className="w-8 h-8 text-blue-600" />
+              <div className="w-12 h-12 sm:w-16 sm:h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Users className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600" />
               </div>
-              <h3 className="text-xl font-semibold mb-2">Expertos Reconocidos</h3>
-              <p className="text-gray-600">
+              <h3 className="text-lg sm:text-xl font-semibold mb-2">Expertos Reconocidos</h3>
+              <p className="text-sm sm:text-base text-gray-600">
                 Aprende de los mejores especialistas en odontología con años de experiencia clínica
               </p>
             </div>
             <div className="text-center">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <CheckCircle className="w-8 h-8 text-green-600" />
+              <div className="w-12 h-12 sm:w-16 sm:h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle className="w-6 h-6 sm:w-8 sm:h-8 text-green-600" />
               </div>
-              <h3 className="text-xl font-semibold mb-2">Certificación Oficial</h3>
-              <p className="text-gray-600">
+              <h3 className="text-lg sm:text-xl font-semibold mb-2">Certificación Oficial</h3>
+              <p className="text-sm sm:text-base text-gray-600">
                 Obtén certificados reconocidos que avalen tu formación continua profesional
               </p>
             </div>
             <div className="text-center">
-              <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Play className="w-8 h-8 text-purple-600" />
+              <div className="w-12 h-12 sm:w-16 sm:h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Play className="w-6 h-6 sm:w-8 sm:h-8 text-purple-600" />
               </div>
-              <h3 className="text-xl font-semibold mb-2">Acceso 24/7</h3>
-              <p className="text-gray-600">
+              <h3 className="text-lg sm:text-xl font-semibold mb-2">Acceso 24/7</h3>
+              <p className="text-sm sm:text-base text-gray-600">
                 Estudia a tu ritmo con acceso ilimitado a todos los contenidos desde cualquier dispositivo
               </p>
             </div>
@@ -117,11 +132,11 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Featured Courses */}
-      <section className="py-16 px-4 bg-gray-50">
+      {/* Featured Courses - Mobile optimized */}
+      <section className="py-12 sm:py-16 px-4 bg-gray-50">
         <div className="container mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-12">Cursos Destacados</h2>
-          <div className="grid md:grid-cols-3 gap-8">
+          <h2 className="text-2xl sm:text-3xl font-bold text-center mb-8 sm:mb-12">Cursos Destacados</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
             {featuredCourses.map((course) => (
               <Card key={course.id} className="overflow-hidden hover:shadow-lg transition-shadow">
                 <div className="aspect-video bg-gray-200 relative">
@@ -130,24 +145,26 @@ export default function HomePage() {
                     alt={course.title}
                     className="w-full h-full object-cover"
                   />
-                  <Badge className="absolute top-3 right-3 bg-blue-600">${course.price}</Badge>
+                  <Badge className="absolute top-3 right-3 bg-blue-600 text-xs sm:text-sm">${course.price}</Badge>
                 </div>
-                <CardHeader>
-                  <CardTitle className="text-lg">{course.title}</CardTitle>
-                  <CardDescription>{course.description}</CardDescription>
+                <CardHeader className="p-4 sm:p-6">
+                  <CardTitle className="text-base sm:text-lg">{course.title}</CardTitle>
+                  <CardDescription className="text-sm">{course.description}</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
+                <CardContent className="p-4 sm:p-6 pt-0">
+                  <div className="flex items-center justify-between text-xs sm:text-sm text-gray-600 mb-4">
                     <span>{course.duration}</span>
                     <div className="flex items-center">
-                      <Star className="w-4 h-4 text-yellow-400 fill-current mr-1" />
+                      <Star className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-400 fill-current mr-1" />
                       <span>{course.rating}</span>
                     </div>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">{course.students} estudiantes</span>
+                    <span className="text-xs sm:text-sm text-gray-600">{course.students} estudiantes</span>
                     <Link href={`/courses/${course.id}`}>
-                      <Button size="sm">Ver Curso</Button>
+                      <Button size="sm" className="text-xs sm:text-sm">
+                        Ver Curso
+                      </Button>
                     </Link>
                   </div>
                 </CardContent>
@@ -157,35 +174,43 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-20 px-4 bg-blue-600 text-white">
+      {/* CTA Section - Mobile optimized */}
+      <section className="py-16 sm:py-20 px-4 bg-blue-600 text-white">
         <div className="container mx-auto text-center">
-          <h2 className="text-4xl font-bold mb-6">Comienza tu Actualización Continua Hoy</h2>
-          <p className="text-xl mb-8 opacity-90 max-w-2xl mx-auto">
+          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-4 sm:mb-6">
+            Comienza tu Actualización Continua Hoy
+          </h2>
+          <p className="text-base sm:text-lg lg:text-xl mb-6 sm:mb-8 opacity-90 max-w-2xl mx-auto">
             Únete a más de 10,000 profesionales que ya han mejorado sus habilidades con OdontoGeek
           </p>
           <Link href="/auth/register">
-            <Button size="lg" variant="secondary" className="text-lg px-8 py-3">
+            <Button size="lg" variant="secondary" className="text-sm sm:text-base lg:text-lg px-6 sm:px-8 py-3">
               Registrarse Gratis
             </Button>
           </Link>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="bg-gray-900 text-white py-12 px-4">
+      {/* Footer - Mobile optimized */}
+      <footer className="bg-gray-900 text-white py-8 sm:py-12 px-4">
         <div className="container mx-auto">
-          <div className="grid md:grid-cols-4 gap-8">
-            <div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8">
+            <div className="col-span-2 md:col-span-1">
               <div className="flex items-center space-x-2 mb-4">
-                <img src="/images/odontogeek-logo.png" alt="OdontoGeek" className="h-10 w-auto brightness-0 invert" />
+                <img
+                  src="/images/odontogeek-logo.png"
+                  alt="OdontoGeek"
+                  className="h-8 sm:h-10 w-auto brightness-0 invert"
+                />
               </div>
-              <p className="text-gray-400">La plataforma líder en actualización continua odontológica</p>
-              <p className="text-sm text-gray-500 mt-2">Actualización continua.</p>
+              <p className="text-sm sm:text-base text-gray-400 mb-2">
+                La plataforma líder en actualización continua odontológica
+              </p>
+              <p className="text-xs sm:text-sm text-gray-500">Actualización continua.</p>
             </div>
             <div>
-              <h3 className="font-semibold mb-4">Cursos</h3>
-              <ul className="space-y-2 text-gray-400">
+              <h3 className="font-semibold mb-3 sm:mb-4 text-sm sm:text-base">Cursos</h3>
+              <ul className="space-y-2 text-gray-400 text-xs sm:text-sm">
                 <li>
                   <Link href="/courses" className="hover:text-white">
                     Implantología
@@ -209,8 +234,8 @@ export default function HomePage() {
               </ul>
             </div>
             <div>
-              <h3 className="font-semibold mb-4">Empresa</h3>
-              <ul className="space-y-2 text-gray-400">
+              <h3 className="font-semibold mb-3 sm:mb-4 text-sm sm:text-base">Empresa</h3>
+              <ul className="space-y-2 text-gray-400 text-xs sm:text-sm">
                 <li>
                   <Link href="/about" className="hover:text-white">
                     Nosotros
@@ -234,8 +259,8 @@ export default function HomePage() {
               </ul>
             </div>
             <div>
-              <h3 className="font-semibold mb-4">Soporte</h3>
-              <ul className="space-y-2 text-gray-400">
+              <h3 className="font-semibold mb-3 sm:mb-4 text-sm sm:text-base">Soporte</h3>
+              <ul className="space-y-2 text-gray-400 text-xs sm:text-sm">
                 <li>
                   <Link href="/help" className="hover:text-white">
                     Centro de Ayuda
@@ -254,8 +279,8 @@ export default function HomePage() {
               </ul>
             </div>
           </div>
-          <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
-            <p>&copy; 2024 OdontoGeek. Todos los derechos reservados.</p>
+          <div className="border-t border-gray-800 mt-6 sm:mt-8 pt-6 sm:pt-8 text-center text-gray-400">
+            <p className="text-xs sm:text-sm">&copy; 2024 OdontoGeek. Todos los derechos reservados.</p>
           </div>
         </div>
       </footer>
