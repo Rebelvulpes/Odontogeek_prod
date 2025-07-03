@@ -23,12 +23,14 @@ import {
   Edit,
   Trash2,
   Eye,
+  EyeOff,
   Clock,
   LinkIcon,
   Menu,
   Home,
   Settings,
   LogOut,
+  Archive,
 } from "lucide-react"
 
 const AdminPage = () => {
@@ -224,6 +226,69 @@ const AdminPage = () => {
       } catch (error) {
         console.error("Error eliminando lección:", error)
         alert("Error eliminando lección")
+      }
+    }
+  }
+
+  // Nuevas funciones para cursos
+  const handleArchiveCourse = async (courseId: string) => {
+    console.log("Intentando archivar curso con ID:", courseId)
+
+    if (!courseId || courseId === "undefined" || courseId === "null") {
+      alert("Error: ID de curso no válido")
+      return
+    }
+
+    if (
+      confirm("¿Estás seguro de que quieres archivar este curso? Se ocultará de la vista pública pero no se eliminará.")
+    ) {
+      try {
+        const response = await fetch(`/api/admin/courses/${courseId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ archived: true }),
+        })
+        const result = await response.json()
+        if (result.success) {
+          loadCourses()
+          alert("Curso archivado exitosamente")
+        } else {
+          alert(result.message)
+        }
+      } catch (error) {
+        console.error("Error archivando curso:", error)
+        alert("Error archivando curso")
+      }
+    }
+  }
+
+  const handleDeleteCourse = async (courseId: string) => {
+    console.log("Intentando eliminar curso con ID:", courseId)
+
+    if (!courseId || courseId === "undefined" || courseId === "null") {
+      alert("Error: ID de curso no válido")
+      return
+    }
+
+    if (
+      confirm(
+        "¿Estás seguro de que quieres ELIMINAR DEFINITIVAMENTE este curso? Esta acción eliminará también todas sus lecciones y no se puede deshacer.",
+      )
+    ) {
+      try {
+        const response = await fetch(`/api/admin/courses/${courseId}`, {
+          method: "DELETE",
+        })
+        const result = await response.json()
+        if (result.success) {
+          loadCourses()
+          alert(result.message)
+        } else {
+          alert(result.message)
+        }
+      } catch (error) {
+        console.error("Error eliminando curso:", error)
+        alert("Error eliminando curso")
       }
     }
   }
@@ -430,7 +495,7 @@ const AdminPage = () => {
                         <TableHead className="min-w-[100px]">Ingresos</TableHead>
                         <TableHead className="min-w-[100px]">Lecciones</TableHead>
                         <TableHead className="min-w-[80px]">Estado</TableHead>
-                        <TableHead className="min-w-[120px]">Acciones</TableHead>
+                        <TableHead className="min-w-[150px]">Acciones</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -438,7 +503,14 @@ const AdminPage = () => {
                         <TableRow key={course.id}>
                           <TableCell>
                             <div>
-                              <p className="font-medium text-sm sm:text-base">{course.title}</p>
+                              <div className="flex items-center space-x-2">
+                                <p className="font-medium text-sm sm:text-base">{course.title}</p>
+                                {course.archived && (
+                                  <Badge variant="secondary" className="text-xs bg-gray-100 text-gray-600">
+                                    Archivado
+                                  </Badge>
+                                )}
+                              </div>
                               <p className="text-xs sm:text-sm text-gray-500">
                                 Creado: {course.created_at ? new Date(course.created_at).toLocaleDateString() : "N/A"}
                               </p>
@@ -466,14 +538,50 @@ const AdminPage = () => {
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center space-x-1">
-                              <Button variant="ghost" size="sm" onClick={() => openLessonDialog(course.id)}>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => openLessonDialog(course.id)}
+                                title="Agregar lección"
+                              >
                                 <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
                               </Button>
-                              <Button variant="ghost" size="sm">
+                              <Button variant="ghost" size="sm" title="Editar curso">
                                 <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
                               </Button>
-                              <Button variant="ghost" size="sm">
-                                <Eye className="w-3 h-3 sm:w-4 sm:h-4" />
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  if (course.id) {
+                                    handleArchiveCourse(course.id)
+                                  } else {
+                                    alert("Error: ID de curso no disponible")
+                                  }
+                                }}
+                                className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                                title={course.archived ? "Curso archivado" : "Archivar curso"}
+                              >
+                                {course.archived ? (
+                                  <EyeOff className="w-3 h-3 sm:w-4 sm:h-4" />
+                                ) : (
+                                  <Archive className="w-3 h-3 sm:w-4 sm:h-4" />
+                                )}
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  if (course.id) {
+                                    handleDeleteCourse(course.id)
+                                  } else {
+                                    alert("Error: ID de curso no disponible")
+                                  }
+                                }}
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                title="Eliminar definitivamente"
+                              >
+                                <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
                               </Button>
                             </div>
                           </TableCell>
@@ -495,7 +603,14 @@ const AdminPage = () => {
                   <CardHeader className="p-4 sm:p-6">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <div>
-                        <CardTitle className="text-base sm:text-lg">{course.title}</CardTitle>
+                        <div className="flex items-center space-x-2">
+                          <CardTitle className="text-base sm:text-lg">{course.title}</CardTitle>
+                          {course.archived && (
+                            <Badge variant="secondary" className="text-xs bg-gray-100 text-gray-600">
+                              Archivado
+                            </Badge>
+                          )}
+                        </div>
                         <CardDescription className="text-sm">
                           {course.lessons?.length || 0} lecciones configuradas
                         </CardDescription>

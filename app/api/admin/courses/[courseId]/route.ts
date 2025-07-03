@@ -38,9 +38,35 @@ export async function GET(req: NextRequest, { params }: { params: { courseId: st
 
 export async function PUT(req: NextRequest, { params }: { params: { courseId: string } }) {
   try {
-    const { title, description, price, instructor, duration_hours, status } = await req.json()
-
+    const body = await req.json()
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+    // Si solo se está archivando/desarchivando
+    if ("archived" in body && Object.keys(body).length === 1) {
+      const { data: updatedCourse, error } = await supabase
+        .from("courses")
+        .update({
+          archived: body.archived,
+        })
+        .eq("id", params.courseId)
+        .select()
+
+      if (error) {
+        return NextResponse.json({
+          success: false,
+          message: `Error ${body.archived ? "archivando" : "desarchivando"} curso: ${error.message}`,
+        })
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: `Curso ${body.archived ? "archivado" : "desarchivado"} exitosamente`,
+        data: updatedCourse[0],
+      })
+    }
+
+    // Actualización completa del curso
+    const { title, description, price, instructor, duration_hours, status } = body
 
     const { data: updatedCourse, error } = await supabase
       .from("courses")
@@ -78,6 +104,41 @@ export async function DELETE(req: NextRequest, { params }: { params: { courseId:
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
+    // Verificar si el curso tiene lecciones
+    const { data: lessons, error: lessonsError } = await supabase
+      .from("lessons")
+      .select("id")
+      .eq("course_id", params.courseId)
+
+    if (lessonsError) {
+      return NextResponse.json({
+        success: false,
+        message: `Error verificando lecciones: ${lessonsError.message}`,
+      })
+    }
+
+    // Verificar si hay inscripciones
+    const { data: enrollments, error: enrollmentsError } = await supabase
+      .from("enrollments")
+      .select("id")
+      .eq("course_id", params.courseId)
+
+    if (enrollmentsError) {
+      return NextResponse.json({
+        success: false,
+        message: `Error verificando inscripciones: ${enrollmentsError.message}`,
+      })
+    }
+
+    // Si hay inscripciones, no permitir eliminación
+    if (enrollments && enrollments.length > 0) {
+      return NextResponse.json({
+        success: false,
+        message: `No se puede eliminar el curso porque tiene ${enrollments.length} estudiantes inscritos. Considera archivarlo en su lugar.`,
+      })
+    }
+
+    // Eliminar el curso (las lecciones se eliminarán automáticamente por CASCADE)
     const { error } = await supabase.from("courses").delete().eq("id", params.courseId)
 
     if (error) {
@@ -89,7 +150,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { courseId:
 
     return NextResponse.json({
       success: true,
-      message: "Curso eliminado exitosamente",
+      message: `Curso eliminado exitosamente${lessons && lessons.length > 0 ? ` junto con ${lessons.length} lecciones` : ""}`,
     })
   } catch (error) {
     return NextResponse.json({
