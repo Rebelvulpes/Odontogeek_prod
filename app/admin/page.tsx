@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -31,75 +31,15 @@ import {
   LogOut,
 } from "lucide-react"
 
-const courses = [
-  {
-    id: 1,
-    title: "Implantología Avanzada",
-    students: 1250,
-    revenue: 373750,
-    status: "Publicado",
-    videos: 24,
-    createdAt: "2024-01-15",
-    lessons: [
-      {
-        id: 1,
-        title: "Introducción a la Implantología",
-        description: "Conceptos básicos y fundamentos",
-        videoUrl: "https://vz-12345.b-cdn.net/intro-implantologia.mp4",
-        duration: 45,
-        order: 1,
-        isFree: true,
-      },
-      {
-        id: 2,
-        title: "Planificación del Tratamiento",
-        description: "Evaluación del paciente y planificación",
-        videoUrl: "https://vz-12345.b-cdn.net/planificacion-tratamiento.mp4",
-        duration: 60,
-        order: 2,
-        isFree: false,
-      },
-    ],
-  },
-  {
-    id: 2,
-    title: "Endodoncia Contemporánea",
-    students: 890,
-    revenue: 177100,
-    status: "Publicado",
-    videos: 18,
-    createdAt: "2024-02-01",
-    lessons: [],
-  },
-]
-
-const users = [
-  {
-    id: 1,
-    name: "Dr. Juan Pérez",
-    email: "juan@ejemplo.com",
-    courses: 2,
-    spent: 498,
-    joinDate: "2024-01-10",
-  },
-  {
-    id: 2,
-    name: "Dra. María García",
-    email: "maria@ejemplo.com",
-    courses: 3,
-    spent: 897,
-    joinDate: "2024-01-15",
-  },
-]
-
-export default function AdminPage() {
+const AdminPage = () => {
+  const [courses, setCourses] = useState([])
+  const [users, setUsers] = useState([])
   const [newCourse, setNewCourse] = useState({
     title: "",
     description: "",
     price: "",
     instructor: "",
   })
-
   const [selectedCourse, setSelectedCourse] = useState<number | null>(null)
   const [isLessonDialogOpen, setIsLessonDialogOpen] = useState(false)
   const [editingLesson, setEditingLesson] = useState<any>(null)
@@ -113,25 +53,71 @@ export default function AdminPage() {
     isFree: false,
   })
 
-  const handleCreateCourse = (e: React.FormEvent) => {
-    e.preventDefault()
-    console.log("Nuevo curso:", newCourse)
-    // Aquí implementarías la creación del curso
+  const loadCourses = async () => {
+    try {
+      const response = await fetch("/api/admin/courses")
+      const result = await response.json()
+      if (result.success) {
+        setCourses(result.data)
+      }
+    } catch (error) {
+      console.error("Error cargando cursos:", error)
+    }
   }
 
-  const handleCreateLesson = (e: React.FormEvent) => {
+  useEffect(() => {
+    loadCourses()
+  }, [])
+
+  const handleCreateCourse = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log("Nueva lección:", newLesson, "para curso:", selectedCourse)
-    // Aquí implementarías la creación de la lección
-    setIsLessonDialogOpen(false)
-    setNewLesson({
-      title: "",
-      description: "",
-      videoUrl: "",
-      duration: "",
-      order: "",
-      isFree: false,
-    })
+    try {
+      const response = await fetch("/api/admin/courses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newCourse),
+      })
+      const result = await response.json()
+      if (result.success) {
+        setNewCourse({ title: "", description: "", price: "", instructor: "" })
+        loadCourses() // Recargar cursos
+        alert("Curso creado exitosamente!")
+      } else {
+        alert(result.message)
+      }
+    } catch (error) {
+      alert("Error creando curso")
+    }
+  }
+
+  const handleCreateLesson = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      const response = await fetch("/api/admin/lessons", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          course_id: selectedCourse,
+          title: newLesson.title,
+          description: newLesson.description,
+          video_url: newLesson.videoUrl,
+          duration_minutes: Number.parseInt(newLesson.duration),
+          order_index: Number.parseInt(newLesson.order),
+          is_free: newLesson.isFree,
+        }),
+      })
+      const result = await response.json()
+      if (result.success) {
+        setIsLessonDialogOpen(false)
+        setNewLesson({ title: "", description: "", videoUrl: "", duration: "", order: "", isFree: false })
+        loadCourses() // Recargar cursos
+        alert("Lección creada exitosamente!")
+      } else {
+        alert(result.message)
+      }
+    } catch (error) {
+      alert("Error creando lección")
+    }
   }
 
   const openLessonDialog = (courseId: number, lesson?: any) => {
@@ -367,8 +353,8 @@ export default function AdminPage() {
                               <p className="text-xs sm:text-sm text-gray-500">Creado: {course.createdAt}</p>
                             </div>
                           </TableCell>
-                          <TableCell className="text-sm sm:text-base">{course.students.toLocaleString()}</TableCell>
-                          <TableCell className="text-sm sm:text-base">${course.revenue.toLocaleString()}</TableCell>
+                          <TableCell className="text-sm sm:text-base">{course.students?.toLocaleString()}</TableCell>
+                          <TableCell className="text-sm sm:text-base">${course.revenue?.toLocaleString()}</TableCell>
                           <TableCell>
                             <div className="flex items-center space-x-2">
                               <Video className="w-3 h-3 sm:w-4 sm:h-4 text-gray-500" />
@@ -773,3 +759,5 @@ export default function AdminPage() {
     </div>
   )
 }
+
+export default AdminPage
