@@ -52,6 +52,7 @@ const AdminPage = () => {
     order: "",
     isFree: false,
   })
+  const [isCreateCourseDialogOpen, setIsCreateCourseDialogOpen] = useState(false)
 
   const loadCourses = async () => {
     try {
@@ -308,22 +309,18 @@ const AdminPage = () => {
         {/* Tabs - Mobile optimized */}
         <Tabs defaultValue="courses" className="space-y-4 sm:space-y-6">
           <div className="overflow-x-auto">
-            <TabsList className="grid w-full grid-cols-4 min-w-[400px] sm:min-w-0">
+            <TabsList className="grid w-full grid-cols-3 min-w-[300px] sm:min-w-0">
               <TabsTrigger value="courses" className="text-xs sm:text-sm">
                 <BookOpen className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                <span className="hidden sm:inline">Gestión de </span> Cursos
+                <span className="hidden sm:inline">Gestión de </span>Cursos
               </TabsTrigger>
               <TabsTrigger value="lessons" className="text-xs sm:text-sm">
                 <Video className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                <span className="hidden sm:inline">Gestión de </span> Lecciones
+                <span className="hidden sm:inline">Gestión de </span>Lecciones
               </TabsTrigger>
               <TabsTrigger value="users" className="text-xs sm:text-sm">
                 <Users className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
                 Usuarios
-              </TabsTrigger>
-              <TabsTrigger value="create" className="text-xs sm:text-sm">
-                <Plus className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                <span className="hidden sm:inline">Crear </span> Contenido
               </TabsTrigger>
             </TabsList>
           </div>
@@ -331,9 +328,9 @@ const AdminPage = () => {
           <TabsContent value="courses" className="space-y-4 sm:space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Cursos</h2>
-              <Button size="sm" className="w-full sm:w-auto">
+              <Button size="sm" className="w-full sm:w-auto" onClick={() => setIsCreateCourseDialogOpen(true)}>
                 <Plus className="w-4 h-4 mr-2" />
-                Nuevo Curso
+                Crear Contenido
               </Button>
             </div>
 
@@ -524,130 +521,6 @@ const AdminPage = () => {
               </CardContent>
             </Card>
           </TabsContent>
-
-          <TabsContent value="create" className="space-y-4 sm:space-y-6">
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Crear Nuevo Curso</h2>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base sm:text-lg">Información del Curso</CardTitle>
-                <CardDescription className="text-sm">
-                  Completa los detalles básicos del curso. Las lecciones se configuran después con enlaces de Bunny.net
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleCreateCourse} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="title" className="text-sm sm:text-base">
-                      Título del Curso
-                    </Label>
-                    <Input
-                      id="title"
-                      placeholder="Ej: Implantología Avanzada"
-                      value={newCourse.title}
-                      onChange={(e) => setNewCourse({ ...newCourse, title: e.target.value })}
-                      className="text-sm sm:text-base"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="description" className="text-sm sm:text-base">
-                      Descripción
-                    </Label>
-                    <Textarea
-                      id="description"
-                      placeholder="Describe el contenido del curso..."
-                      value={newCourse.description}
-                      onChange={(e) => setNewCourse({ ...newCourse, description: e.target.value })}
-                      className="text-sm sm:text-base"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="price" className="text-sm sm:text-base">
-                        Precio ($)
-                      </Label>
-                      <Input
-                        id="price"
-                        type="number"
-                        placeholder="299"
-                        value={newCourse.price}
-                        onChange={(e) => setNewCourse({ ...newCourse, price: e.target.value })}
-                        className="text-sm sm:text-base"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="instructor" className="text-sm sm:text-base">
-                        Instructor
-                      </Label>
-                      <Input
-                        id="instructor"
-                        placeholder="Dr. Juan Pérez"
-                        value={newCourse.instructor}
-                        onChange={(e) => setNewCourse({ ...newCourse, instructor: e.target.value })}
-                        className="text-sm sm:text-base"
-                      />
-                    </div>
-                  </div>
-
-                  <Button type="submit" className="w-full">
-                    Crear Curso
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2 text-base sm:text-lg">
-                  <img
-                    src="https://sjc.microlink.io/fwaEQxkrhQryOdc9uWl01AFU3L8KtJuDucDCGSljBKstN4yoPNLEati3Kpdm14J7I1V7spCnFfv827E1pXUsCg.jpeg"
-                    alt="Bunny.net"
-                    className="w-5 h-5 sm:w-6 sm:h-6 rounded"
-                  />
-                  <span>Integración con Bunny.net</span>
-                </CardTitle>
-                <CardDescription className="text-sm">
-                  Los videos se hospedan en Bunny.net para máximo rendimiento y velocidad global
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="bg-orange-50 p-3 sm:p-4 rounded-lg border border-orange-200">
-                    <h4 className="font-medium text-orange-900 mb-2 text-sm sm:text-base">Cómo configurar videos:</h4>
-                    <ol className="text-xs sm:text-sm text-orange-800 space-y-1">
-                      <li>1. Sube tus videos a tu cuenta de Bunny.net</li>
-                      <li>2. Copia el enlace directo del video (formato: https://vz-xxxxx.b-cdn.net/video.mp4)</li>
-                      <li>3. Usa ese enlace al crear lecciones en OdontoGeek</li>
-                      <li>4. Los videos se reproducirán con máxima velocidad para tus estudiantes</li>
-                    </ol>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs sm:text-sm">
-                    <div className="bg-green-50 p-3 rounded-lg">
-                      <h5 className="font-medium text-green-900">✓ Ventajas</h5>
-                      <ul className="text-green-700 mt-1 space-y-1">
-                        <li>• CDN global ultra-rápido</li>
-                        <li>• Reproducción adaptativa</li>
-                        <li>• Protección contra hotlinking</li>
-                        <li>• Analytics detallados</li>
-                      </ul>
-                    </div>
-                    <div className="bg-blue-50 p-3 rounded-lg">
-                      <h5 className="font-medium text-blue-900">📊 Formatos soportados</h5>
-                      <ul className="text-blue-700 mt-1 space-y-1">
-                        <li>• MP4 (recomendado)</li>
-                        <li>• WebM</li>
-                        <li>• MOV</li>
-                        <li>• Streaming HLS</li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
         </Tabs>
       </div>
 
@@ -766,6 +639,98 @@ const AdminPage = () => {
               </Button>
               <Button type="submit" className="w-full sm:w-auto">
                 {editingLesson ? "Actualizar Lección" : "Crear Lección"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+      {/* Dialog para crear curso */}
+      <Dialog open={isCreateCourseDialogOpen} onOpenChange={setIsCreateCourseDialogOpen}>
+        <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-base sm:text-lg">Crear Nuevo Curso</DialogTitle>
+            <DialogDescription className="text-sm">
+              Completa los detalles básicos del curso. Las lecciones se configuran después.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              handleCreateCourse(e)
+              setIsCreateCourseDialogOpen(false)
+            }}
+            className="space-y-4"
+          >
+            <div className="space-y-2">
+              <Label htmlFor="title" className="text-sm sm:text-base">
+                Título del Curso
+              </Label>
+              <Input
+                id="title"
+                placeholder="Ej: Implantología Avanzada"
+                value={newCourse.title}
+                onChange={(e) => setNewCourse({ ...newCourse, title: e.target.value })}
+                className="text-sm sm:text-base"
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="description" className="text-sm sm:text-base">
+                Descripción
+              </Label>
+              <Textarea
+                id="description"
+                placeholder="Describe el contenido del curso..."
+                value={newCourse.description}
+                onChange={(e) => setNewCourse({ ...newCourse, description: e.target.value })}
+                className="text-sm sm:text-base"
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="price" className="text-sm sm:text-base">
+                  Precio ($)
+                </Label>
+                <Input
+                  id="price"
+                  type="number"
+                  placeholder="299"
+                  value={newCourse.price}
+                  onChange={(e) => setNewCourse({ ...newCourse, price: e.target.value })}
+                  className="text-sm sm:text-base"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="instructor" className="text-sm sm:text-base">
+                  Instructor
+                </Label>
+                <Input
+                  id="instructor"
+                  placeholder="Dr. Juan Pérez"
+                  value={newCourse.instructor}
+                  onChange={(e) => setNewCourse({ ...newCourse, instructor: e.target.value })}
+                  className="text-sm sm:text-base"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-2 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsCreateCourseDialogOpen(false)}
+                className="w-full sm:w-auto"
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" className="w-full sm:w-auto">
+                Crear Curso
               </Button>
             </div>
           </form>
