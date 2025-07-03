@@ -58,7 +58,14 @@ const AdminPage = () => {
       const response = await fetch("/api/admin/courses")
       const result = await response.json()
       if (result.success) {
-        setCourses(result.data)
+        // Ensure lessons array exists for each course
+        const coursesWithLessons = result.data.map((course) => ({
+          ...course,
+          lessons: course.lessons || [],
+        }))
+        setCourses(coursesWithLessons)
+      } else {
+        console.error("Error loading courses:", result.message)
       }
     } catch (error) {
       console.error("Error cargando cursos:", error)
@@ -125,12 +132,12 @@ const AdminPage = () => {
     if (lesson) {
       setEditingLesson(lesson)
       setNewLesson({
-        title: lesson.title,
-        description: lesson.description,
-        videoUrl: lesson.videoUrl,
-        duration: lesson.duration.toString(),
-        order: lesson.order.toString(),
-        isFree: lesson.isFree,
+        title: lesson.title || "",
+        description: lesson.description || "",
+        videoUrl: lesson.video_url || "", // database uses video_url
+        duration: lesson.duration_minutes?.toString() || "", // database uses duration_minutes
+        order: lesson.order_index?.toString() || "", // database uses order_index
+        isFree: lesson.is_free || false, // database uses is_free
       })
     } else {
       setEditingLesson(null)
@@ -350,23 +357,29 @@ const AdminPage = () => {
                           <TableCell>
                             <div>
                               <p className="font-medium text-sm sm:text-base">{course.title}</p>
-                              <p className="text-xs sm:text-sm text-gray-500">Creado: {course.createdAt}</p>
+                              <p className="text-xs sm:text-sm text-gray-500">
+                                Creado: {course.created_at ? new Date(course.created_at).toLocaleDateString() : "N/A"}
+                              </p>
                             </div>
                           </TableCell>
-                          <TableCell className="text-sm sm:text-base">{course.students?.toLocaleString()}</TableCell>
-                          <TableCell className="text-sm sm:text-base">${course.revenue?.toLocaleString()}</TableCell>
+                          <TableCell className="text-sm sm:text-base">
+                            {(course.students || 0).toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-sm sm:text-base">
+                            ${(course.revenue || 0).toLocaleString()}
+                          </TableCell>
                           <TableCell>
                             <div className="flex items-center space-x-2">
                               <Video className="w-3 h-3 sm:w-4 sm:h-4 text-gray-500" />
-                              <span className="text-sm sm:text-base">{course.lessons?.length || 0}</span>
+                              <span className="text-sm sm:text-base">{course.lessonsCount || 0}</span>
                             </div>
                           </TableCell>
                           <TableCell>
                             <Badge
-                              variant={course.status === "Publicado" ? "default" : "secondary"}
+                              variant={course.status === "published" ? "default" : "secondary"}
                               className="text-xs"
                             >
-                              {course.status}
+                              {course.status === "published" ? "Publicado" : "Borrador"}
                             </Badge>
                           </TableCell>
                           <TableCell>
@@ -421,20 +434,22 @@ const AdminPage = () => {
                           >
                             <div className="flex items-center space-x-3">
                               <div className="w-6 h-6 sm:w-8 sm:h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                                <span className="text-xs sm:text-sm font-medium text-blue-600">{lesson.order}</span>
+                                <span className="text-xs sm:text-sm font-medium text-blue-600">
+                                  {lesson.order_index}
+                                </span>
                               </div>
                               <div className="min-w-0">
                                 <p className="font-medium text-sm sm:text-base truncate">{lesson.title}</p>
                                 <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-500">
                                   <div className="flex items-center space-x-1">
                                     <Clock className="w-3 h-3" />
-                                    <span>{lesson.duration} min</span>
+                                    <span>{lesson.duration_minutes} min</span>
                                   </div>
                                   <div className="flex items-center space-x-1">
                                     <LinkIcon className="w-3 h-3" />
                                     <span>Bunny.net</span>
                                   </div>
-                                  {lesson.isFree && (
+                                  {lesson.is_free && (
                                     <Badge variant="secondary" className="text-xs">
                                       Gratis
                                     </Badge>
