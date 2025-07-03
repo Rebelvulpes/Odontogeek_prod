@@ -10,14 +10,14 @@ import { CheckCircle, Clock, Users, Award, CreditCard } from "lucide-react"
 
 const courseData = {
   1: {
-    title: "Implantología Avanzada",
+    title: "Férulas Oclusales",
     description: "Técnicas modernas de implantes dentales con casos clínicos reales",
-    price: 299,
-    originalPrice: 399,
-    duration: "12 horas",
-    lessons: 24,
-    students: 1250,
-    instructor: "Dr. María González",
+    price: 4000,
+    originalPrice: 9999,
+    duration: "8 horas",
+    lessons: 4,
+    students: 0,
+    instructor: "Dra. Nydia Chávez",
     features: [
       "24 lecciones en video HD",
       "Casos clínicos reales",
