@@ -154,6 +154,48 @@ const AdminPage = () => {
     setIsLessonDialogOpen(true)
   }
 
+  const handleArchiveLesson = async (lessonId: string) => {
+    if (confirm("¿Estás seguro de que quieres archivar esta lección? Se ocultará pero no se eliminará.")) {
+      try {
+        const response = await fetch(`/api/admin/lessons/${lessonId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ archived: true }),
+        })
+        const result = await response.json()
+        if (result.success) {
+          loadCourses()
+          alert("Lección archivada exitosamente")
+        } else {
+          alert(result.message)
+        }
+      } catch (error) {
+        alert("Error archivando lección")
+      }
+    }
+  }
+
+  const handleDeleteLesson = async (lessonId: string) => {
+    if (
+      confirm("¿Estás seguro de que quieres ELIMINAR DEFINITIVAMENTE esta lección? Esta acción no se puede deshacer.")
+    ) {
+      try {
+        const response = await fetch(`/api/admin/lessons/${lessonId}`, {
+          method: "DELETE",
+        })
+        const result = await response.json()
+        if (result.success) {
+          loadCourses()
+          alert("Lección eliminada definitivamente")
+        } else {
+          alert(result.message)
+        }
+      } catch (error) {
+        alert("Error eliminando lección")
+      }
+    }
+  }
+
   const selectedCourseData = courses.find((c) => c.id === selectedCourse)
 
   // Navigation items
@@ -458,7 +500,20 @@ const AdminPage = () => {
                               <Button variant="ghost" size="sm" onClick={() => openLessonDialog(course.id, lesson)}>
                                 <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
                               </Button>
-                              <Button variant="ghost" size="sm">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleArchiveLesson(lesson.id)}
+                                className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                              >
+                                <Eye className="w-3 h-3 sm:w-4 sm:h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteLesson(lesson.id)}
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                              >
                                 <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
                               </Button>
                             </div>
