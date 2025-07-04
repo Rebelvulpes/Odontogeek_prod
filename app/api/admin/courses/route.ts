@@ -8,11 +8,13 @@ export async function GET() {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Primero obtener todos los cursos
-    const { data: courses, error: coursesError } = await supabase
-      .from("courses")
-      .select("*")
-      .order("created_at", { ascending: false })
+    // Usar la función personalizada para obtener cursos con etiquetas
+    const { data: courses, error: coursesError } = await supabase.rpc("get_courses_with_tags", {
+      p_limit: 100, // Límite alto para admin
+      p_offset: 0,
+      p_tag_slugs: null,
+      p_search: null,
+    })
 
     if (coursesError) {
       return NextResponse.json({
@@ -21,26 +23,9 @@ export async function GET() {
       })
     }
 
-    // Luego obtener las lecciones para cada curso
+    // Obtener datos adicionales para cada curso
     const coursesWithStats = await Promise.all(
       courses.map(async (course) => {
-        // Obtener lecciones del curso
-        const { data: lessons, error: lessonsError } = await supabase
-          .from("lessons")
-          .select("*")
-          .eq("course_id", course.id)
-          .order("order_index", { ascending: true })
-
-        if (lessonsError) {
-          console.error(`Error obteniendo lecciones para curso ${course.id}:`, lessonsError)
-        }
-
-        // Obtener número de estudiantes inscritos
-        const { count: studentsCount } = await supabase
-          .from("enrollments")
-          .select("*", { count: "exact", head: true })
-          .eq("course_id", course.id)
-
         // Obtener ingresos totales
         const { data: payments } = await supabase
           .from("payments")
@@ -52,10 +37,9 @@ export async function GET() {
 
         return {
           ...course,
-          lessons: lessons || [],
-          students: studentsCount || 0,
           revenue: totalRevenue,
-          lessonsCount: lessons?.length || 0,
+          lessonsCount: course.lessons_count || 0,
+          students: course.students_count || 0,
         }
       }),
     )
@@ -75,7 +59,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const { title, description, price, instructor, duration_hours } = await req.json()
+    const { title, description, price, instructor, duration_hours, tags } = await req.json()
 
     if (!title || !description || !price || !instructor) {
       return NextResponse.json({
@@ -106,6 +90,23 @@ export async function POST(req: NextRequest) {
         success: false,
         message: `Error creando curso: ${createError.message}`,
       })
+    }
+
+    const courseId = newCourse[0].id
+
+    // Asociar etiquetas si se proporcionaron
+    if (tags && tags.length > 0) {
+      const tagRelations = tags.map((tagId: string) => ({
+        course_id: courseId,
+        tag_id: tagId,
+      }))
+
+      const { error: tagsError } = await supabase.from("course_tag_relations").insert(tagRelations)
+
+      if (tagsError) {
+        console.error("Error asociando etiquetas:", tagsError)
+        // No fallar por esto, solo registrar el error
+      }
     }
 
     return NextResponse.json({

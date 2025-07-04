@@ -14,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Switch } from "@/components/ui/switch"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Video,
   Users,
@@ -31,17 +32,20 @@ import {
   Settings,
   LogOut,
   Archive,
+  Tag,
 } from "lucide-react"
 
 const AdminPage = () => {
   const [courses, setCourses] = useState([])
   const [users, setUsers] = useState([])
+  const [tags, setTags] = useState([])
   const [loading, setLoading] = useState(true)
   const [newCourse, setNewCourse] = useState({
     title: "",
     description: "",
     price: "",
     instructor: "",
+    tags: [],
   })
   const [selectedCourse, setSelectedCourse] = useState<number | null>(null)
   const [isLessonDialogOpen, setIsLessonDialogOpen] = useState(false)
@@ -56,6 +60,12 @@ const AdminPage = () => {
     isFree: false,
   })
   const [isCreateCourseDialogOpen, setIsCreateCourseDialogOpen] = useState(false)
+  const [isCreateTagDialogOpen, setIsCreateTagDialogOpen] = useState(false)
+  const [newTag, setNewTag] = useState({
+    name: "",
+    color: "#3B82F6",
+    description: "",
+  })
 
   const loadCourses = async () => {
     try {
@@ -87,8 +97,21 @@ const AdminPage = () => {
     }
   }
 
+  const loadTags = async () => {
+    try {
+      const response = await fetch("/api/course-tags")
+      const result = await response.json()
+      if (result.success) {
+        setTags(result.data)
+      }
+    } catch (error) {
+      console.error("Error cargando etiquetas:", error)
+    }
+  }
+
   useEffect(() => {
     loadCourses()
+    loadTags()
   }, [])
 
   const handleCreateCourse = async (e: React.FormEvent) => {
@@ -101,7 +124,8 @@ const AdminPage = () => {
       })
       const result = await response.json()
       if (result.success) {
-        setNewCourse({ title: "", description: "", price: "", instructor: "" })
+        setNewCourse({ title: "", description: "", price: "", instructor: "", tags: [] })
+        setIsCreateCourseDialogOpen(false)
         loadCourses() // Recargar cursos
         alert("Curso creado exitosamente!")
       } else {
@@ -109,6 +133,28 @@ const AdminPage = () => {
       }
     } catch (error) {
       alert("Error creando curso")
+    }
+  }
+
+  const handleCreateTag = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      const response = await fetch("/api/course-tags", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newTag),
+      })
+      const result = await response.json()
+      if (result.success) {
+        setNewTag({ name: "", color: "#3B82F6", description: "" })
+        setIsCreateTagDialogOpen(false)
+        loadTags() // Recargar etiquetas
+        alert("Etiqueta creada exitosamente!")
+      } else {
+        alert(result.message)
+      }
+    } catch (error) {
+      alert("Error creando etiqueta")
     }
   }
 
@@ -293,6 +339,13 @@ const AdminPage = () => {
     }
   }
 
+  const handleTagToggle = (tagId: string) => {
+    setNewCourse((prev) => ({
+      ...prev,
+      tags: prev.tags.includes(tagId) ? prev.tags.filter((id) => id !== tagId) : [...prev.tags, tagId],
+    }))
+  }
+
   const selectedCourseData = courses.find((c) => c.id === selectedCourse)
 
   // Navigation items
@@ -459,7 +512,7 @@ const AdminPage = () => {
         {/* Tabs - Mobile optimized */}
         <Tabs defaultValue="courses" className="space-y-4 sm:space-y-6">
           <div className="overflow-x-auto">
-            <TabsList className="grid w-full grid-cols-3 min-w-[300px] sm:min-w-0">
+            <TabsList className="grid w-full grid-cols-4 min-w-[400px] sm:min-w-0">
               <TabsTrigger value="courses" className="text-xs sm:text-sm">
                 <BookOpen className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
                 <span className="hidden sm:inline">Gestión de </span>Cursos
@@ -467,6 +520,10 @@ const AdminPage = () => {
               <TabsTrigger value="lessons" className="text-xs sm:text-sm">
                 <Video className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
                 <span className="hidden sm:inline">Gestión de </span>Lecciones
+              </TabsTrigger>
+              <TabsTrigger value="tags" className="text-xs sm:text-sm">
+                <Tag className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                Etiquetas
               </TabsTrigger>
               <TabsTrigger value="users" className="text-xs sm:text-sm">
                 <Users className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
@@ -480,7 +537,7 @@ const AdminPage = () => {
               <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Cursos</h2>
               <Button size="sm" className="w-full sm:w-auto" onClick={() => setIsCreateCourseDialogOpen(true)}>
                 <Plus className="w-4 h-4 mr-2" />
-                Crear Contenido
+                Crear Curso
               </Button>
             </div>
 
@@ -508,6 +565,23 @@ const AdminPage = () => {
                                 {course.archived && (
                                   <Badge variant="secondary" className="text-xs bg-gray-100 text-gray-600">
                                     Archivado
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {course.tags?.slice(0, 2).map((tag) => (
+                                  <Badge
+                                    key={tag.id}
+                                    variant="secondary"
+                                    className="text-xs"
+                                    style={{ backgroundColor: tag.color + "20", color: tag.color }}
+                                  >
+                                    {tag.name}
+                                  </Badge>
+                                ))}
+                                {course.tags?.length > 2 && (
+                                  <Badge variant="secondary" className="text-xs">
+                                    +{course.tags.length - 2}
                                   </Badge>
                                 )}
                               </div>
@@ -711,6 +785,37 @@ const AdminPage = () => {
             </div>
           </TabsContent>
 
+          <TabsContent value="tags" className="space-y-4 sm:space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Etiquetas de Cursos</h2>
+              <Button size="sm" className="w-full sm:w-auto" onClick={() => setIsCreateTagDialogOpen(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                Crear Etiqueta
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {tags.map((tag) => (
+                <Card key={tag.id} className="hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <Badge
+                        variant="secondary"
+                        className="text-sm font-medium"
+                        style={{ backgroundColor: tag.color + "20", color: tag.color }}
+                      >
+                        {tag.name}
+                      </Badge>
+                      <div className="w-4 h-4 rounded-full border" style={{ backgroundColor: tag.color }} />
+                    </div>
+                    <p className="text-sm text-gray-600 mb-2">{tag.description}</p>
+                    <p className="text-xs text-gray-400">Slug: {tag.slug}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </TabsContent>
+
           <TabsContent value="users" className="space-y-4 sm:space-y-6">
             <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Usuarios Registrados</h2>
 
@@ -877,6 +982,7 @@ const AdminPage = () => {
           </form>
         </DialogContent>
       </Dialog>
+
       {/* Dialog para crear curso */}
       <Dialog open={isCreateCourseDialogOpen} onOpenChange={setIsCreateCourseDialogOpen}>
         <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -887,14 +993,7 @@ const AdminPage = () => {
             </DialogDescription>
           </DialogHeader>
 
-          <form
-            onSubmit={(e) => {
-              e.preventDefault()
-              handleCreateCourse(e)
-              setIsCreateCourseDialogOpen(false)
-            }}
-            className="space-y-4"
-          >
+          <form onSubmit={handleCreateCourse} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="title" className="text-sm sm:text-base">
                 Título del Curso
@@ -953,6 +1052,26 @@ const AdminPage = () => {
               </div>
             </div>
 
+            {/* Selección de Etiquetas */}
+            <div className="space-y-2">
+              <Label className="text-sm sm:text-base">Etiquetas del Curso</Label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-40 overflow-y-auto p-2 border rounded-md">
+                {tags.map((tag) => (
+                  <div key={tag.id} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`tag-${tag.id}`}
+                      checked={newCourse.tags.includes(tag.id)}
+                      onCheckedChange={() => handleTagToggle(tag.id)}
+                    />
+                    <Label htmlFor={`tag-${tag.id}`} className="text-xs cursor-pointer" style={{ color: tag.color }}>
+                      {tag.name}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-gray-500">Selecciona las etiquetas que mejor describan este curso</p>
+            </div>
+
             <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-2 pt-4">
               <Button
                 type="button"
@@ -964,6 +1083,82 @@ const AdminPage = () => {
               </Button>
               <Button type="submit" className="w-full sm:w-auto">
                 Crear Curso
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para crear etiqueta */}
+      <Dialog open={isCreateTagDialogOpen} onOpenChange={setIsCreateTagDialogOpen}>
+        <DialogContent className="max-w-[95vw] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base sm:text-lg">Crear Nueva Etiqueta</DialogTitle>
+            <DialogDescription className="text-sm">
+              Crea una nueva etiqueta para categorizar los cursos
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleCreateTag} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="tagName" className="text-sm">
+                Nombre de la Etiqueta
+              </Label>
+              <Input
+                id="tagName"
+                placeholder="Ej: Cirugía Oral"
+                value={newTag.name}
+                onChange={(e) => setNewTag({ ...newTag, name: e.target.value })}
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="tagColor" className="text-sm">
+                Color
+              </Label>
+              <div className="flex items-center space-x-2">
+                <Input
+                  id="tagColor"
+                  type="color"
+                  value={newTag.color}
+                  onChange={(e) => setNewTag({ ...newTag, color: e.target.value })}
+                  className="w-16 h-10 p-1"
+                />
+                <Input
+                  type="text"
+                  value={newTag.color}
+                  onChange={(e) => setNewTag({ ...newTag, color: e.target.value })}
+                  placeholder="#3B82F6"
+                  className="flex-1"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="tagDescription" className="text-sm">
+                Descripción (Opcional)
+              </Label>
+              <Textarea
+                id="tagDescription"
+                placeholder="Describe el tipo de cursos que incluye esta etiqueta..."
+                value={newTag.description}
+                onChange={(e) => setNewTag({ ...newTag, description: e.target.value })}
+                rows={3}
+              />
+            </div>
+
+            <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-2 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsCreateTagDialogOpen(false)}
+                className="w-full sm:w-auto"
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" className="w-full sm:w-auto">
+                Crear Etiqueta
               </Button>
             </div>
           </form>
