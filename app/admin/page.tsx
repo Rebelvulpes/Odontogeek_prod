@@ -1343,9 +1343,9 @@ const AdminPage = () => {
               ¿Estás seguro de que quieres eliminar la etiqueta "{tagToDelete?.name}"? Esta acción no se puede deshacer.
               {tagToDelete && (
                 <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-md">
-                  <p className="text-xs text-yellow-800">
+                  <span className="text-xs text-yellow-800">
                     <strong>Nota:</strong> Si esta etiqueta está siendo usada por algún curso, no podrá ser eliminada.
-                  </p>
+                  </span>
                 </div>
               )}
             </AlertDialogDescription>
