@@ -16,6 +16,16 @@ import { Switch } from "@/components/ui/switch"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
   Video,
   Users,
   DollarSign,
@@ -61,6 +71,10 @@ const AdminPage = () => {
   })
   const [isCreateCourseDialogOpen, setIsCreateCourseDialogOpen] = useState(false)
   const [isCreateTagDialogOpen, setIsCreateTagDialogOpen] = useState(false)
+  const [isEditTagDialogOpen, setIsEditTagDialogOpen] = useState(false)
+  const [isDeleteTagDialogOpen, setIsDeleteTagDialogOpen] = useState(false)
+  const [editingTag, setEditingTag] = useState<any>(null)
+  const [tagToDelete, setTagToDelete] = useState<any>(null)
   const [newTag, setNewTag] = useState({
     name: "",
     color: "#3B82F6",
@@ -156,6 +170,65 @@ const AdminPage = () => {
     } catch (error) {
       alert("Error creando etiqueta")
     }
+  }
+
+  const handleEditTag = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingTag) return
+
+    try {
+      const response = await fetch(`/api/course-tags/${editingTag.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: editingTag.name,
+          color: editingTag.color,
+          description: editingTag.description,
+        }),
+      })
+      const result = await response.json()
+      if (result.success) {
+        setIsEditTagDialogOpen(false)
+        setEditingTag(null)
+        loadTags() // Recargar etiquetas
+        alert("Etiqueta actualizada exitosamente!")
+      } else {
+        alert(result.message)
+      }
+    } catch (error) {
+      alert("Error actualizando etiqueta")
+    }
+  }
+
+  const handleDeleteTag = async () => {
+    if (!tagToDelete) return
+
+    try {
+      const response = await fetch(`/api/course-tags/${tagToDelete.id}`, {
+        method: "DELETE",
+      })
+      const result = await response.json()
+      if (result.success) {
+        setIsDeleteTagDialogOpen(false)
+        setTagToDelete(null)
+        loadTags() // Recargar etiquetas
+        alert("Etiqueta eliminada exitosamente!")
+      } else {
+        alert(result.message)
+      }
+    } catch (error) {
+      alert("Error eliminando etiqueta")
+    }
+  }
+
+  const openEditTagDialog = (tag: any) => {
+    setEditingTag({ ...tag })
+    setIsEditTagDialogOpen(true)
+  }
+
+  const openDeleteTagDialog = (tag: any) => {
+    setTagToDelete(tag)
+    setIsDeleteTagDialogOpen(true)
   }
 
   const handleCreateLesson = async (e: React.FormEvent) => {
@@ -809,7 +882,29 @@ const AdminPage = () => {
                       <div className="w-4 h-4 rounded-full border" style={{ backgroundColor: tag.color }} />
                     </div>
                     <p className="text-sm text-gray-600 mb-2">{tag.description}</p>
-                    <p className="text-xs text-gray-400">Slug: {tag.slug}</p>
+                    <p className="text-xs text-gray-400 mb-3">Slug: {tag.slug}</p>
+
+                    {/* Botones de acción */}
+                    <div className="flex items-center justify-end space-x-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openEditTagDialog(tag)}
+                        className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                        title="Editar etiqueta"
+                      >
+                        <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openDeleteTagDialog(tag)}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        title="Eliminar etiqueta"
+                      >
+                        <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               ))}
@@ -1164,6 +1259,105 @@ const AdminPage = () => {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Dialog para editar etiqueta */}
+      <Dialog open={isEditTagDialogOpen} onOpenChange={setIsEditTagDialogOpen}>
+        <DialogContent className="max-w-[95vw] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base sm:text-lg">Editar Etiqueta</DialogTitle>
+            <DialogDescription className="text-sm">Modifica los detalles de la etiqueta</DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleEditTag} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="editTagName" className="text-sm">
+                Nombre de la Etiqueta
+              </Label>
+              <Input
+                id="editTagName"
+                placeholder="Ej: Cirugía Oral"
+                value={editingTag?.name || ""}
+                onChange={(e) => setEditingTag({ ...editingTag, name: e.target.value })}
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="editTagColor" className="text-sm">
+                Color
+              </Label>
+              <div className="flex items-center space-x-2">
+                <Input
+                  id="editTagColor"
+                  type="color"
+                  value={editingTag?.color || "#3B82F6"}
+                  onChange={(e) => setEditingTag({ ...editingTag, color: e.target.value })}
+                  className="w-16 h-10 p-1"
+                />
+                <Input
+                  type="text"
+                  value={editingTag?.color || "#3B82F6"}
+                  onChange={(e) => setEditingTag({ ...editingTag, color: e.target.value })}
+                  placeholder="#3B82F6"
+                  className="flex-1"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="editTagDescription" className="text-sm">
+                Descripción (Opcional)
+              </Label>
+              <Textarea
+                id="editTagDescription"
+                placeholder="Describe el tipo de cursos que incluye esta etiqueta..."
+                value={editingTag?.description || ""}
+                onChange={(e) => setEditingTag({ ...editingTag, description: e.target.value })}
+                rows={3}
+              />
+            </div>
+
+            <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-2 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsEditTagDialogOpen(false)}
+                className="w-full sm:w-auto"
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" className="w-full sm:w-auto">
+                Actualizar Etiqueta
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de confirmación para eliminar etiqueta */}
+      <AlertDialog open={isDeleteTagDialogOpen} onOpenChange={setIsDeleteTagDialogOpen}>
+        <AlertDialogContent className="max-w-[95vw] sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-base sm:text-lg">¿Eliminar Etiqueta?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm">
+              ¿Estás seguro de que quieres eliminar la etiqueta "{tagToDelete?.name}"? Esta acción no se puede deshacer.
+              {tagToDelete && (
+                <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-md">
+                  <p className="text-xs text-yellow-800">
+                    <strong>Nota:</strong> Si esta etiqueta está siendo usada por algún curso, no podrá ser eliminada.
+                  </p>
+                </div>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex flex-col sm:flex-row gap-2">
+            <AlertDialogCancel className="w-full sm:w-auto">Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteTag} className="w-full sm:w-auto bg-red-600 hover:bg-red-700">
+              Eliminar Etiqueta
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
