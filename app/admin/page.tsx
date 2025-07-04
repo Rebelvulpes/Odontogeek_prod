@@ -51,6 +51,12 @@ const AdminPage = () => {
   const [courses, setCourses] = useState([])
   const [users, setUsers] = useState([])
   const [tags, setTags] = useState([])
+  const [stats, setStats] = useState({
+    totalUsers: 0,
+    totalCourses: 0,
+    totalLessons: 0,
+    totalRevenue: 0,
+  })
   const [loading, setLoading] = useState(true)
   const [newCourse, setNewCourse] = useState({
     title: "",
@@ -86,6 +92,20 @@ const AdminPage = () => {
   })
   const [isEditCourseDialogOpen, setIsEditCourseDialogOpen] = useState(false)
   const [editingCourse, setEditingCourse] = useState<any>(null)
+
+  const loadStats = async () => {
+    try {
+      const response = await fetch("/api/admin/stats")
+      const result = await response.json()
+      if (result.success) {
+        setStats(result.data)
+      } else {
+        console.error("Error cargando estadísticas:", result.message)
+      }
+    } catch (error) {
+      console.error("Error cargando estadísticas:", error)
+    }
+  }
 
   const loadCourses = async () => {
     try {
@@ -130,6 +150,7 @@ const AdminPage = () => {
   }
 
   useEffect(() => {
+    loadStats()
     loadCourses()
     loadTags()
   }, [])
@@ -158,6 +179,7 @@ const AdminPage = () => {
         })
         setIsCreateCourseDialogOpen(false)
         loadCourses() // Recargar cursos
+        loadStats() // Recargar estadísticas
         alert("Curso creado exitosamente!")
       } else {
         alert(result.message)
@@ -269,6 +291,7 @@ const AdminPage = () => {
         setIsLessonDialogOpen(false)
         setNewLesson({ title: "", description: "", videoUrl: "", duration: "", order: "", isFree: false })
         loadCourses() // Recargar cursos
+        loadStats() // Recargar estadísticas
         alert("Lección creada exitosamente!")
       } else {
         alert(result.message)
@@ -325,6 +348,7 @@ const AdminPage = () => {
         const result = await response.json()
         if (result.success) {
           loadCourses()
+          loadStats()
           alert("Lección archivada exitosamente")
         } else {
           alert(result.message)
@@ -355,6 +379,7 @@ const AdminPage = () => {
         const result = await response.json()
         if (result.success) {
           loadCourses()
+          loadStats()
           alert("Lección eliminada definitivamente")
         } else {
           alert(result.message)
@@ -387,6 +412,7 @@ const AdminPage = () => {
         const result = await response.json()
         if (result.success) {
           loadCourses()
+          loadStats()
           alert("Curso archivado exitosamente")
         } else {
           alert(result.message)
@@ -418,6 +444,7 @@ const AdminPage = () => {
         const result = await response.json()
         if (result.success) {
           loadCourses()
+          loadStats()
           alert(result.message)
         } else {
           alert(result.message)
@@ -484,6 +511,7 @@ const AdminPage = () => {
         setIsEditCourseDialogOpen(false)
         setEditingCourse(null)
         loadCourses()
+        loadStats()
         alert("Curso actualizado exitosamente!")
       } else {
         alert(result.message)
@@ -604,14 +632,16 @@ const AdminPage = () => {
       </header>
 
       <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
-        {/* Stats Cards - Mobile optimized */}
+        {/* Stats Cards - Mobile optimized con datos reales */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 mb-6 sm:mb-8">
           <Card>
             <CardContent className="p-3 sm:p-4 lg:p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs sm:text-sm font-medium text-gray-600">Total Usuarios</p>
-                  <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">2,847</p>
+                  <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">
+                    {stats.totalUsers.toLocaleString()}
+                  </p>
                 </div>
                 <Users className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-blue-500" />
               </div>
@@ -623,7 +653,9 @@ const AdminPage = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs sm:text-sm font-medium text-gray-600">Ingresos</p>
-                  <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">$810K</p>
+                  <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">
+                    ${stats.totalRevenue.toLocaleString()}
+                  </p>
                 </div>
                 <DollarSign className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-green-500" />
               </div>
@@ -635,7 +667,7 @@ const AdminPage = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs sm:text-sm font-medium text-gray-600">Cursos</p>
-                  <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">{courses.length}</p>
+                  <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">{stats.totalCourses}</p>
                 </div>
                 <BookOpen className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-purple-500" />
               </div>
@@ -647,7 +679,7 @@ const AdminPage = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs sm:text-sm font-medium text-gray-600">Videos</p>
-                  <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">156</p>
+                  <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">{stats.totalLessons}</p>
                 </div>
                 <Video className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-orange-500" />
               </div>
@@ -763,12 +795,8 @@ const AdminPage = () => {
                               </div>
                             </div>
                           </TableCell>
-                          <TableCell className="text-sm sm:text-base">
-                            {(course.students || 0).toLocaleString()}
-                          </TableCell>
-                          <TableCell className="text-sm sm:text-base">
-                            ${(course.revenue || 0).toLocaleString()}
-                          </TableCell>
+                          <TableCell className="text-sm sm:text-base">{course.students.toLocaleString()}</TableCell>
+                          <TableCell className="text-sm sm:text-base">${course.revenue.toLocaleString()}</TableCell>
                           <TableCell>
                             <div className="flex items-center space-x-2">
                               <Video className="w-3 h-3 sm:w-4 sm:h-4 text-gray-500" />
@@ -1034,25 +1062,35 @@ const AdminPage = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {users.map((user) => (
-                        <TableRow key={user.id}>
-                          <TableCell className="font-medium text-sm sm:text-base">{user.name}</TableCell>
-                          <TableCell className="text-sm sm:text-base">{user.email}</TableCell>
-                          <TableCell className="text-sm sm:text-base">{user.courses}</TableCell>
-                          <TableCell className="text-sm sm:text-base">${user.spent}</TableCell>
-                          <TableCell className="text-sm sm:text-base">{user.joinDate}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center space-x-2">
-                              <Button variant="ghost" size="sm">
-                                <Eye className="w-3 h-3 sm:w-4 sm:h-4" />
-                              </Button>
-                              <Button variant="ghost" size="sm">
-                                <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
-                              </Button>
-                            </div>
+                      {users.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                            <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                            <p className="text-sm sm:text-base">No hay usuarios registrados</p>
+                            <p className="text-xs sm:text-sm">Los usuarios aparecerán aquí cuando se registren</p>
                           </TableCell>
                         </TableRow>
-                      ))}
+                      ) : (
+                        users.map((user) => (
+                          <TableRow key={user.id}>
+                            <TableCell className="font-medium text-sm sm:text-base">{user.name}</TableCell>
+                            <TableCell className="text-sm sm:text-base">{user.email}</TableCell>
+                            <TableCell className="text-sm sm:text-base">{user.courses}</TableCell>
+                            <TableCell className="text-sm sm:text-base">${user.spent}</TableCell>
+                            <TableCell className="text-sm sm:text-base">{user.joinDate}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center space-x-2">
+                                <Button variant="ghost" size="sm">
+                                  <Eye className="w-3 h-3 sm:w-4 sm:h-4" />
+                                </Button>
+                                <Button variant="ghost" size="sm">
+                                  <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
                     </TableBody>
                   </Table>
                 </div>

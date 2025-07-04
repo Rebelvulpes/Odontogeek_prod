@@ -47,52 +47,37 @@ export async function GET(req: NextRequest, { params }: { params: { courseId: st
 
 export async function PUT(req: NextRequest, { params }: { params: { courseId: string } }) {
   try {
+    const { courseId } = params
     const body = await req.json()
+    const { title, description, price, instructor, thumbnail_url, duration_hours, tags, archived } = body
+
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Si solo se está archivando/desarchivando
-    if ("archived" in body && Object.keys(body).length === 1) {
-      const { data: updatedCourse, error } = await supabase
-        .from("courses")
-        .update({
-          archived: body.archived,
-        })
-        .eq("id", params.courseId)
-        .select()
-
-      if (error) {
-        return NextResponse.json({
-          success: false,
-          message: `Error ${body.archived ? "archivando" : "desarchivando"} curso: ${error.message}`,
-        })
-      }
-
-      return NextResponse.json({
-        success: true,
-        message: `Curso ${body.archived ? "archivado" : "desarchivado"} exitosamente`,
-        data: updatedCourse[0],
-      })
+    // Preparar datos de actualización
+    const updateData: any = {
+      updated_at: new Date().toISOString(),
     }
 
-    // Actualización completa del curso
-    const { title, description, price, instructor, duration_hours, thumbnail_url, tags } = body
+    // Solo agregar campos que no sean undefined
+    if (title !== undefined) updateData.title = title
+    if (description !== undefined) updateData.description = description
+    if (price !== undefined) updateData.price = Number.parseFloat(price)
+    if (instructor !== undefined) updateData.instructor_name = instructor // Mapear a instructor_name
+    if (thumbnail_url !== undefined) updateData.thumbnail_url = thumbnail_url
+    if (duration_hours !== undefined)
+      updateData.duration_hours = duration_hours ? Number.parseInt(duration_hours) : null
+    if (archived !== undefined) updateData.archived = archived
 
-    // Actualizar datos básicos del curso
-    const { data: updatedCourse, error: courseError } = await supabase
+    // Actualizar el curso
+    const { data: course, error: courseError } = await supabase
       .from("courses")
-      .update({
-        title,
-        description,
-        price: Number.parseFloat(price),
-        instructor_name: instructor, // Usar instructor_name en lugar de instructor
-        duration_hours: duration_hours ? Number.parseInt(duration_hours) : null,
-        thumbnail_url,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", params.courseId)
+      .update(updateData)
+      .eq("id", courseId)
       .select()
+      .single()
 
     if (courseError) {
+      console.error("Error actualizando curso:", courseError)
       return NextResponse.json({
         success: false,
         message: `Error actualizando curso: ${courseError.message}`,
@@ -101,13 +86,13 @@ export async function PUT(req: NextRequest, { params }: { params: { courseId: st
 
     // Actualizar etiquetas si se proporcionaron
     if (tags && Array.isArray(tags)) {
-      // Eliminar relaciones existentes
-      await supabase.from("course_tag_relations").delete().eq("course_id", params.courseId)
+      // Eliminar etiquetas existentes
+      await supabase.from("course_tag_relations").delete().eq("course_id", courseId)
 
-      // Agregar nuevas relaciones
+      // Agregar nuevas etiquetas
       if (tags.length > 0) {
         const tagRelations = tags.map((tagId: string) => ({
-          course_id: params.courseId,
+          course_id: courseId,
           tag_id: tagId,
         }))
 
@@ -115,17 +100,18 @@ export async function PUT(req: NextRequest, { params }: { params: { courseId: st
 
         if (tagError) {
           console.error("Error actualizando etiquetas:", tagError)
-          // No fallar la actualización por las etiquetas
+          // No fallar la actualización del curso por las etiquetas
         }
       }
     }
 
     return NextResponse.json({
       success: true,
+      data: course,
       message: "Curso actualizado exitosamente",
-      data: updatedCourse[0],
     })
   } catch (error) {
+    console.error("Error interno en PUT /api/admin/courses/[courseId]:", error)
     return NextResponse.json({
       success: false,
       message: `Error interno: ${(error as Error).message}`,
@@ -135,60 +121,53 @@ export async function PUT(req: NextRequest, { params }: { params: { courseId: st
 
 export async function DELETE(req: NextRequest, { params }: { params: { courseId: string } }) {
   try {
+    const { courseId } = params
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Verificar si el curso tiene lecciones
-    const { data: lessons, error: lessonsError } = await supabase
-      .from("lessons")
-      .select("id")
-      .eq("course_id", params.courseId)
-
-    if (lessonsError) {
-      return NextResponse.json({
-        success: false,
-        message: `Error verificando lecciones: ${lessonsError.message}`,
-      })
-    }
-
-    // Verificar si hay inscripciones
+    // Verificar si el curso tiene inscripciones
     const { data: enrollments, error: enrollmentsError } = await supabase
       .from("enrollments")
       .select("id")
-      .eq("course_id", params.courseId)
+      .eq("course_id", courseId)
 
     if (enrollmentsError) {
+      console.error("Error verificando inscripciones:", enrollmentsError)
       return NextResponse.json({
         success: false,
-        message: `Error verificando inscripciones: ${enrollmentsError.message}`,
+        message: "Error verificando inscripciones del curso",
       })
     }
 
-    // Si hay inscripciones, no permitir eliminación
     if (enrollments && enrollments.length > 0) {
       return NextResponse.json({
         success: false,
-        message: `No se puede eliminar el curso porque tiene ${enrollments.length} estudiantes inscritos. Considera archivarlo en su lugar.`,
+        message: `No se puede eliminar el curso porque tiene ${enrollments.length} estudiante(s) inscrito(s). Considera archivarlo en su lugar.`,
       })
     }
 
-    // Eliminar relaciones de etiquetas primero
-    await supabase.from("course_tag_relations").delete().eq("course_id", params.courseId)
+    // Eliminar relaciones de etiquetas
+    await supabase.from("course_tag_relations").delete().eq("course_id", courseId)
 
-    // Eliminar el curso (las lecciones se eliminarán automáticamente por CASCADE)
-    const { error } = await supabase.from("courses").delete().eq("id", params.courseId)
+    // Eliminar lecciones del curso
+    await supabase.from("lessons").delete().eq("course_id", courseId)
 
-    if (error) {
+    // Eliminar el curso
+    const { error: courseError } = await supabase.from("courses").delete().eq("id", courseId)
+
+    if (courseError) {
+      console.error("Error eliminando curso:", courseError)
       return NextResponse.json({
         success: false,
-        message: `Error eliminando curso: ${error.message}`,
+        message: `Error eliminando curso: ${courseError.message}`,
       })
     }
 
     return NextResponse.json({
       success: true,
-      message: `Curso eliminado exitosamente${lessons && lessons.length > 0 ? ` junto con ${lessons.length} lecciones` : ""}`,
+      message: "Curso eliminado exitosamente",
     })
   } catch (error) {
+    console.error("Error interno en DELETE /api/admin/courses/[courseId]:", error)
     return NextResponse.json({
       success: false,
       message: `Error interno: ${(error as Error).message}`,

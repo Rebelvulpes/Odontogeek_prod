@@ -31,6 +31,11 @@ export async function GET() {
             color,
             description
           )
+        ),
+        enrollments:enrollments(
+          id,
+          user_id,
+          created_at
         )
       `)
       .order("created_at", { ascending: false })
@@ -43,14 +48,21 @@ export async function GET() {
       })
     }
 
-    // Transformar los datos para que tengan la estructura correcta
-    const coursesWithStats = courses.map((course) => ({
-      ...course,
-      tags: course.tags?.map((relation: any) => relation.course_tags).filter(Boolean) || [],
-      lessonsCount: course.lessons?.length || 0,
-      students: Math.floor(Math.random() * 1000), // Placeholder
-      revenue: Math.floor(Math.random() * 50000), // Placeholder
-    }))
+    // Transformar los datos para que tengan la estructura correcta con datos reales
+    const coursesWithStats = courses.map((course) => {
+      const enrollmentsCount = course.enrollments?.length || 0
+      const coursePrice = course.price || 0
+      const totalRevenue = enrollmentsCount * coursePrice
+      const lessonsCount = course.lessons?.filter((lesson) => !lesson.archived).length || 0
+
+      return {
+        ...course,
+        tags: course.tags?.map((relation: any) => relation.course_tags).filter(Boolean) || [],
+        lessonsCount: lessonsCount,
+        students: enrollmentsCount, // Número real de estudiantes inscritos
+        revenue: totalRevenue, // Ingresos reales basados en inscripciones
+      }
+    })
 
     return NextResponse.json({
       success: true,
@@ -83,6 +95,7 @@ export async function POST(req: NextRequest) {
         duration_hours: duration_hours ? Number.parseInt(duration_hours) : null,
         thumbnail_url: thumbnailUrl || null,
         status: "published",
+        archived: false,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
