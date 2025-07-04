@@ -84,6 +84,8 @@ const AdminPage = () => {
     color: "#3B82F6",
     description: "",
   })
+  const [isEditCourseDialogOpen, setIsEditCourseDialogOpen] = useState(false)
+  const [editingCourse, setEditingCourse] = useState<any>(null)
 
   const loadCourses = async () => {
     try {
@@ -436,6 +438,61 @@ const AdminPage = () => {
 
   const selectedCourseData = courses.find((c) => c.id === selectedCourse)
 
+  const openEditCourseDialog = (course: any) => {
+    setEditingCourse(course)
+    setNewCourse({
+      title: course.title || "",
+      description: course.description || "",
+      price: course.price?.toString() || "",
+      instructor: course.instructor || "",
+      thumbnailUrl: course.thumbnail_url || "",
+      durationHours: course.duration_hours?.toString() || "",
+      tags: course.tags?.map((tag: any) => tag.id) || [],
+    })
+    setIsEditCourseDialogOpen(true)
+  }
+
+  const handleUpdateCourse = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingCourse) return
+
+    try {
+      const response = await fetch(`/api/admin/courses/${editingCourse.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: newCourse.title,
+          description: newCourse.description,
+          price: Number.parseFloat(newCourse.price),
+          instructor: newCourse.instructor,
+          thumbnail_url: newCourse.thumbnailUrl,
+          duration_hours: newCourse.durationHours ? Number.parseInt(newCourse.durationHours) : null,
+          tags: newCourse.tags,
+        }),
+      })
+      const result = await response.json()
+      if (result.success) {
+        setNewCourse({
+          title: "",
+          description: "",
+          price: "",
+          instructor: "",
+          thumbnailUrl: "",
+          durationHours: "",
+          tags: [],
+        })
+        setIsEditCourseDialogOpen(false)
+        setEditingCourse(null)
+        loadCourses()
+        alert("Curso actualizado exitosamente!")
+      } else {
+        alert(result.message)
+      }
+    } catch (error) {
+      alert("Error actualizando curso")
+    }
+  }
+
   // Navigation items
   const navigationItems = [
     { icon: Home, label: "Dashboard", href: "/admin" },
@@ -732,7 +789,12 @@ const AdminPage = () => {
                               >
                                 <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
                               </Button>
-                              <Button variant="ghost" size="sm" title="Editar curso">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                title="Editar curso"
+                                onClick={() => openEditCourseDialog(course)}
+                              >
                                 <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
                               </Button>
                               <Button
@@ -1284,6 +1346,194 @@ const AdminPage = () => {
               <Button type="submit" className="w-full sm:w-auto">
                 <Plus className="w-4 h-4 mr-2" />
                 Crear Curso
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para editar curso */}
+      <Dialog open={isEditCourseDialogOpen} onOpenChange={setIsEditCourseDialogOpen}>
+        <DialogContent className="max-w-[95vw] sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-base sm:text-lg">Editar Curso</DialogTitle>
+            <DialogDescription className="text-sm">
+              Modifica los detalles del curso "{editingCourse?.title}"
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleUpdateCourse} className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Columna izquierda - Información básica */}
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="editTitle" className="text-sm sm:text-base">
+                    Título del Curso
+                  </Label>
+                  <Input
+                    id="editTitle"
+                    placeholder="Ej: Implantología Avanzada"
+                    value={newCourse.title}
+                    onChange={(e) => setNewCourse({ ...newCourse, title: e.target.value })}
+                    className="text-sm sm:text-base"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="editDescription" className="text-sm sm:text-base">
+                    Descripción
+                  </Label>
+                  <Textarea
+                    id="editDescription"
+                    placeholder="Describe el contenido del curso..."
+                    value={newCourse.description}
+                    onChange={(e) => setNewCourse({ ...newCourse, description: e.target.value })}
+                    className="text-sm sm:text-base"
+                    rows={4}
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="editPrice" className="text-sm sm:text-base">
+                      Precio ($)
+                    </Label>
+                    <Input
+                      id="editPrice"
+                      type="number"
+                      placeholder="299"
+                      value={newCourse.price}
+                      onChange={(e) => setNewCourse({ ...newCourse, price: e.target.value })}
+                      className="text-sm sm:text-base"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="editDurationHours" className="text-sm sm:text-base">
+                      Duración (horas)
+                    </Label>
+                    <Input
+                      id="editDurationHours"
+                      type="number"
+                      placeholder="12"
+                      value={newCourse.durationHours}
+                      onChange={(e) => setNewCourse({ ...newCourse, durationHours: e.target.value })}
+                      className="text-sm sm:text-base"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="editInstructor" className="text-sm sm:text-base">
+                    Instructor
+                  </Label>
+                  <Input
+                    id="editInstructor"
+                    placeholder="Dr. Juan Pérez"
+                    value={newCourse.instructor}
+                    onChange={(e) => setNewCourse({ ...newCourse, instructor: e.target.value })}
+                    className="text-sm sm:text-base"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Columna derecha - Imagen y etiquetas */}
+              <div className="space-y-4">
+                {/* Imagen del curso */}
+                <div className="space-y-2">
+                  <Label htmlFor="editThumbnailUrl" className="text-sm sm:text-base flex items-center">
+                    <ImageIcon className="w-4 h-4 mr-2" />
+                    Imagen del Curso
+                  </Label>
+                  <Input
+                    id="editThumbnailUrl"
+                    type="url"
+                    placeholder="https://res.cloudinary.com/tu-cuenta/image/upload/v123/curso.jpg"
+                    value={newCourse.thumbnailUrl}
+                    onChange={(e) => setNewCourse({ ...newCourse, thumbnailUrl: e.target.value })}
+                    className="text-sm sm:text-base"
+                  />
+                  <div className="flex items-start space-x-2 text-xs text-gray-500">
+                    <ExternalLink className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p>Sube tu imagen a Cloudinary, Imgur, o cualquier servicio de hosting de imágenes.</p>
+                      <p className="mt-1">Tamaño recomendado: 1080x1080px (1:1)</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Vista previa de la imagen */}
+                {newCourse.thumbnailUrl && (
+                  <div className="space-y-2">
+                    <Label className="text-sm">Vista Previa</Label>
+                    <div className="w-full max-w-sm">
+                      <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden border">
+                        <img
+                          src={newCourse.thumbnailUrl || "/placeholder.svg"}
+                          alt="Vista previa del curso"
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.src = "/placeholder.svg?height=300&width=300&text=Error+cargando+imagen"
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Selección de Etiquetas */}
+                <div className="space-y-2">
+                  <Label className="text-sm sm:text-base">Etiquetas del Curso</Label>
+                  <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-3 border rounded-md bg-gray-50">
+                    {tags.map((tag) => (
+                      <div key={tag.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`edit-tag-${tag.id}`}
+                          checked={newCourse.tags.includes(tag.id)}
+                          onCheckedChange={() => handleTagToggle(tag.id)}
+                        />
+                        <Label
+                          htmlFor={`edit-tag-${tag.id}`}
+                          className="text-xs cursor-pointer flex items-center space-x-1"
+                        >
+                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: tag.color }} />
+                          <span style={{ color: tag.color }}>{tag.name}</span>
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-500">Selecciona las etiquetas que mejor describan este curso</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-2 pt-6 border-t">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setIsEditCourseDialogOpen(false)
+                  setEditingCourse(null)
+                  setNewCourse({
+                    title: "",
+                    description: "",
+                    price: "",
+                    instructor: "",
+                    thumbnailUrl: "",
+                    durationHours: "",
+                    tags: [],
+                  })
+                }}
+                className="w-full sm:w-auto"
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" className="w-full sm:w-auto">
+                <Edit className="w-4 h-4 mr-2" />
+                Actualizar Curso
               </Button>
             </div>
           </form>
