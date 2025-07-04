@@ -444,7 +444,7 @@ const AdminPage = () => {
       title: course.title || "",
       description: course.description || "",
       price: course.price?.toString() || "",
-      instructor: course.instructor || "",
+      instructor: course.instructor_name || "", // Usar instructor_name
       thumbnailUrl: course.thumbnail_url || "",
       durationHours: course.duration_hours?.toString() || "",
       tags: course.tags?.map((tag: any) => tag.id) || [],
@@ -464,7 +464,7 @@ const AdminPage = () => {
           title: newCourse.title,
           description: newCourse.description,
           price: Number.parseFloat(newCourse.price),
-          instructor: newCourse.instructor,
+          instructor: newCourse.instructor, // Se mapea a instructor_name en la API
           thumbnail_url: newCourse.thumbnailUrl,
           duration_hours: newCourse.durationHours ? Number.parseInt(newCourse.durationHours) : null,
           tags: newCourse.tags,
@@ -489,6 +489,7 @@ const AdminPage = () => {
         alert(result.message)
       }
     } catch (error) {
+      console.error("Error actualizando curso:", error)
       alert("Error actualizando curso")
     }
   }
@@ -752,6 +753,9 @@ const AdminPage = () => {
                                 </div>
                                 <p className="text-xs sm:text-sm text-gray-500 mt-1">
                                   ${course.price} • {course.duration_hours || 0}h
+                                </p>
+                                <p className="text-xs text-gray-400">
+                                  Instructor: {course.instructor_name || "No asignado"}
                                 </p>
                                 <p className="text-xs text-gray-400">
                                   Creado: {course.created_at ? new Date(course.created_at).toLocaleDateString() : "N/A"}

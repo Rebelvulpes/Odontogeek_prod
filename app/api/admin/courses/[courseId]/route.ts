@@ -84,7 +84,7 @@ export async function PUT(req: NextRequest, { params }: { params: { courseId: st
         title,
         description,
         price: Number.parseFloat(price),
-        instructor,
+        instructor_name: instructor, // Usar instructor_name en lugar de instructor
         duration_hours: duration_hours ? Number.parseInt(duration_hours) : null,
         thumbnail_url,
         updated_at: new Date().toISOString(),

@@ -5,11 +5,12 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     email VARCHAR(255) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
+    password_hash VARCHAR(255),
     full_name VARCHAR(255) NOT NULL,
     role VARCHAR(50) DEFAULT 'student' CHECK (role IN ('admin', 'instructor', 'student')),
     is_active BOOLEAN DEFAULT true,
     email_verified BOOLEAN DEFAULT false,
+    is_test_user BOOLEAN DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -20,9 +21,11 @@ CREATE TABLE IF NOT EXISTS courses (
     title VARCHAR(255) NOT NULL,
     description TEXT,
     price DECIMAL(10,2) NOT NULL DEFAULT 0,
-    instructor VARCHAR(255) NOT NULL,
+    instructor_id UUID REFERENCES users(id),
+    instructor_name VARCHAR(255),
     thumbnail_url TEXT,
     duration_hours INTEGER,
+    total_lessons INTEGER DEFAULT 0,
     status VARCHAR(50) DEFAULT 'draft' CHECK (status IN ('draft', 'published', 'archived')),
     archived BOOLEAN DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -100,10 +103,21 @@ CREATE TABLE IF NOT EXISTS payments (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Tabla de certificados
+CREATE TABLE IF NOT EXISTS certificates (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id),
+    course_id UUID NOT NULL REFERENCES courses(id),
+    certificate_url VARCHAR(500),
+    issued_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, course_id)
+);
+
 -- Índices para optimizar consultas
 CREATE INDEX IF NOT EXISTS idx_courses_status ON courses(status);
 CREATE INDEX IF NOT EXISTS idx_courses_archived ON courses(archived);
 CREATE INDEX IF NOT EXISTS idx_courses_created_at ON courses(created_at);
+CREATE INDEX IF NOT EXISTS idx_courses_instructor ON courses(instructor_id);
 CREATE INDEX IF NOT EXISTS idx_lessons_course_id ON lessons(course_id);
 CREATE INDEX IF NOT EXISTS idx_lessons_order ON lessons(course_id, order_index);
 CREATE INDEX IF NOT EXISTS idx_enrollments_user_id ON enrollments(user_id);

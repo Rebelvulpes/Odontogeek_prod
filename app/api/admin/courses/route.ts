@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
         title,
         description,
         price: Number.parseFloat(price),
-        instructor,
+        instructor_name: instructor, // Usar instructor_name en lugar de instructor
         duration_hours: duration_hours ? Number.parseInt(duration_hours) : null,
         thumbnail_url: thumbnailUrl || null,
         status: "published",
