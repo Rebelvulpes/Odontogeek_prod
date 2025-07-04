@@ -17,7 +17,7 @@ export async function GET() {
       console.error("Error obteniendo usuarios:", usersError)
     }
 
-    // Obtener total de cursos
+    // Obtener total de cursos (no archivados)
     const { count: totalCourses, error: coursesError } = await supabase
       .from("courses")
       .select("*", { count: "exact", head: true })
@@ -27,7 +27,7 @@ export async function GET() {
       console.error("Error obteniendo cursos:", coursesError)
     }
 
-    // Obtener total de lecciones (videos)
+    // Obtener total de lecciones (no archivadas)
     const { count: totalLessons, error: lessonsError } = await supabase
       .from("lessons")
       .select("*", { count: "exact", head: true })
@@ -37,22 +37,20 @@ export async function GET() {
       console.error("Error obteniendo lecciones:", lessonsError)
     }
 
-    // Obtener total de inscripciones para calcular ingresos
-    const { data: enrollments, error: enrollmentsError } = await supabase.from("enrollments").select(`
-        *,
-        courses:course_id(price)
-      `)
+    // Obtener ingresos totales (solo inscripciones completadas)
+    const { data: enrollments, error: enrollmentsError } = await supabase
+      .from("enrollments")
+      .select("amount_paid")
+      .eq("payment_status", "completed")
 
-    if (enrollmentsError) {
+    let totalRevenue = 0
+    if (!enrollmentsError && enrollments) {
+      totalRevenue = enrollments.reduce((sum, enrollment) => {
+        return sum + (enrollment.amount_paid || 0)
+      }, 0)
+    } else if (enrollmentsError) {
       console.error("Error obteniendo inscripciones:", enrollmentsError)
     }
-
-    // Calcular ingresos totales
-    const totalRevenue =
-      enrollments?.reduce((sum, enrollment) => {
-        const coursePrice = enrollment.courses?.price || 0
-        return sum + coursePrice
-      }, 0) || 0
 
     return NextResponse.json({
       success: true,
@@ -60,7 +58,7 @@ export async function GET() {
         totalUsers: totalUsers || 0,
         totalCourses: totalCourses || 0,
         totalLessons: totalLessons || 0,
-        totalRevenue: totalRevenue,
+        totalRevenue: totalRevenue || 0,
       },
     })
   } catch (error) {
@@ -68,6 +66,12 @@ export async function GET() {
     return NextResponse.json({
       success: false,
       message: `Error interno: ${(error as Error).message}`,
+      data: {
+        totalUsers: 0,
+        totalCourses: 0,
+        totalLessons: 0,
+        totalRevenue: 0,
+      },
     })
   }
 }

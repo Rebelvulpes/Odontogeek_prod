@@ -101,9 +101,23 @@ const AdminPage = () => {
         setStats(result.data)
       } else {
         console.error("Error cargando estadísticas:", result.message)
+        // Usar datos por defecto si hay error
+        setStats({
+          totalUsers: 0,
+          totalCourses: 0,
+          totalLessons: 0,
+          totalRevenue: 0,
+        })
       }
     } catch (error) {
       console.error("Error cargando estadísticas:", error)
+      // Usar datos por defecto si hay error
+      setStats({
+        totalUsers: 0,
+        totalCourses: 0,
+        totalLessons: 0,
+        totalRevenue: 0,
+      })
     }
   }
 

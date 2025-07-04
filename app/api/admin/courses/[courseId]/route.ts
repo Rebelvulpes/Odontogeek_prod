@@ -6,38 +6,75 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 export async function GET(req: NextRequest, { params }: { params: { courseId: string } }) {
   try {
+    const { courseId } = params
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
     const { data: course, error } = await supabase
       .from("courses")
       .select(`
         *,
-        lessons:lessons(*),
+        lessons:lessons(
+          id,
+          title,
+          description,
+          video_url,
+          duration_minutes,
+          order_index,
+          is_free,
+          archived,
+          created_at
+        ),
         tags:course_tag_relations(
-          course_tags(*)
+          course_tags(
+            id,
+            name,
+            slug,
+            color,
+            description
+          )
         )
       `)
-      .eq("id", params.courseId)
+      .eq("id", courseId)
       .single()
 
     if (error) {
+      console.error("Error obteniendo curso:", error)
       return NextResponse.json({
         success: false,
         message: `Error obteniendo curso: ${error.message}`,
       })
     }
 
-    // Transformar las etiquetas para que tengan la estructura correcta
-    const courseWithTags = {
+    // Obtener inscripciones para este curso
+    const { data: enrollments, error: enrollmentsError } = await supabase
+      .from("enrollments")
+      .select("amount_paid, payment_status")
+      .eq("course_id", courseId)
+
+    let studentsCount = 0
+    let revenue = 0
+
+    if (!enrollmentsError && enrollments) {
+      studentsCount = enrollments.length
+      revenue = enrollments
+        .filter((e) => e.payment_status === "completed")
+        .reduce((sum, e) => sum + (e.amount_paid || 0), 0)
+    }
+
+    const courseWithStats = {
       ...course,
-      tags: course.tags?.map((relation: any) => relation.course_tags) || [],
+      tags: course.tags?.map((relation: any) => relation.course_tags).filter(Boolean) || [],
+      lessonsCount: course.lessons?.filter((lesson) => !lesson.archived).length || 0,
+      students: studentsCount,
+      revenue: revenue,
     }
 
     return NextResponse.json({
       success: true,
-      data: courseWithTags,
+      data: courseWithStats,
     })
   } catch (error) {
+    console.error("Error interno en GET /api/admin/courses/[courseId]:", error)
     return NextResponse.json({
       success: false,
       message: `Error interno: ${(error as Error).message}`,
@@ -53,22 +90,20 @@ export async function PUT(req: NextRequest, { params }: { params: { courseId: st
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Preparar datos de actualización
+    // Actualizar el curso
     const updateData: any = {
       updated_at: new Date().toISOString(),
     }
 
-    // Solo agregar campos que no sean undefined
     if (title !== undefined) updateData.title = title
     if (description !== undefined) updateData.description = description
     if (price !== undefined) updateData.price = Number.parseFloat(price)
-    if (instructor !== undefined) updateData.instructor_name = instructor // Mapear a instructor_name
+    if (instructor !== undefined) updateData.instructor_name = instructor
     if (thumbnail_url !== undefined) updateData.thumbnail_url = thumbnail_url
     if (duration_hours !== undefined)
       updateData.duration_hours = duration_hours ? Number.parseInt(duration_hours) : null
     if (archived !== undefined) updateData.archived = archived
 
-    // Actualizar el curso
     const { data: course, error: courseError } = await supabase
       .from("courses")
       .update(updateData)
@@ -129,19 +164,12 @@ export async function DELETE(req: NextRequest, { params }: { params: { courseId:
       .from("enrollments")
       .select("id")
       .eq("course_id", courseId)
+      .limit(1)
 
-    if (enrollmentsError) {
-      console.error("Error verificando inscripciones:", enrollmentsError)
+    if (!enrollmentsError && enrollments && enrollments.length > 0) {
       return NextResponse.json({
         success: false,
-        message: "Error verificando inscripciones del curso",
-      })
-    }
-
-    if (enrollments && enrollments.length > 0) {
-      return NextResponse.json({
-        success: false,
-        message: `No se puede eliminar el curso porque tiene ${enrollments.length} estudiante(s) inscrito(s). Considera archivarlo en su lugar.`,
+        message: "No se puede eliminar un curso que tiene estudiantes inscritos. Archívalo en su lugar.",
       })
     }
 

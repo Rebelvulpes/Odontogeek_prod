@@ -8,6 +8,7 @@ export async function GET() {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
+    // Primero obtenemos los cursos con sus lecciones y etiquetas
     const { data: courses, error } = await supabase
       .from("courses")
       .select(`
@@ -31,11 +32,6 @@ export async function GET() {
             color,
             description
           )
-        ),
-        enrollments:enrollments(
-          id,
-          user_id,
-          created_at
         )
       `)
       .order("created_at", { ascending: false })
@@ -48,19 +44,46 @@ export async function GET() {
       })
     }
 
+    // Ahora obtenemos las inscripciones por separado para evitar el error de JOIN
+    const { data: enrollments, error: enrollmentsError } = await supabase
+      .from("enrollments")
+      .select("course_id, amount_paid, payment_status")
+
+    if (enrollmentsError) {
+      console.error("Error obteniendo inscripciones:", enrollmentsError)
+      // No fallar si no hay tabla de inscripciones, solo usar datos vacíos
+    }
+
+    // Crear un mapa de inscripciones por curso
+    const enrollmentsByCourse = new Map()
+    if (enrollments) {
+      enrollments.forEach((enrollment) => {
+        const courseId = enrollment.course_id
+        if (!enrollmentsByCourse.has(courseId)) {
+          enrollmentsByCourse.set(courseId, {
+            count: 0,
+            revenue: 0,
+          })
+        }
+        const courseEnrollments = enrollmentsByCourse.get(courseId)
+        courseEnrollments.count += 1
+        if (enrollment.payment_status === "completed") {
+          courseEnrollments.revenue += enrollment.amount_paid || 0
+        }
+      })
+    }
+
     // Transformar los datos para que tengan la estructura correcta con datos reales
     const coursesWithStats = courses.map((course) => {
-      const enrollmentsCount = course.enrollments?.length || 0
-      const coursePrice = course.price || 0
-      const totalRevenue = enrollmentsCount * coursePrice
+      const courseEnrollments = enrollmentsByCourse.get(course.id) || { count: 0, revenue: 0 }
       const lessonsCount = course.lessons?.filter((lesson) => !lesson.archived).length || 0
 
       return {
         ...course,
         tags: course.tags?.map((relation: any) => relation.course_tags).filter(Boolean) || [],
         lessonsCount: lessonsCount,
-        students: enrollmentsCount, // Número real de estudiantes inscritos
-        revenue: totalRevenue, // Ingresos reales basados en inscripciones
+        students: courseEnrollments.count, // Número real de estudiantes inscritos
+        revenue: courseEnrollments.revenue, // Ingresos reales basados en inscripciones completadas
       }
     })
 
