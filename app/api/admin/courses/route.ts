@@ -8,7 +8,7 @@ export async function GET() {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Obtener cursos con sus lecciones y etiquetas
+    // Obtener cursos con sus lecciones
     const { data: courses, error } = await supabase
       .from("courses")
       .select(`
@@ -23,15 +23,6 @@ export async function GET() {
           is_free,
           archived,
           created_at
-        ),
-        course_tags:course_tags(
-          course_tag:course_tag(
-            id,
-            name,
-            color,
-            slug,
-            description
-          )
         )
       `)
       .order("created_at", { ascending: false })
@@ -43,6 +34,31 @@ export async function GET() {
         message: `Error obteniendo cursos: ${error.message}`,
         data: [],
       })
+    }
+
+    // Obtener relaciones de etiquetas por separado
+    const { data: tagRelations, error: tagRelationsError } = await supabase.from("course_tag_relations").select(`
+        course_id,
+        course_tags:tag_id(
+          id,
+          name,
+          color,
+          slug,
+          description
+        )
+      `)
+
+    let tagsByCourse = {}
+    if (!tagRelationsError && tagRelations) {
+      tagsByCourse = tagRelations.reduce((acc, relation) => {
+        if (!acc[relation.course_id]) {
+          acc[relation.course_id] = []
+        }
+        if (relation.course_tags) {
+          acc[relation.course_id].push(relation.course_tags)
+        }
+        return acc
+      }, {})
     }
 
     // Obtener estadísticas de inscripciones para cada curso
@@ -64,8 +80,8 @@ export async function GET() {
         // Filtrar lecciones no archivadas
         const activeLessons = course.lessons?.filter((lesson) => !lesson.archived) || []
 
-        // Procesar etiquetas
-        const tags = course.course_tags?.map((ct) => ct.course_tag).filter(Boolean) || []
+        // Obtener etiquetas para este curso
+        const courseTags = tagsByCourse[course.id] || []
 
         // Calcular estadísticas
         const enrollmentCount = enrollmentStats[course.id] || 0
@@ -75,7 +91,7 @@ export async function GET() {
           ...course,
           lessons: activeLessons,
           lessonsCount: activeLessons.length,
-          tags: tags,
+          tags: courseTags,
           students: enrollmentCount,
           revenue: revenue,
         }
@@ -132,10 +148,10 @@ export async function POST(request: Request) {
     if (tags && tags.length > 0 && course) {
       const tagAssociations = tags.map((tagId: string) => ({
         course_id: course.id,
-        course_tag_id: tagId,
+        tag_id: tagId,
       }))
 
-      const { error: tagsError } = await supabase.from("course_tags").insert(tagAssociations)
+      const { error: tagsError } = await supabase.from("course_tag_relations").insert(tagAssociations)
 
       if (tagsError) {
         console.error("Error asociando etiquetas:", tagsError)

@@ -7,15 +7,12 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 export async function PUT(request: Request, { params }: { params: { courseId: string } }) {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
-    const { courseId } = params
     const body = await request.json()
+    const courseId = params.courseId
 
-    console.log("Actualizando curso:", courseId, "con datos:", body)
-
-    // Extraer datos del cuerpo
     const { title, description, price, instructor, thumbnail_url, duration_hours, tags, archived } = body
 
-    // Preparar datos de actualización
+    // Actualizar el curso
     const updateData: any = {}
 
     if (title !== undefined) updateData.title = title
@@ -27,7 +24,8 @@ export async function PUT(request: Request, { params }: { params: { courseId: st
       updateData.duration_hours = duration_hours ? Number.parseInt(duration_hours) : null
     if (archived !== undefined) updateData.archived = archived
 
-    // Actualizar el curso
+    updateData.updated_at = new Date().toISOString()
+
     const { data: course, error: courseError } = await supabase
       .from("courses")
       .update(updateData)
@@ -43,33 +41,30 @@ export async function PUT(request: Request, { params }: { params: { courseId: st
       })
     }
 
-    // Si se proporcionaron etiquetas, actualizar las asociaciones
+    // Actualizar etiquetas si se proporcionaron
     if (tags !== undefined && Array.isArray(tags)) {
-      // Eliminar asociaciones existentes
-      const { error: deleteError } = await supabase.from("course_tags").delete().eq("course_id", courseId)
+      // Eliminar etiquetas existentes
+      await supabase.from("course_tag_relations").delete().eq("course_id", courseId)
 
-      if (deleteError) {
-        console.error("Error eliminando etiquetas existentes:", deleteError)
-      }
-
-      // Crear nuevas asociaciones
+      // Agregar nuevas etiquetas
       if (tags.length > 0) {
         const tagAssociations = tags.map((tagId: string) => ({
           course_id: courseId,
-          course_tag_id: tagId,
+          tag_id: tagId,
         }))
 
-        const { error: tagsError } = await supabase.from("course_tags").insert(tagAssociations)
+        const { error: tagsError } = await supabase.from("course_tag_relations").insert(tagAssociations)
 
         if (tagsError) {
-          console.error("Error asociando nuevas etiquetas:", tagsError)
+          console.error("Error actualizando etiquetas:", tagsError)
+          // No fallar por esto, solo logear
         }
       }
     }
 
     return NextResponse.json({
       success: true,
-      message: archived ? "Curso archivado exitosamente" : "Curso actualizado exitosamente",
+      message: "Curso actualizado exitosamente",
       data: course,
     })
   } catch (error) {
@@ -84,30 +79,16 @@ export async function PUT(request: Request, { params }: { params: { courseId: st
 export async function DELETE(request: Request, { params }: { params: { courseId: string } }) {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
-    const { courseId } = params
+    const courseId = params.courseId
 
-    console.log("Eliminando curso:", courseId)
+    // Eliminar relaciones de etiquetas primero
+    await supabase.from("course_tag_relations").delete().eq("course_id", courseId)
 
-    // Primero eliminar las lecciones asociadas
-    const { error: lessonsError } = await supabase.from("lessons").delete().eq("course_id", courseId)
+    // Eliminar lecciones del curso
+    await supabase.from("lessons").delete().eq("course_id", courseId)
 
-    if (lessonsError) {
-      console.error("Error eliminando lecciones:", lessonsError)
-    }
-
-    // Eliminar asociaciones de etiquetas
-    const { error: tagsError } = await supabase.from("course_tags").delete().eq("course_id", courseId)
-
-    if (tagsError) {
-      console.error("Error eliminando asociaciones de etiquetas:", tagsError)
-    }
-
-    // Eliminar inscripciones asociadas
-    const { error: enrollmentsError } = await supabase.from("enrollments").delete().eq("course_id", courseId)
-
-    if (enrollmentsError) {
-      console.error("Error eliminando inscripciones:", enrollmentsError)
-    }
+    // Eliminar inscripciones del curso
+    await supabase.from("enrollments").delete().eq("course_id", courseId)
 
     // Finalmente eliminar el curso
     const { error: courseError } = await supabase.from("courses").delete().eq("id", courseId)
@@ -122,7 +103,7 @@ export async function DELETE(request: Request, { params }: { params: { courseId:
 
     return NextResponse.json({
       success: true,
-      message: "Curso y todos sus datos asociados eliminados exitosamente",
+      message: "Curso eliminado exitosamente",
     })
   } catch (error) {
     console.error("Error interno en DELETE /api/admin/courses/[courseId]:", error)

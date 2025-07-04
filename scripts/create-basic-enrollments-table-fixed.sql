@@ -1,61 +1,88 @@
--- Eliminar tabla existente si tiene problemas
+-- Script para crear tabla de inscripciones básica y datos de ejemplo
+-- Versión corregida sin restricciones de clave foránea
+
+-- Eliminar tabla existente si existe
 DROP TABLE IF EXISTS enrollments CASCADE;
 
--- Crear tabla de inscripciones básica sin restricciones de clave foránea
+-- Crear tabla de inscripciones básica
 CREATE TABLE enrollments (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    user_id UUID NOT NULL,
-    course_id UUID NOT NULL,
-    enrolled_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    id SERIAL PRIMARY KEY,
+    course_id INTEGER NOT NULL,
+    user_email VARCHAR(255) NOT NULL,
+    enrolled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    status VARCHAR(50) DEFAULT 'active'
 );
 
--- Crear índices básicos para performance
-CREATE INDEX IF NOT EXISTS idx_enrollments_user_id ON enrollments(user_id);
-CREATE INDEX IF NOT EXISTS idx_enrollments_course_id ON enrollments(course_id);
-CREATE INDEX IF NOT EXISTS idx_enrollments_enrolled_at ON enrollments(enrolled_at);
+-- Crear índices para mejorar rendimiento
+CREATE INDEX idx_enrollments_course_id ON enrollments(course_id);
+CREATE INDEX idx_enrollments_user_email ON enrollments(user_email);
+CREATE INDEX idx_enrollments_status ON enrollments(status);
 
--- Insertar SOLO 1-2 inscripciones de ejemplo usando IDs de cursos reales
+-- Obtener IDs de cursos existentes para usar en los datos de ejemplo
 DO $$
 DECLARE
-    course_record RECORD;
-    sample_user_id UUID;
-    enrollment_count INTEGER := 0;
+    course_ids INTEGER[];
+    sample_course_id INTEGER;
 BEGIN
-    -- Para los primeros 2 cursos existentes, crear 1 inscripción cada uno
-    FOR course_record IN SELECT id FROM courses WHERE NOT archived ORDER BY created_at LIMIT 2 LOOP
-        sample_user_id := gen_random_uuid();
-        INSERT INTO enrollments (user_id, course_id, enrolled_at) VALUES
-        (sample_user_id, course_record.id, NOW() - INTERVAL '5 days')
-        ON CONFLICT DO NOTHING;
-        
-        enrollment_count := enrollment_count + 1;
-        RAISE NOTICE 'Inscripción creada para curso ID: %', course_record.id;
-    END LOOP;
+    -- Obtener hasta 3 IDs de cursos existentes
+    SELECT ARRAY(SELECT id FROM courses WHERE NOT archived LIMIT 3) INTO course_ids;
     
-    -- Mensaje de confirmación
-    RAISE NOTICE 'Tabla enrollments creada con % inscripciones de ejemplo', enrollment_count;
+    -- Solo insertar datos si hay cursos disponibles
+    IF array_length(course_ids, 1) > 0 THEN
+        -- Insertar algunas inscripciones de ejemplo usando IDs reales
+        
+        -- Para el primer curso (si existe)
+        sample_course_id := course_ids[1];
+        INSERT INTO enrollments (course_id, user_email, enrolled_at, status) VALUES
+        (sample_course_id, 'estudiante1@ejemplo.com', CURRENT_TIMESTAMP - INTERVAL '5 days', 'active'),
+        (sample_course_id, 'estudiante2@ejemplo.com', CURRENT_TIMESTAMP - INTERVAL '3 days', 'active');
+        
+        -- Para el segundo curso (si existe)
+        IF array_length(course_ids, 1) > 1 THEN
+            sample_course_id := course_ids[2];
+            INSERT INTO enrollments (course_id, user_email, enrolled_at, status) VALUES
+            (sample_course_id, 'estudiante3@ejemplo.com', CURRENT_TIMESTAMP - INTERVAL '2 days', 'active');
+        END IF;
+        
+        -- Para el tercer curso (si existe)
+        IF array_length(course_ids, 1) > 2 THEN
+            sample_course_id := course_ids[3];
+            INSERT INTO enrollments (course_id, user_email, enrolled_at, status) VALUES
+            (sample_course_id, 'estudiante4@ejemplo.com', CURRENT_TIMESTAMP - INTERVAL '1 day', 'active');
+        END IF;
+        
+        RAISE NOTICE 'Tabla enrollments creada exitosamente con % inscripciones de ejemplo', 
+                     (SELECT COUNT(*) FROM enrollments);
+    ELSE
+        RAISE NOTICE 'Tabla enrollments creada pero sin datos de ejemplo (no hay cursos disponibles)';
+    END IF;
 END $$;
 
--- Verificar que se crearon los datos correctamente
+-- Verificar los datos insertados
 SELECT 
-    c.title as curso,
-    COUNT(e.id) as inscripciones,
-    c.price as precio_curso,
-    (COUNT(e.id) * c.price) as ingresos_calculados
-FROM courses c
-LEFT JOIN enrollments e ON c.id = e.course_id
-WHERE NOT c.archived
-GROUP BY c.id, c.title, c.price
-ORDER BY inscripciones DESC;
+    'Inscripciones por curso' as tipo,
+    course_id,
+    COUNT(*) as total_inscripciones
+FROM enrollments 
+GROUP BY course_id
+ORDER BY course_id;
 
--- Mostrar resumen final
+-- Mostrar resumen total
 SELECT 
-    'Total inscripciones' as metric,
-    COUNT(*) as value
-FROM enrollments
-UNION ALL
-SELECT 
-    'Total cursos con inscripciones' as metric,
-    COUNT(DISTINCT course_id) as value
+    'Resumen total' as tipo,
+    COUNT(*) as total_inscripciones,
+    COUNT(DISTINCT course_id) as cursos_con_inscripciones,
+    COUNT(DISTINCT user_email) as estudiantes_unicos
 FROM enrollments;
+
+-- Verificar que los course_ids existen en la tabla courses
+SELECT 
+    'Verificación de integridad' as tipo,
+    e.course_id,
+    c.title as curso_titulo,
+    c.price as precio_curso,
+    COUNT(e.id) as inscripciones
+FROM enrollments e
+LEFT JOIN courses c ON e.course_id = c.id
+GROUP BY e.course_id, c.title, c.price
+ORDER BY e.course_id;

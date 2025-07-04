@@ -17,7 +17,7 @@ export async function GET() {
       console.error("Error obteniendo usuarios:", usersError)
     }
 
-    // Obtener total de cursos (no archivados)
+    // Obtener total de cursos no archivados
     const { count: totalCourses, error: coursesError } = await supabase
       .from("courses")
       .select("*", { count: "exact", head: true })
@@ -27,7 +27,7 @@ export async function GET() {
       console.error("Error obteniendo cursos:", coursesError)
     }
 
-    // Obtener total de lecciones (no archivadas)
+    // Obtener total de lecciones no archivadas
     const { count: totalLessons, error: lessonsError } = await supabase
       .from("lessons")
       .select("*", { count: "exact", head: true })
@@ -37,35 +37,38 @@ export async function GET() {
       console.error("Error obteniendo lecciones:", lessonsError)
     }
 
-    // Calcular ingresos totales de forma correcta
+    // Calcular ingresos totales
     let totalRevenue = 0
     try {
-      // Primero obtener todas las inscripciones
+      // Obtener todas las inscripciones
       const { data: enrollments, error: enrollmentsError } = await supabase.from("enrollments").select("course_id")
 
-      if (enrollmentsError) {
-        console.error("Error obteniendo inscripciones:", enrollmentsError)
-        totalRevenue = 0
-      } else if (enrollments && enrollments.length > 0) {
-        // Obtener los IDs únicos de cursos
-        const courseIds = [...new Set(enrollments.map((e) => e.course_id))]
+      if (!enrollmentsError && enrollments) {
+        // Obtener precios de cursos únicos
+        const uniqueCourseIds = [...new Set(enrollments.map((e) => e.course_id))]
 
-        // Obtener los precios de esos cursos
-        const { data: courses, error: coursesError } = await supabase
-          .from("courses")
-          .select("id, price")
-          .in("id", courseIds)
+        if (uniqueCourseIds.length > 0) {
+          const { data: courses, error: coursePricesError } = await supabase
+            .from("courses")
+            .select("id, price")
+            .in("id", uniqueCourseIds)
 
-        if (!coursesError && courses) {
-          // Calcular ingresos: contar inscripciones por curso y multiplicar por precio
-          for (const course of courses) {
-            const enrollmentCount = enrollments.filter((e) => e.course_id === course.id).length
-            totalRevenue += (course.price || 0) * enrollmentCount
+          if (!coursePricesError && courses) {
+            // Crear mapa de precios por curso
+            const priceMap = courses.reduce((acc, course) => {
+              acc[course.id] = course.price || 0
+              return acc
+            }, {})
+
+            // Calcular ingresos totales
+            totalRevenue = enrollments.reduce((total, enrollment) => {
+              return total + (priceMap[enrollment.course_id] || 0)
+            }, 0)
           }
         }
       }
-    } catch (enrollmentError) {
-      console.error("Error calculando ingresos:", enrollmentError)
+    } catch (revenueError) {
+      console.error("Error calculando ingresos:", revenueError)
       totalRevenue = 0
     }
 
@@ -75,7 +78,7 @@ export async function GET() {
         totalUsers: totalUsers || 0,
         totalCourses: totalCourses || 0,
         totalLessons: totalLessons || 0,
-        totalRevenue: totalRevenue || 0,
+        totalRevenue: totalRevenue,
       },
     })
   } catch (error) {
