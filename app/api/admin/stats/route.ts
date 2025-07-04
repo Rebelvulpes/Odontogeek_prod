@@ -37,9 +37,10 @@ export async function GET() {
       console.error("Error obteniendo lecciones:", lessonsError)
     }
 
-    // Calcular ingresos basados en inscripciones y precios de cursos
+    // Calcular ingresos totales de forma segura
     let totalRevenue = 0
     try {
+      // Obtener inscripciones con información del curso
       const { data: enrollmentsWithCourses, error: enrollmentsError } = await supabase.from("enrollments").select(`
           id,
           courses:course_id(price)
@@ -55,7 +56,7 @@ export async function GET() {
         totalRevenue = 0
       }
     } catch (enrollmentError) {
-      console.error("Tabla enrollments no existe:", enrollmentError)
+      console.error("Error calculando ingresos:", enrollmentError)
       totalRevenue = 0
     }
 

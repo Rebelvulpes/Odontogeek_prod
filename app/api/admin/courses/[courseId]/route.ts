@@ -45,9 +45,35 @@ export async function GET(req: NextRequest, { params }: { params: { courseId: st
       })
     }
 
+    // Obtener inscripciones para este curso específico
+    let studentsCount = 0
+    let revenue = 0
+
+    try {
+      const { data: enrollments, error: enrollmentsError } = await supabase
+        .from("enrollments")
+        .select("id")
+        .eq("course_id", courseId)
+
+      if (!enrollmentsError && enrollments) {
+        studentsCount = enrollments.length
+        revenue = studentsCount * (course.price || 0)
+      }
+    } catch (enrollmentError) {
+      console.error("Error obteniendo inscripciones del curso:", enrollmentError)
+    }
+
+    const courseWithStats = {
+      ...course,
+      tags: course.tags?.map((relation: any) => relation.course_tags).filter(Boolean) || [],
+      lessonsCount: course.lessons?.filter((lesson) => !lesson.archived).length || 0,
+      students: studentsCount,
+      revenue: revenue,
+    }
+
     return NextResponse.json({
       success: true,
-      data: course,
+      data: courseWithStats,
     })
   } catch (error) {
     console.error("Error interno en GET /api/admin/courses/[courseId]:", error)
@@ -135,18 +161,18 @@ export async function DELETE(req: NextRequest, { params }: { params: { courseId:
     const { courseId } = params
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
+    // Eliminar inscripciones del curso primero
+    try {
+      await supabase.from("enrollments").delete().eq("course_id", courseId)
+    } catch (enrollmentError) {
+      console.log("Error eliminando inscripciones (puede que no existan):", enrollmentError)
+    }
+
     // Eliminar relaciones de etiquetas
     await supabase.from("course_tag_relations").delete().eq("course_id", courseId)
 
     // Eliminar lecciones del curso
     await supabase.from("lessons").delete().eq("course_id", courseId)
-
-    // Eliminar inscripciones del curso
-    try {
-      await supabase.from("enrollments").delete().eq("course_id", courseId)
-    } catch (enrollmentError) {
-      console.log("Tabla enrollments no existe, continuando...")
-    }
 
     // Eliminar el curso
     const { error: courseError } = await supabase.from("courses").delete().eq("id", courseId)
