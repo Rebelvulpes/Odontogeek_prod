@@ -37,22 +37,25 @@ export async function GET() {
       console.error("Error obteniendo lecciones:", lessonsError)
     }
 
-    // Obtener ingresos totales - manejo seguro de la tabla enrollments
+    // Calcular ingresos basados en inscripciones y precios de cursos
     let totalRevenue = 0
     try {
-      const { data: enrollments, error: enrollmentsError } = await supabase.from("enrollments").select("amount_paid")
+      const { data: enrollmentsWithCourses, error: enrollmentsError } = await supabase.from("enrollments").select(`
+          id,
+          courses:course_id(price)
+        `)
 
-      if (!enrollmentsError && enrollments) {
-        totalRevenue = enrollments.reduce((sum, enrollment) => {
-          return sum + (enrollment.amount_paid || 0)
+      if (!enrollmentsError && enrollmentsWithCourses) {
+        totalRevenue = enrollmentsWithCourses.reduce((sum, enrollment) => {
+          const coursePrice = enrollment.courses?.price || 0
+          return sum + coursePrice
         }, 0)
       } else if (enrollmentsError) {
-        console.error("Error obteniendo inscripciones (tabla puede no existir):", enrollmentsError)
-        // Si la tabla no existe, usar 0 como valor por defecto
+        console.error("Error obteniendo inscripciones:", enrollmentsError)
         totalRevenue = 0
       }
     } catch (enrollmentError) {
-      console.error("Tabla enrollments no existe o tiene problemas:", enrollmentError)
+      console.error("Tabla enrollments no existe:", enrollmentError)
       totalRevenue = 0
     }
 

@@ -44,44 +44,38 @@ export async function GET() {
       })
     }
 
-    // Ahora obtenemos las inscripciones por separado - manejo seguro
+    // Obtener inscripciones por curso - manejo seguro
     const enrollmentsByCourse = new Map()
     try {
-      const { data: enrollments, error: enrollmentsError } = await supabase
-        .from("enrollments")
-        .select("course_id, amount_paid")
+      const { data: enrollments, error: enrollmentsError } = await supabase.from("enrollments").select("course_id")
 
       if (!enrollmentsError && enrollments) {
         enrollments.forEach((enrollment) => {
           const courseId = enrollment.course_id
           if (!enrollmentsByCourse.has(courseId)) {
-            enrollmentsByCourse.set(courseId, {
-              count: 0,
-              revenue: 0,
-            })
+            enrollmentsByCourse.set(courseId, 0)
           }
-          const courseEnrollments = enrollmentsByCourse.get(courseId)
-          courseEnrollments.count += 1
-          courseEnrollments.revenue += enrollment.amount_paid || 0
+          enrollmentsByCourse.set(courseId, enrollmentsByCourse.get(courseId) + 1)
         })
       } else if (enrollmentsError) {
-        console.error("Error obteniendo inscripciones (tabla puede no existir):", enrollmentsError)
+        console.error("Error obteniendo inscripciones:", enrollmentsError)
       }
     } catch (enrollmentError) {
-      console.error("Tabla enrollments no existe o tiene problemas:", enrollmentError)
+      console.error("Tabla enrollments no existe:", enrollmentError)
     }
 
-    // Transformar los datos para que tengan la estructura correcta con datos reales
+    // Transformar los datos para que tengan la estructura correcta
     const coursesWithStats = courses.map((course) => {
-      const courseEnrollments = enrollmentsByCourse.get(course.id) || { count: 0, revenue: 0 }
+      const enrollmentCount = enrollmentsByCourse.get(course.id) || 0
       const lessonsCount = course.lessons?.filter((lesson) => !lesson.archived).length || 0
+      const revenue = enrollmentCount * (course.price || 0)
 
       return {
         ...course,
         tags: course.tags?.map((relation: any) => relation.course_tags).filter(Boolean) || [],
         lessonsCount: lessonsCount,
-        students: courseEnrollments.count, // Número real de estudiantes inscritos
-        revenue: courseEnrollments.revenue, // Ingresos reales basados en inscripciones
+        students: enrollmentCount, // Número real de estudiantes inscritos
+        revenue: revenue, // Ingresos calculados basados en precio del curso * inscripciones
       }
     })
 

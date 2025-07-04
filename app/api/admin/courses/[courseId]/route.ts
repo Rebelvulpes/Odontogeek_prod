@@ -6,8 +6,8 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 export async function GET(req: NextRequest, { params }: { params: { courseId: string } }) {
   try {
-    const { courseId } = params
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    const { courseId } = params
 
     const { data: course, error } = await supabase
       .from("courses")
@@ -45,33 +45,9 @@ export async function GET(req: NextRequest, { params }: { params: { courseId: st
       })
     }
 
-    // Obtener inscripciones para este curso
-    const { data: enrollments, error: enrollmentsError } = await supabase
-      .from("enrollments")
-      .select("amount_paid, payment_status")
-      .eq("course_id", courseId)
-
-    let studentsCount = 0
-    let revenue = 0
-
-    if (!enrollmentsError && enrollments) {
-      studentsCount = enrollments.length
-      revenue = enrollments
-        .filter((e) => e.payment_status === "completed")
-        .reduce((sum, e) => sum + (e.amount_paid || 0), 0)
-    }
-
-    const courseWithStats = {
-      ...course,
-      tags: course.tags?.map((relation: any) => relation.course_tags).filter(Boolean) || [],
-      lessonsCount: course.lessons?.filter((lesson) => !lesson.archived).length || 0,
-      students: studentsCount,
-      revenue: revenue,
-    }
-
     return NextResponse.json({
       success: true,
-      data: courseWithStats,
+      data: course,
     })
   } catch (error) {
     console.error("Error interno en GET /api/admin/courses/[courseId]:", error)
@@ -84,8 +60,8 @@ export async function GET(req: NextRequest, { params }: { params: { courseId: st
 
 export async function PUT(req: NextRequest, { params }: { params: { courseId: string } }) {
   try {
-    const { courseId } = params
     const body = await req.json()
+    const { courseId } = params
     const { title, description, price, instructor, thumbnail_url, duration_hours, tags, archived } = body
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
@@ -159,25 +135,18 @@ export async function DELETE(req: NextRequest, { params }: { params: { courseId:
     const { courseId } = params
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Verificar si el curso tiene inscripciones
-    const { data: enrollments, error: enrollmentsError } = await supabase
-      .from("enrollments")
-      .select("id")
-      .eq("course_id", courseId)
-      .limit(1)
-
-    if (!enrollmentsError && enrollments && enrollments.length > 0) {
-      return NextResponse.json({
-        success: false,
-        message: "No se puede eliminar un curso que tiene estudiantes inscritos. Archívalo en su lugar.",
-      })
-    }
-
     // Eliminar relaciones de etiquetas
     await supabase.from("course_tag_relations").delete().eq("course_id", courseId)
 
     // Eliminar lecciones del curso
     await supabase.from("lessons").delete().eq("course_id", courseId)
+
+    // Eliminar inscripciones del curso
+    try {
+      await supabase.from("enrollments").delete().eq("course_id", courseId)
+    } catch (enrollmentError) {
+      console.log("Tabla enrollments no existe, continuando...")
+    }
 
     // Eliminar el curso
     const { error: courseError } = await supabase.from("courses").delete().eq("id", courseId)
