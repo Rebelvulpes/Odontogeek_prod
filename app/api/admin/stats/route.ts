@@ -37,19 +37,23 @@ export async function GET() {
       console.error("Error obteniendo lecciones:", lessonsError)
     }
 
-    // Obtener ingresos totales (solo inscripciones completadas)
-    const { data: enrollments, error: enrollmentsError } = await supabase
-      .from("enrollments")
-      .select("amount_paid")
-      .eq("payment_status", "completed")
-
+    // Obtener ingresos totales - manejo seguro de la tabla enrollments
     let totalRevenue = 0
-    if (!enrollmentsError && enrollments) {
-      totalRevenue = enrollments.reduce((sum, enrollment) => {
-        return sum + (enrollment.amount_paid || 0)
-      }, 0)
-    } else if (enrollmentsError) {
-      console.error("Error obteniendo inscripciones:", enrollmentsError)
+    try {
+      const { data: enrollments, error: enrollmentsError } = await supabase.from("enrollments").select("amount_paid")
+
+      if (!enrollmentsError && enrollments) {
+        totalRevenue = enrollments.reduce((sum, enrollment) => {
+          return sum + (enrollment.amount_paid || 0)
+        }, 0)
+      } else if (enrollmentsError) {
+        console.error("Error obteniendo inscripciones (tabla puede no existir):", enrollmentsError)
+        // Si la tabla no existe, usar 0 como valor por defecto
+        totalRevenue = 0
+      }
+    } catch (enrollmentError) {
+      console.error("Tabla enrollments no existe o tiene problemas:", enrollmentError)
+      totalRevenue = 0
     }
 
     return NextResponse.json({

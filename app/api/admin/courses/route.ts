@@ -44,33 +44,31 @@ export async function GET() {
       })
     }
 
-    // Ahora obtenemos las inscripciones por separado para evitar el error de JOIN
-    const { data: enrollments, error: enrollmentsError } = await supabase
-      .from("enrollments")
-      .select("course_id, amount_paid, payment_status")
-
-    if (enrollmentsError) {
-      console.error("Error obteniendo inscripciones:", enrollmentsError)
-      // No fallar si no hay tabla de inscripciones, solo usar datos vacíos
-    }
-
-    // Crear un mapa de inscripciones por curso
+    // Ahora obtenemos las inscripciones por separado - manejo seguro
     const enrollmentsByCourse = new Map()
-    if (enrollments) {
-      enrollments.forEach((enrollment) => {
-        const courseId = enrollment.course_id
-        if (!enrollmentsByCourse.has(courseId)) {
-          enrollmentsByCourse.set(courseId, {
-            count: 0,
-            revenue: 0,
-          })
-        }
-        const courseEnrollments = enrollmentsByCourse.get(courseId)
-        courseEnrollments.count += 1
-        if (enrollment.payment_status === "completed") {
+    try {
+      const { data: enrollments, error: enrollmentsError } = await supabase
+        .from("enrollments")
+        .select("course_id, amount_paid")
+
+      if (!enrollmentsError && enrollments) {
+        enrollments.forEach((enrollment) => {
+          const courseId = enrollment.course_id
+          if (!enrollmentsByCourse.has(courseId)) {
+            enrollmentsByCourse.set(courseId, {
+              count: 0,
+              revenue: 0,
+            })
+          }
+          const courseEnrollments = enrollmentsByCourse.get(courseId)
+          courseEnrollments.count += 1
           courseEnrollments.revenue += enrollment.amount_paid || 0
-        }
-      })
+        })
+      } else if (enrollmentsError) {
+        console.error("Error obteniendo inscripciones (tabla puede no existir):", enrollmentsError)
+      }
+    } catch (enrollmentError) {
+      console.error("Tabla enrollments no existe o tiene problemas:", enrollmentError)
     }
 
     // Transformar los datos para que tengan la estructura correcta con datos reales
@@ -83,7 +81,7 @@ export async function GET() {
         tags: course.tags?.map((relation: any) => relation.course_tags).filter(Boolean) || [],
         lessonsCount: lessonsCount,
         students: courseEnrollments.count, // Número real de estudiantes inscritos
-        revenue: courseEnrollments.revenue, // Ingresos reales basados en inscripciones completadas
+        revenue: courseEnrollments.revenue, // Ingresos reales basados en inscripciones
       }
     })
 
