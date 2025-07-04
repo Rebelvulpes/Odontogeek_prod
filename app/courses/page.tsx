@@ -276,21 +276,21 @@ export default function CoursesPage() {
           )}
         </div>
 
-        {/* Courses Grid */}
+        {/* Courses Grid - Tarjetas más grandes para imágenes 1080x1080 */}
         {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {Array.from({ length: 12 }).map((_, index) => (
               <Card key={index} className="overflow-hidden">
-                <Skeleton className="aspect-video w-full" />
-                <CardHeader className="p-4">
-                  <Skeleton className="h-5 w-3/4 mb-2" />
-                  <Skeleton className="h-4 w-full" />
+                <Skeleton className="aspect-square w-full" />
+                <CardHeader className="p-6">
+                  <Skeleton className="h-6 w-3/4 mb-3" />
+                  <Skeleton className="h-4 w-full mb-2" />
                   <Skeleton className="h-4 w-2/3" />
                 </CardHeader>
-                <CardContent className="p-4 pt-0">
+                <CardContent className="p-6 pt-0">
                   <div className="flex justify-between items-center">
-                    <Skeleton className="h-6 w-16" />
-                    <Skeleton className="h-8 w-20" />
+                    <Skeleton className="h-6 w-20" />
+                    <Skeleton className="h-10 w-24" />
                   </div>
                 </CardContent>
               </Card>
@@ -312,80 +312,101 @@ export default function CoursesPage() {
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {courses.map((course) => (
-              <Card key={course.id} className="overflow-hidden hover:shadow-lg transition-shadow group">
-                <div className="aspect-video bg-gradient-to-br from-blue-100 to-indigo-100 relative overflow-hidden">
+              <Card
+                key={course.id}
+                className="overflow-hidden hover:shadow-xl transition-all duration-300 group bg-white"
+              >
+                {/* Imagen cuadrada 1:1 para 1080x1080 */}
+                <div className="aspect-square bg-gradient-to-br from-blue-50 to-indigo-50 relative overflow-hidden">
                   {course.thumbnail_url ? (
                     <img
                       src={course.thumbnail_url || "/placeholder.svg"}
                       alt={course.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       onError={(e) => {
-                        e.currentTarget.src = "/placeholder.svg?height=200&width=300&text=Imagen+no+disponible"
+                        console.error("Error cargando imagen:", course.thumbnail_url)
+                        e.currentTarget.src = "/placeholder.svg?height=400&width=400&text=Imagen+no+disponible"
                       }}
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-100 to-indigo-100">
-                      <BookOpen className="w-12 h-12 text-blue-400" />
+                      <BookOpen className="w-16 h-16 text-blue-400" />
                     </div>
                   )}
-                  <div className="absolute inset-0 bg-black/20 group-hover:bg-black/30 transition-colors" />
-                  <div className="absolute top-3 right-3">
-                    <Badge className="bg-white/90 text-gray-900 font-semibold">${course.price}</Badge>
+
+                  {/* Overlay con gradiente */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
+                  {/* Precio en la esquina superior derecha */}
+                  <div className="absolute top-4 right-4">
+                    <Badge className="bg-white/95 text-gray-900 font-bold text-base px-3 py-1 shadow-lg">
+                      ${course.price}
+                    </Badge>
                   </div>
-                  <div className="absolute bottom-3 left-3">
-                    <div className="flex items-center space-x-2 text-white text-sm">
+
+                  {/* Info de lecciones en la esquina inferior izquierda */}
+                  <div className="absolute bottom-4 left-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <div className="flex items-center space-x-2 text-white text-sm font-medium bg-black/50 rounded-full px-3 py-1 backdrop-blur-sm">
                       <Play className="w-4 h-4" />
                       <span>{course.lessons_count} lecciones</span>
                     </div>
                   </div>
                 </div>
 
-                <CardHeader className="p-4">
-                  <div className="flex flex-wrap gap-1 mb-2">
-                    {course.tags.slice(0, 2).map((tag) => (
+                <CardHeader className="p-6">
+                  {/* Etiquetas */}
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {course.tags.slice(0, 3).map((tag) => (
                       <Badge
                         key={tag.id}
                         variant="secondary"
-                        className="text-xs"
-                        style={{ backgroundColor: tag.color + "20", color: tag.color }}
+                        className="text-xs font-medium"
+                        style={{ backgroundColor: tag.color + "15", color: tag.color, borderColor: tag.color + "30" }}
                       >
                         {tag.name}
                       </Badge>
                     ))}
-                    {course.tags.length > 2 && (
+                    {course.tags.length > 3 && (
                       <Badge variant="secondary" className="text-xs">
-                        +{course.tags.length - 2}
+                        +{course.tags.length - 3} más
                       </Badge>
                     )}
                   </div>
-                  <CardTitle className="text-lg line-clamp-2">{course.title}</CardTitle>
-                  <CardDescription className="line-clamp-2 text-sm">{course.description}</CardDescription>
+
+                  <CardTitle className="text-xl font-bold line-clamp-2 mb-2 group-hover:text-blue-600 transition-colors">
+                    {course.title}
+                  </CardTitle>
+                  <CardDescription className="line-clamp-3 text-sm text-gray-600 leading-relaxed">
+                    {course.description}
+                  </CardDescription>
                 </CardHeader>
 
-                <CardContent className="p-4 pt-0">
-                  <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
+                <CardContent className="p-6 pt-0">
+                  {/* Estadísticas del curso */}
+                  <div className="flex items-center justify-between text-sm text-gray-600 mb-6">
                     <div className="flex items-center space-x-4">
                       <div className="flex items-center space-x-1">
-                        <Clock className="w-4 h-4" />
-                        <span>{course.duration_hours || 0}h</span>
+                        <Clock className="w-4 h-4 text-blue-500" />
+                        <span className="font-medium">{course.duration_hours || 0}h</span>
                       </div>
                       <div className="flex items-center space-x-1">
-                        <Users className="w-4 h-4" />
-                        <span>{course.students_count}</span>
+                        <Users className="w-4 h-4 text-green-500" />
+                        <span className="font-medium">{course.students_count}</span>
                       </div>
                     </div>
                     <div className="flex items-center space-x-1">
                       <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                      <span>4.8</span>
+                      <span className="font-medium">4.8</span>
                     </div>
                   </div>
 
+                  {/* Botón de acción */}
                   <Link href={`/courses/${course.id}`} className="block">
-                    <Button className="w-full group-hover:bg-blue-700 transition-colors">
-                      <Award className="w-4 h-4 mr-2" />
-                      Ver Curso
+                    <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition-all duration-200 group-hover:shadow-lg">
+                      <Award className="w-5 h-5 mr-2" />
+                      Ver Curso Completo
                     </Button>
                   </Link>
                 </CardContent>

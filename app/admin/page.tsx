@@ -649,19 +649,20 @@ const AdminPage = () => {
                           <TableCell>
                             <div className="flex items-start space-x-3">
                               {/* Imagen del curso */}
-                              <div className="w-16 h-12 sm:w-20 sm:h-14 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+                              <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
                                 {course.thumbnail_url ? (
                                   <img
                                     src={course.thumbnail_url || "/placeholder.svg"}
                                     alt={course.title}
                                     className="w-full h-full object-cover"
                                     onError={(e) => {
-                                      e.currentTarget.src = "/placeholder.svg?height=56&width=80&text=No+Image"
+                                      console.error("Error cargando imagen en admin:", course.thumbnail_url)
+                                      e.currentTarget.src = "/placeholder.svg?height=80&width=80&text=No+Image"
                                     }}
                                   />
                                 ) : (
                                   <div className="w-full h-full flex items-center justify-center bg-gray-200">
-                                    <ImageIcon className="w-4 h-4 text-gray-400" />
+                                    <ImageIcon className="w-6 h-6 text-gray-400" />
                                   </div>
                                 )}
                               </div>
@@ -1224,7 +1225,7 @@ const AdminPage = () => {
                     <ExternalLink className="w-3 h-3 mt-0.5 flex-shrink-0" />
                     <div>
                       <p>Sube tu imagen a Cloudinary, Imgur, o cualquier servicio de hosting de imágenes.</p>
-                      <p className="mt-1">Tamaño recomendado: 400x300px (4:3)</p>
+                      <p className="mt-1">Tamaño recomendado: 1080x1080px (1:1)</p>
                     </div>
                   </div>
                 </div>
@@ -1234,13 +1235,13 @@ const AdminPage = () => {
                   <div className="space-y-2">
                     <Label className="text-sm">Vista Previa</Label>
                     <div className="w-full max-w-sm">
-                      <div className="aspect-[4/3] bg-gray-100 rounded-lg overflow-hidden border">
+                      <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden border">
                         <img
                           src={newCourse.thumbnailUrl || "/placeholder.svg"}
                           alt="Vista previa del curso"
                           className="w-full h-full object-cover"
                           onError={(e) => {
-                            e.currentTarget.src = "/placeholder.svg?height=225&width=300&text=Error+cargando+imagen"
+                            e.currentTarget.src = "/placeholder.svg?height=300&width=300&text=Error+cargando+imagen"
                           }}
                         />
                       </div>
