@@ -43,6 +43,8 @@ import {
   LogOut,
   Archive,
   Tag,
+  ImageIcon,
+  ExternalLink,
 } from "lucide-react"
 
 const AdminPage = () => {
@@ -55,6 +57,8 @@ const AdminPage = () => {
     description: "",
     price: "",
     instructor: "",
+    thumbnailUrl: "",
+    durationHours: "",
     tags: [],
   })
   const [selectedCourse, setSelectedCourse] = useState<number | null>(null)
@@ -134,11 +138,22 @@ const AdminPage = () => {
       const response = await fetch("/api/admin/courses", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newCourse),
+        body: JSON.stringify({
+          ...newCourse,
+          duration_hours: newCourse.durationHours ? Number.parseInt(newCourse.durationHours) : null,
+        }),
       })
       const result = await response.json()
       if (result.success) {
-        setNewCourse({ title: "", description: "", price: "", instructor: "", tags: [] })
+        setNewCourse({
+          title: "",
+          description: "",
+          price: "",
+          instructor: "",
+          thumbnailUrl: "",
+          durationHours: "",
+          tags: [],
+        })
         setIsCreateCourseDialogOpen(false)
         loadCourses() // Recargar cursos
         alert("Curso creado exitosamente!")
@@ -620,7 +635,7 @@ const AdminPage = () => {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="min-w-[200px]">Curso</TableHead>
+                        <TableHead className="min-w-[250px]">Curso</TableHead>
                         <TableHead className="min-w-[100px]">Estudiantes</TableHead>
                         <TableHead className="min-w-[100px]">Ingresos</TableHead>
                         <TableHead className="min-w-[100px]">Lecciones</TableHead>
@@ -632,35 +647,58 @@ const AdminPage = () => {
                       {courses.map((course) => (
                         <TableRow key={course.id}>
                           <TableCell>
-                            <div>
-                              <div className="flex items-center space-x-2">
-                                <p className="font-medium text-sm sm:text-base">{course.title}</p>
-                                {course.archived && (
-                                  <Badge variant="secondary" className="text-xs bg-gray-100 text-gray-600">
-                                    Archivado
-                                  </Badge>
+                            <div className="flex items-start space-x-3">
+                              {/* Imagen del curso */}
+                              <div className="w-16 h-12 sm:w-20 sm:h-14 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+                                {course.thumbnail_url ? (
+                                  <img
+                                    src={course.thumbnail_url || "/placeholder.svg"}
+                                    alt={course.title}
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                      e.currentTarget.src = "/placeholder.svg?height=56&width=80&text=No+Image"
+                                    }}
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center bg-gray-200">
+                                    <ImageIcon className="w-4 h-4 text-gray-400" />
+                                  </div>
                                 )}
                               </div>
-                              <div className="flex flex-wrap gap-1 mt-1">
-                                {course.tags?.slice(0, 2).map((tag) => (
-                                  <Badge
-                                    key={tag.id}
-                                    variant="secondary"
-                                    className="text-xs"
-                                    style={{ backgroundColor: tag.color + "20", color: tag.color }}
-                                  >
-                                    {tag.name}
-                                  </Badge>
-                                ))}
-                                {course.tags?.length > 2 && (
-                                  <Badge variant="secondary" className="text-xs">
-                                    +{course.tags.length - 2}
-                                  </Badge>
-                                )}
+
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center space-x-2">
+                                  <p className="font-medium text-sm sm:text-base truncate">{course.title}</p>
+                                  {course.archived && (
+                                    <Badge variant="secondary" className="text-xs bg-gray-100 text-gray-600">
+                                      Archivado
+                                    </Badge>
+                                  )}
+                                </div>
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {course.tags?.slice(0, 2).map((tag) => (
+                                    <Badge
+                                      key={tag.id}
+                                      variant="secondary"
+                                      className="text-xs"
+                                      style={{ backgroundColor: tag.color + "20", color: tag.color }}
+                                    >
+                                      {tag.name}
+                                    </Badge>
+                                  ))}
+                                  {course.tags?.length > 2 && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      +{course.tags.length - 2}
+                                    </Badge>
+                                  )}
+                                </div>
+                                <p className="text-xs sm:text-sm text-gray-500 mt-1">
+                                  ${course.price} • {course.duration_hours || 0}h
+                                </p>
+                                <p className="text-xs text-gray-400">
+                                  Creado: {course.created_at ? new Date(course.created_at).toLocaleDateString() : "N/A"}
+                                </p>
                               </div>
-                              <p className="text-xs sm:text-sm text-gray-500">
-                                Creado: {course.created_at ? new Date(course.created_at).toLocaleDateString() : "N/A"}
-                              </p>
                             </div>
                           </TableCell>
                           <TableCell className="text-sm sm:text-base">
@@ -1080,7 +1118,7 @@ const AdminPage = () => {
 
       {/* Dialog para crear curso */}
       <Dialog open={isCreateCourseDialogOpen} onOpenChange={setIsCreateCourseDialogOpen}>
-        <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-[95vw] sm:max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-base sm:text-lg">Crear Nuevo Curso</DialogTitle>
             <DialogDescription className="text-sm">
@@ -1089,85 +1127,151 @@ const AdminPage = () => {
           </DialogHeader>
 
           <form onSubmit={handleCreateCourse} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="title" className="text-sm sm:text-base">
-                Título del Curso
-              </Label>
-              <Input
-                id="title"
-                placeholder="Ej: Implantología Avanzada"
-                value={newCourse.title}
-                onChange={(e) => setNewCourse({ ...newCourse, title: e.target.value })}
-                className="text-sm sm:text-base"
-                required
-              />
-            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Columna izquierda - Información básica */}
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="title" className="text-sm sm:text-base">
+                    Título del Curso
+                  </Label>
+                  <Input
+                    id="title"
+                    placeholder="Ej: Implantología Avanzada"
+                    value={newCourse.title}
+                    onChange={(e) => setNewCourse({ ...newCourse, title: e.target.value })}
+                    className="text-sm sm:text-base"
+                    required
+                  />
+                </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="description" className="text-sm sm:text-base">
-                Descripción
-              </Label>
-              <Textarea
-                id="description"
-                placeholder="Describe el contenido del curso..."
-                value={newCourse.description}
-                onChange={(e) => setNewCourse({ ...newCourse, description: e.target.value })}
-                className="text-sm sm:text-base"
-                required
-              />
-            </div>
+                <div className="space-y-2">
+                  <Label htmlFor="description" className="text-sm sm:text-base">
+                    Descripción
+                  </Label>
+                  <Textarea
+                    id="description"
+                    placeholder="Describe el contenido del curso..."
+                    value={newCourse.description}
+                    onChange={(e) => setNewCourse({ ...newCourse, description: e.target.value })}
+                    className="text-sm sm:text-base"
+                    rows={4}
+                    required
+                  />
+                </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="price" className="text-sm sm:text-base">
-                  Precio ($)
-                </Label>
-                <Input
-                  id="price"
-                  type="number"
-                  placeholder="299"
-                  value={newCourse.price}
-                  onChange={(e) => setNewCourse({ ...newCourse, price: e.target.value })}
-                  className="text-sm sm:text-base"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="instructor" className="text-sm sm:text-base">
-                  Instructor
-                </Label>
-                <Input
-                  id="instructor"
-                  placeholder="Dr. Juan Pérez"
-                  value={newCourse.instructor}
-                  onChange={(e) => setNewCourse({ ...newCourse, instructor: e.target.value })}
-                  className="text-sm sm:text-base"
-                  required
-                />
-              </div>
-            </div>
-
-            {/* Selección de Etiquetas */}
-            <div className="space-y-2">
-              <Label className="text-sm sm:text-base">Etiquetas del Curso</Label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-40 overflow-y-auto p-2 border rounded-md">
-                {tags.map((tag) => (
-                  <div key={tag.id} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={`tag-${tag.id}`}
-                      checked={newCourse.tags.includes(tag.id)}
-                      onCheckedChange={() => handleTagToggle(tag.id)}
-                    />
-                    <Label htmlFor={`tag-${tag.id}`} className="text-xs cursor-pointer" style={{ color: tag.color }}>
-                      {tag.name}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="price" className="text-sm sm:text-base">
+                      Precio ($)
                     </Label>
+                    <Input
+                      id="price"
+                      type="number"
+                      placeholder="299"
+                      value={newCourse.price}
+                      onChange={(e) => setNewCourse({ ...newCourse, price: e.target.value })}
+                      className="text-sm sm:text-base"
+                      required
+                    />
                   </div>
-                ))}
+                  <div className="space-y-2">
+                    <Label htmlFor="durationHours" className="text-sm sm:text-base">
+                      Duración (horas)
+                    </Label>
+                    <Input
+                      id="durationHours"
+                      type="number"
+                      placeholder="12"
+                      value={newCourse.durationHours}
+                      onChange={(e) => setNewCourse({ ...newCourse, durationHours: e.target.value })}
+                      className="text-sm sm:text-base"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="instructor" className="text-sm sm:text-base">
+                    Instructor
+                  </Label>
+                  <Input
+                    id="instructor"
+                    placeholder="Dr. Juan Pérez"
+                    value={newCourse.instructor}
+                    onChange={(e) => setNewCourse({ ...newCourse, instructor: e.target.value })}
+                    className="text-sm sm:text-base"
+                    required
+                  />
+                </div>
               </div>
-              <p className="text-xs text-gray-500">Selecciona las etiquetas que mejor describan este curso</p>
+
+              {/* Columna derecha - Imagen y etiquetas */}
+              <div className="space-y-4">
+                {/* Imagen del curso */}
+                <div className="space-y-2">
+                  <Label htmlFor="thumbnailUrl" className="text-sm sm:text-base flex items-center">
+                    <ImageIcon className="w-4 h-4 mr-2" />
+                    Imagen del Curso
+                  </Label>
+                  <Input
+                    id="thumbnailUrl"
+                    type="url"
+                    placeholder="https://res.cloudinary.com/tu-cuenta/image/upload/v123/curso.jpg"
+                    value={newCourse.thumbnailUrl}
+                    onChange={(e) => setNewCourse({ ...newCourse, thumbnailUrl: e.target.value })}
+                    className="text-sm sm:text-base"
+                  />
+                  <div className="flex items-start space-x-2 text-xs text-gray-500">
+                    <ExternalLink className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p>Sube tu imagen a Cloudinary, Imgur, o cualquier servicio de hosting de imágenes.</p>
+                      <p className="mt-1">Tamaño recomendado: 400x300px (4:3)</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Vista previa de la imagen */}
+                {newCourse.thumbnailUrl && (
+                  <div className="space-y-2">
+                    <Label className="text-sm">Vista Previa</Label>
+                    <div className="w-full max-w-sm">
+                      <div className="aspect-[4/3] bg-gray-100 rounded-lg overflow-hidden border">
+                        <img
+                          src={newCourse.thumbnailUrl || "/placeholder.svg"}
+                          alt="Vista previa del curso"
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.src = "/placeholder.svg?height=225&width=300&text=Error+cargando+imagen"
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Selección de Etiquetas */}
+                <div className="space-y-2">
+                  <Label className="text-sm sm:text-base">Etiquetas del Curso</Label>
+                  <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-3 border rounded-md bg-gray-50">
+                    {tags.map((tag) => (
+                      <div key={tag.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`tag-${tag.id}`}
+                          checked={newCourse.tags.includes(tag.id)}
+                          onCheckedChange={() => handleTagToggle(tag.id)}
+                        />
+                        <Label htmlFor={`tag-${tag.id}`} className="text-xs cursor-pointer flex items-center space-x-1">
+                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: tag.color }} />
+                          <span style={{ color: tag.color }}>{tag.name}</span>
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-500">Selecciona las etiquetas que mejor describan este curso</p>
+                </div>
+              </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-2 pt-4">
+            <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-2 pt-6 border-t">
               <Button
                 type="button"
                 variant="outline"
@@ -1177,6 +1281,7 @@ const AdminPage = () => {
                 Cancelar
               </Button>
               <Button type="submit" className="w-full sm:w-auto">
+                <Plus className="w-4 h-4 mr-2" />
                 Crear Curso
               </Button>
             </div>

@@ -19,6 +19,7 @@ interface Course {
   duration_hours: number
   lessons_count: number
   students_count: number
+  thumbnail_url?: string
   tags: Array<{
     id: string
     name: string
@@ -315,11 +316,20 @@ export default function CoursesPage() {
             {courses.map((course) => (
               <Card key={course.id} className="overflow-hidden hover:shadow-lg transition-shadow group">
                 <div className="aspect-video bg-gradient-to-br from-blue-100 to-indigo-100 relative overflow-hidden">
-                  <img
-                    src="/placeholder.svg?height=200&width=300"
-                    alt={course.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
+                  {course.thumbnail_url ? (
+                    <img
+                      src={course.thumbnail_url || "/placeholder.svg"}
+                      alt={course.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      onError={(e) => {
+                        e.currentTarget.src = "/placeholder.svg?height=200&width=300&text=Imagen+no+disponible"
+                      }}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-100 to-indigo-100">
+                      <BookOpen className="w-12 h-12 text-blue-400" />
+                    </div>
+                  )}
                   <div className="absolute inset-0 bg-black/20 group-hover:bg-black/30 transition-colors" />
                   <div className="absolute top-3 right-3">
                     <Badge className="bg-white/90 text-gray-900 font-semibold">${course.price}</Badge>
@@ -359,7 +369,7 @@ export default function CoursesPage() {
                     <div className="flex items-center space-x-4">
                       <div className="flex items-center space-x-1">
                         <Clock className="w-4 h-4" />
-                        <span>{course.duration_hours}h</span>
+                        <span>{course.duration_hours || 0}h</span>
                       </div>
                       <div className="flex items-center space-x-1">
                         <Users className="w-4 h-4" />

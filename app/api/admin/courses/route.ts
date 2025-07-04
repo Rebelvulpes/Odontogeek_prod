@@ -84,12 +84,12 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const { title, description, price, instructor, duration_hours, tags } = await req.json()
+    const { title, description, price, instructor, duration_hours, thumbnailUrl, tags } = await req.json()
 
     if (!title || !description || !price || !instructor) {
       return NextResponse.json({
         success: false,
-        message: "Todos los campos son requeridos",
+        message: "Todos los campos requeridos deben estar completos",
       })
     }
 
@@ -104,8 +104,10 @@ export async function POST(req: NextRequest) {
           description,
           price: Number.parseFloat(price),
           instructor_id: null, // Por ahora sin instructor específico
+          thumbnail_url: thumbnailUrl || null,
           duration_hours: duration_hours ? Number.parseInt(duration_hours) : null,
-          status: "draft",
+          status: "published", // Publicar automáticamente
+          total_lessons: 0, // Se actualizará cuando se agreguen lecciones
         },
       ])
       .select()
