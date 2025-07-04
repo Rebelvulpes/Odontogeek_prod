@@ -6,36 +6,34 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 export async function PUT(req: NextRequest, { params }: { params: { lessonId: string } }) {
   try {
-    const { title, description, video_url, duration_minutes, order_index, is_free } = await req.json()
+    const { lessonId } = params
+    const body = await req.json()
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    const { data: updatedLesson, error } = await supabase
+    // Actualizar la lección
+    const { data: lesson, error: lessonError } = await supabase
       .from("lessons")
-      .update({
-        title,
-        description,
-        video_url,
-        duration_minutes: Number.parseInt(duration_minutes),
-        order_index: Number.parseInt(order_index),
-        is_free: is_free || false,
-      })
-      .eq("id", params.lessonId)
+      .update(body)
+      .eq("id", lessonId)
       .select()
+      .single()
 
-    if (error) {
+    if (lessonError) {
+      console.error("Error actualizando lección:", lessonError)
       return NextResponse.json({
         success: false,
-        message: `Error actualizando lección: ${error.message}`,
+        message: `Error actualizando lección: ${lessonError.message}`,
       })
     }
 
     return NextResponse.json({
       success: true,
+      data: lesson,
       message: "Lección actualizada exitosamente",
-      data: updatedLesson[0],
     })
   } catch (error) {
+    console.error("Error interno en PUT /api/admin/lessons/[lessonId]:", error)
     return NextResponse.json({
       success: false,
       message: `Error interno: ${(error as Error).message}`,
@@ -45,14 +43,18 @@ export async function PUT(req: NextRequest, { params }: { params: { lessonId: st
 
 export async function DELETE(req: NextRequest, { params }: { params: { lessonId: string } }) {
   try {
+    const { lessonId } = params
+
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    const { error } = await supabase.from("lessons").delete().eq("id", params.lessonId)
+    // Eliminar la lección
+    const { error: lessonError } = await supabase.from("lessons").delete().eq("id", lessonId)
 
-    if (error) {
+    if (lessonError) {
+      console.error("Error eliminando lección:", lessonError)
       return NextResponse.json({
         success: false,
-        message: `Error eliminando lección: ${error.message}`,
+        message: `Error eliminando lección: ${lessonError.message}`,
       })
     }
 
@@ -61,6 +63,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { lessonId:
       message: "Lección eliminada exitosamente",
     })
   } catch (error) {
+    console.error("Error interno en DELETE /api/admin/lessons/[lessonId]:", error)
     return NextResponse.json({
       success: false,
       message: `Error interno: ${(error as Error).message}`,

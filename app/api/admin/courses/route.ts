@@ -8,70 +8,69 @@ export async function GET() {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Obtener todos los cursos
+    // Obtener todos los cursos con sus lecciones y etiquetas
     const { data: courses, error: coursesError } = await supabase
       .from("courses")
-      .select("*")
+      .select(`
+        *,
+        lessons:lessons(
+          id,
+          title,
+          description,
+          video_url,
+          duration_minutes,
+          order_index,
+          is_free,
+          archived,
+          created_at
+        )
+      `)
       .order("created_at", { ascending: false })
 
     if (coursesError) {
+      console.error("Error obteniendo cursos:", coursesError)
       return NextResponse.json({
         success: false,
         message: `Error obteniendo cursos: ${coursesError.message}`,
       })
     }
 
-    // Procesar cada curso para obtener datos adicionales
-    const coursesWithStats = await Promise.all(
+    // Obtener etiquetas para cada curso
+    const coursesWithTags = await Promise.all(
       (courses || []).map(async (course) => {
-        // Obtener etiquetas del curso
         const { data: courseTags } = await supabase
           .from("course_tag_relations")
           .select(`
-            course_tags(*)
+            course_tags(
+              id,
+              name,
+              slug,
+              color
+            )
           `)
           .eq("course_id", course.id)
 
-        // Obtener lecciones del curso
-        const { data: lessons, error: lessonsError } = await supabase
-          .from("lessons")
-          .select("*")
-          .eq("course_id", course.id)
-          .order("order_index", { ascending: true })
-
-        if (lessonsError) {
-          console.error(`Error obteniendo lecciones para curso ${course.id}:`, lessonsError)
-        }
-
-        // Obtener número de estudiantes inscritos
+        // Contar estudiantes y calcular ingresos
         const { count: studentsCount } = await supabase
           .from("enrollments")
           .select("*", { count: "exact", head: true })
           .eq("course_id", course.id)
 
-        // Obtener ingresos totales
-        const { data: payments } = await supabase
-          .from("payments")
-          .select("amount")
-          .eq("course_id", course.id)
-          .eq("status", "completed")
-
-        const totalRevenue = payments?.reduce((sum, payment) => sum + payment.amount, 0) || 0
+        const revenue = (studentsCount || 0) * (course.price || 0)
 
         return {
           ...course,
-          lessons: lessons || [],
-          students: studentsCount || 0,
-          revenue: totalRevenue,
-          lessonsCount: lessons?.length || 0,
           tags: courseTags?.map((relation) => relation.course_tags).filter(Boolean) || [],
+          students: studentsCount || 0,
+          revenue,
+          lessonsCount: course.lessons?.length || 0,
         }
       }),
     )
 
     return NextResponse.json({
       success: true,
-      data: coursesWithStats,
+      data: coursesWithTags,
     })
   } catch (error) {
     console.error("Error interno en GET /api/admin/courses:", error)
@@ -84,47 +83,39 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const { title, description, price, instructor, duration_hours, thumbnailUrl, tags } = await req.json()
-
-    if (!title || !description || !price || !instructor) {
-      return NextResponse.json({
-        success: false,
-        message: "Todos los campos requeridos deben estar completos",
-      })
-    }
+    const body = await req.json()
+    const { title, description, price, instructor, thumbnailUrl, duration_hours, tags } = body
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
     // Crear el curso
-    const { data: newCourse, error: createError } = await supabase
+    const { data: course, error: courseError } = await supabase
       .from("courses")
-      .insert([
-        {
-          title,
-          description,
-          price: Number.parseFloat(price),
-          instructor_id: null, // Por ahora sin instructor específico
-          thumbnail_url: thumbnailUrl || null,
-          duration_hours: duration_hours ? Number.parseInt(duration_hours) : null,
-          status: "published", // Publicar automáticamente
-          total_lessons: 0, // Se actualizará cuando se agreguen lecciones
-        },
-      ])
+      .insert({
+        title,
+        description,
+        price: Number.parseFloat(price),
+        instructor,
+        thumbnail_url: thumbnailUrl || null,
+        duration_hours: duration_hours || null,
+        status: "published",
+        archived: false,
+      })
       .select()
+      .single()
 
-    if (createError) {
+    if (courseError) {
+      console.error("Error creando curso:", courseError)
       return NextResponse.json({
         success: false,
-        message: `Error creando curso: ${createError.message}`,
+        message: `Error creando curso: ${courseError.message}`,
       })
     }
-
-    const courseId = newCourse[0].id
 
     // Asociar etiquetas si se proporcionaron
     if (tags && tags.length > 0) {
       const tagRelations = tags.map((tagId: string) => ({
-        course_id: courseId,
+        course_id: course.id,
         tag_id: tagId,
       }))
 
@@ -132,16 +123,17 @@ export async function POST(req: NextRequest) {
 
       if (tagsError) {
         console.error("Error asociando etiquetas:", tagsError)
-        // No fallar por esto, solo registrar el error
+        // No fallar completamente, solo advertir
       }
     }
 
     return NextResponse.json({
       success: true,
+      data: course,
       message: "Curso creado exitosamente",
-      data: newCourse[0],
     })
   } catch (error) {
+    console.error("Error interno en POST /api/admin/courses:", error)
     return NextResponse.json({
       success: false,
       message: `Error interno: ${(error as Error).message}`,
