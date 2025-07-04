@@ -8,13 +8,11 @@ export async function GET() {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Usar la función personalizada para obtener cursos con etiquetas
-    const { data: courses, error: coursesError } = await supabase.rpc("get_courses_with_tags", {
-      p_limit: 100, // Límite alto para admin
-      p_offset: 0,
-      p_tag_slugs: null,
-      p_search: null,
-    })
+    // Obtener todos los cursos
+    const { data: courses, error: coursesError } = await supabase
+      .from("courses")
+      .select("*")
+      .order("created_at", { ascending: false })
 
     if (coursesError) {
       return NextResponse.json({
@@ -23,9 +21,34 @@ export async function GET() {
       })
     }
 
-    // Obtener datos adicionales para cada curso
+    // Procesar cada curso para obtener datos adicionales
     const coursesWithStats = await Promise.all(
-      courses.map(async (course) => {
+      (courses || []).map(async (course) => {
+        // Obtener etiquetas del curso
+        const { data: courseTags } = await supabase
+          .from("course_tag_relations")
+          .select(`
+            course_tags(*)
+          `)
+          .eq("course_id", course.id)
+
+        // Obtener lecciones del curso
+        const { data: lessons, error: lessonsError } = await supabase
+          .from("lessons")
+          .select("*")
+          .eq("course_id", course.id)
+          .order("order_index", { ascending: true })
+
+        if (lessonsError) {
+          console.error(`Error obteniendo lecciones para curso ${course.id}:`, lessonsError)
+        }
+
+        // Obtener número de estudiantes inscritos
+        const { count: studentsCount } = await supabase
+          .from("enrollments")
+          .select("*", { count: "exact", head: true })
+          .eq("course_id", course.id)
+
         // Obtener ingresos totales
         const { data: payments } = await supabase
           .from("payments")
@@ -37,9 +60,11 @@ export async function GET() {
 
         return {
           ...course,
+          lessons: lessons || [],
+          students: studentsCount || 0,
           revenue: totalRevenue,
-          lessonsCount: course.lessons_count || 0,
-          students: course.students_count || 0,
+          lessonsCount: lessons?.length || 0,
+          tags: courseTags?.map((relation) => relation.course_tags).filter(Boolean) || [],
         }
       }),
     )
