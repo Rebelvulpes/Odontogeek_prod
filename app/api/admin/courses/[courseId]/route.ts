@@ -1,101 +1,22 @@
-import { type NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
-export async function GET(req: NextRequest, { params }: { params: { courseId: string } }) {
+export async function PUT(request: Request, { params }: { params: { courseId: string } }) {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
     const { courseId } = params
+    const body = await request.json()
 
-    const { data: course, error } = await supabase
-      .from("courses")
-      .select(`
-        *,
-        lessons:lessons(
-          id,
-          title,
-          description,
-          video_url,
-          duration_minutes,
-          order_index,
-          is_free,
-          archived,
-          created_at
-        ),
-        tags:course_tag_relations(
-          course_tags(
-            id,
-            name,
-            slug,
-            color,
-            description
-          )
-        )
-      `)
-      .eq("id", courseId)
-      .single()
+    console.log("Actualizando curso:", courseId, "con datos:", body)
 
-    if (error) {
-      console.error("Error obteniendo curso:", error)
-      return NextResponse.json({
-        success: false,
-        message: `Error obteniendo curso: ${error.message}`,
-      })
-    }
-
-    // Obtener inscripciones para este curso específico
-    let studentsCount = 0
-    let revenue = 0
-
-    try {
-      const { data: enrollments, error: enrollmentsError } = await supabase
-        .from("enrollments")
-        .select("id")
-        .eq("course_id", courseId)
-
-      if (!enrollmentsError && enrollments) {
-        studentsCount = enrollments.length
-        revenue = studentsCount * (course.price || 0)
-      }
-    } catch (enrollmentError) {
-      console.error("Error obteniendo inscripciones del curso:", enrollmentError)
-    }
-
-    const courseWithStats = {
-      ...course,
-      tags: course.tags?.map((relation: any) => relation.course_tags).filter(Boolean) || [],
-      lessonsCount: course.lessons?.filter((lesson) => !lesson.archived).length || 0,
-      students: studentsCount,
-      revenue: revenue,
-    }
-
-    return NextResponse.json({
-      success: true,
-      data: courseWithStats,
-    })
-  } catch (error) {
-    console.error("Error interno en GET /api/admin/courses/[courseId]:", error)
-    return NextResponse.json({
-      success: false,
-      message: `Error interno: ${(error as Error).message}`,
-    })
-  }
-}
-
-export async function PUT(req: NextRequest, { params }: { params: { courseId: string } }) {
-  try {
-    const body = await req.json()
-    const { courseId } = params
+    // Extraer datos del cuerpo
     const { title, description, price, instructor, thumbnail_url, duration_hours, tags, archived } = body
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
-
-    // Actualizar el curso
-    const updateData: any = {
-      updated_at: new Date().toISOString(),
-    }
+    // Preparar datos de actualización
+    const updateData: any = {}
 
     if (title !== undefined) updateData.title = title
     if (description !== undefined) updateData.description = description
@@ -106,6 +27,7 @@ export async function PUT(req: NextRequest, { params }: { params: { courseId: st
       updateData.duration_hours = duration_hours ? Number.parseInt(duration_hours) : null
     if (archived !== undefined) updateData.archived = archived
 
+    // Actualizar el curso
     const { data: course, error: courseError } = await supabase
       .from("courses")
       .update(updateData)
@@ -121,31 +43,34 @@ export async function PUT(req: NextRequest, { params }: { params: { courseId: st
       })
     }
 
-    // Actualizar etiquetas si se proporcionaron
-    if (tags && Array.isArray(tags)) {
-      // Eliminar etiquetas existentes
-      await supabase.from("course_tag_relations").delete().eq("course_id", courseId)
+    // Si se proporcionaron etiquetas, actualizar las asociaciones
+    if (tags !== undefined && Array.isArray(tags)) {
+      // Eliminar asociaciones existentes
+      const { error: deleteError } = await supabase.from("course_tags").delete().eq("course_id", courseId)
 
-      // Agregar nuevas etiquetas
+      if (deleteError) {
+        console.error("Error eliminando etiquetas existentes:", deleteError)
+      }
+
+      // Crear nuevas asociaciones
       if (tags.length > 0) {
-        const tagRelations = tags.map((tagId: string) => ({
+        const tagAssociations = tags.map((tagId: string) => ({
           course_id: courseId,
-          tag_id: tagId,
+          course_tag_id: tagId,
         }))
 
-        const { error: tagError } = await supabase.from("course_tag_relations").insert(tagRelations)
+        const { error: tagsError } = await supabase.from("course_tags").insert(tagAssociations)
 
-        if (tagError) {
-          console.error("Error actualizando etiquetas:", tagError)
-          // No fallar la actualización del curso por las etiquetas
+        if (tagsError) {
+          console.error("Error asociando nuevas etiquetas:", tagsError)
         }
       }
     }
 
     return NextResponse.json({
       success: true,
+      message: archived ? "Curso archivado exitosamente" : "Curso actualizado exitosamente",
       data: course,
-      message: "Curso actualizado exitosamente",
     })
   } catch (error) {
     console.error("Error interno en PUT /api/admin/courses/[courseId]:", error)
@@ -156,25 +81,35 @@ export async function PUT(req: NextRequest, { params }: { params: { courseId: st
   }
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { courseId: string } }) {
+export async function DELETE(request: Request, { params }: { params: { courseId: string } }) {
   try {
-    const { courseId } = params
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    const { courseId } = params
 
-    // Eliminar inscripciones del curso primero
-    try {
-      await supabase.from("enrollments").delete().eq("course_id", courseId)
-    } catch (enrollmentError) {
-      console.log("Error eliminando inscripciones (puede que no existan):", enrollmentError)
+    console.log("Eliminando curso:", courseId)
+
+    // Primero eliminar las lecciones asociadas
+    const { error: lessonsError } = await supabase.from("lessons").delete().eq("course_id", courseId)
+
+    if (lessonsError) {
+      console.error("Error eliminando lecciones:", lessonsError)
     }
 
-    // Eliminar relaciones de etiquetas
-    await supabase.from("course_tag_relations").delete().eq("course_id", courseId)
+    // Eliminar asociaciones de etiquetas
+    const { error: tagsError } = await supabase.from("course_tags").delete().eq("course_id", courseId)
 
-    // Eliminar lecciones del curso
-    await supabase.from("lessons").delete().eq("course_id", courseId)
+    if (tagsError) {
+      console.error("Error eliminando asociaciones de etiquetas:", tagsError)
+    }
 
-    // Eliminar el curso
+    // Eliminar inscripciones asociadas
+    const { error: enrollmentsError } = await supabase.from("enrollments").delete().eq("course_id", courseId)
+
+    if (enrollmentsError) {
+      console.error("Error eliminando inscripciones:", enrollmentsError)
+    }
+
+    // Finalmente eliminar el curso
     const { error: courseError } = await supabase.from("courses").delete().eq("id", courseId)
 
     if (courseError) {
@@ -187,7 +122,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { courseId:
 
     return NextResponse.json({
       success: true,
-      message: "Curso eliminado exitosamente",
+      message: "Curso y todos sus datos asociados eliminados exitosamente",
     })
   } catch (error) {
     console.error("Error interno en DELETE /api/admin/courses/[courseId]:", error)

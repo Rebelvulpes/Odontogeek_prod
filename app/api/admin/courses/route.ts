@@ -1,4 +1,4 @@
-import { type NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -8,7 +8,7 @@ export async function GET() {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Primero obtenemos los cursos con sus lecciones y etiquetas
+    // Obtener cursos con sus lecciones y etiquetas
     const { data: courses, error } = await supabase
       .from("courses")
       .select(`
@@ -24,12 +24,12 @@ export async function GET() {
           archived,
           created_at
         ),
-        tags:course_tag_relations(
-          course_tags(
+        course_tags:course_tags(
+          course_tag:course_tag(
             id,
             name,
-            slug,
             color,
+            slug,
             description
           )
         )
@@ -41,79 +41,82 @@ export async function GET() {
       return NextResponse.json({
         success: false,
         message: `Error obteniendo cursos: ${error.message}`,
+        data: [],
       })
     }
 
-    // Obtener inscripciones por curso - manejo seguro
-    const enrollmentsByCourse = new Map()
-    try {
-      const { data: enrollments, error: enrollmentsError } = await supabase.from("enrollments").select("course_id")
+    // Obtener estadísticas de inscripciones para cada curso
+    const { data: enrollments, error: enrollmentsError } = await supabase.from("enrollments").select("course_id")
 
-      if (!enrollmentsError && enrollments) {
-        enrollments.forEach((enrollment) => {
-          const courseId = enrollment.course_id
-          if (!enrollmentsByCourse.has(courseId)) {
-            enrollmentsByCourse.set(courseId, 0)
-          }
-          enrollmentsByCourse.set(courseId, enrollmentsByCourse.get(courseId) + 1)
-        })
-      } else if (enrollmentsError) {
-        console.error("Error obteniendo inscripciones:", enrollmentsError)
-      }
-    } catch (enrollmentError) {
-      console.error("Tabla enrollments no existe:", enrollmentError)
+    let enrollmentStats = {}
+    if (!enrollmentsError && enrollments) {
+      // Contar inscripciones por curso
+      enrollmentStats = enrollments.reduce((acc, enrollment) => {
+        const courseId = enrollment.course_id
+        acc[courseId] = (acc[courseId] || 0) + 1
+        return acc
+      }, {})
     }
 
-    // Transformar los datos para que tengan la estructura correcta
-    const coursesWithStats = courses.map((course) => {
-      const enrollmentCount = enrollmentsByCourse.get(course.id) || 0
-      const lessonsCount = course.lessons?.filter((lesson) => !lesson.archived).length || 0
-      const revenue = enrollmentCount * (course.price || 0)
+    // Procesar los datos para el frontend
+    const processedCourses =
+      courses?.map((course) => {
+        // Filtrar lecciones no archivadas
+        const activeLessons = course.lessons?.filter((lesson) => !lesson.archived) || []
 
-      return {
-        ...course,
-        tags: course.tags?.map((relation: any) => relation.course_tags).filter(Boolean) || [],
-        lessonsCount: lessonsCount,
-        students: enrollmentCount, // Número real de estudiantes inscritos
-        revenue: revenue, // Ingresos calculados basados en precio del curso * inscripciones
-      }
-    })
+        // Procesar etiquetas
+        const tags = course.course_tags?.map((ct) => ct.course_tag).filter(Boolean) || []
+
+        // Calcular estadísticas
+        const enrollmentCount = enrollmentStats[course.id] || 0
+        const revenue = enrollmentCount * (course.price || 0)
+
+        return {
+          ...course,
+          lessons: activeLessons,
+          lessonsCount: activeLessons.length,
+          tags: tags,
+          students: enrollmentCount,
+          revenue: revenue,
+        }
+      }) || []
 
     return NextResponse.json({
       success: true,
-      data: coursesWithStats,
+      data: processedCourses,
     })
   } catch (error) {
     console.error("Error interno en GET /api/admin/courses:", error)
     return NextResponse.json({
       success: false,
       message: `Error interno: ${(error as Error).message}`,
+      data: [],
     })
   }
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(request: Request) {
   try {
-    const body = await req.json()
-    const { title, description, price, instructor, duration_hours, thumbnailUrl, tags } = body
-
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    const body = await request.json()
+
+    const { title, description, price, instructor, thumbnailUrl, duration_hours, tags } = body
 
     // Crear el curso
     const { data: course, error: courseError } = await supabase
       .from("courses")
-      .insert({
-        title,
-        description,
-        price: Number.parseFloat(price),
-        instructor_name: instructor, // Usar instructor_name en lugar de instructor
-        duration_hours: duration_hours ? Number.parseInt(duration_hours) : null,
-        thumbnail_url: thumbnailUrl || null,
-        status: "published",
-        archived: false,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
+      .insert([
+        {
+          title,
+          description,
+          price: Number.parseFloat(price),
+          instructor_name: instructor,
+          thumbnail_url: thumbnailUrl,
+          duration_hours: duration_hours ? Number.parseInt(duration_hours) : null,
+          status: "published",
+          archived: false,
+        },
+      ])
       .select()
       .single()
 
@@ -125,25 +128,25 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // Agregar etiquetas si se proporcionaron
-    if (tags && Array.isArray(tags) && tags.length > 0) {
-      const tagRelations = tags.map((tagId: string) => ({
+    // Asociar etiquetas si se proporcionaron
+    if (tags && tags.length > 0 && course) {
+      const tagAssociations = tags.map((tagId: string) => ({
         course_id: course.id,
-        tag_id: tagId,
+        course_tag_id: tagId,
       }))
 
-      const { error: tagError } = await supabase.from("course_tag_relations").insert(tagRelations)
+      const { error: tagsError } = await supabase.from("course_tags").insert(tagAssociations)
 
-      if (tagError) {
-        console.error("Error agregando etiquetas:", tagError)
-        // No fallar la creación del curso por las etiquetas
+      if (tagsError) {
+        console.error("Error asociando etiquetas:", tagsError)
+        // No fallar por esto, solo logear
       }
     }
 
     return NextResponse.json({
       success: true,
-      data: course,
       message: "Curso creado exitosamente",
+      data: course,
     })
   } catch (error) {
     console.error("Error interno en POST /api/admin/courses:", error)
