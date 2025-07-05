@@ -8,7 +8,7 @@ export async function GET() {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Obtener total de usuarios
+    // Obtener total de usuarios reales
     const { count: totalUsers, error: usersError } = await supabase
       .from("users")
       .select("*", { count: "exact", head: true })
@@ -37,14 +37,14 @@ export async function GET() {
       console.error("Error obteniendo lecciones:", lessonsError)
     }
 
-    // Calcular ingresos totales
+    // Calcular ingresos reales (solo si hay inscripciones reales)
     let totalRevenue = 0
     try {
-      // Obtener todas las inscripciones
+      // Verificar si la tabla enrollments existe y tiene datos
       const { data: enrollments, error: enrollmentsError } = await supabase.from("enrollments").select("course_id")
 
-      if (!enrollmentsError && enrollments) {
-        // Obtener precios de cursos únicos
+      if (!enrollmentsError && enrollments && enrollments.length > 0) {
+        // Solo calcular si hay inscripciones reales
         const uniqueCourseIds = [...new Set(enrollments.map((e) => e.course_id))]
 
         if (uniqueCourseIds.length > 0) {
@@ -54,18 +54,19 @@ export async function GET() {
             .in("id", uniqueCourseIds)
 
           if (!coursePricesError && courses) {
-            // Crear mapa de precios por curso
             const priceMap = courses.reduce((acc, course) => {
               acc[course.id] = course.price || 0
               return acc
             }, {})
 
-            // Calcular ingresos totales
             totalRevenue = enrollments.reduce((total, enrollment) => {
               return total + (priceMap[enrollment.course_id] || 0)
             }, 0)
           }
         }
+      } else {
+        // No hay inscripciones, ingresos = 0
+        totalRevenue = 0
       }
     } catch (revenueError) {
       console.error("Error calculando ingresos:", revenueError)

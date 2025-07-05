@@ -61,17 +61,25 @@ export async function GET() {
       }, {})
     }
 
-    // Obtener estadísticas de inscripciones para cada curso
-    const { data: enrollments, error: enrollmentsError } = await supabase.from("enrollments").select("course_id")
-
+    // Obtener inscripciones reales (solo si existen)
     let enrollmentStats = {}
-    if (!enrollmentsError && enrollments) {
-      // Contar inscripciones por curso
-      enrollmentStats = enrollments.reduce((acc, enrollment) => {
-        const courseId = enrollment.course_id
-        acc[courseId] = (acc[courseId] || 0) + 1
-        return acc
-      }, {})
+    try {
+      const { data: enrollments, error: enrollmentsError } = await supabase.from("enrollments").select("course_id")
+
+      if (!enrollmentsError && enrollments && enrollments.length > 0) {
+        // Solo contar si hay inscripciones reales
+        enrollmentStats = enrollments.reduce((acc, enrollment) => {
+          const courseId = enrollment.course_id
+          acc[courseId] = (acc[courseId] || 0) + 1
+          return acc
+        }, {})
+      } else {
+        // No hay inscripciones, todos los cursos tienen 0 estudiantes
+        enrollmentStats = {}
+      }
+    } catch (enrollmentError) {
+      console.error("Error obteniendo inscripciones:", enrollmentError)
+      enrollmentStats = {}
     }
 
     // Procesar los datos para el frontend
@@ -83,17 +91,17 @@ export async function GET() {
         // Obtener etiquetas para este curso
         const courseTags = tagsByCourse[course.id] || []
 
-        // Calcular estadísticas
-        const enrollmentCount = enrollmentStats[course.id] || 0
-        const revenue = enrollmentCount * (course.price || 0)
+        // Calcular estadísticas REALES (sin datos falsos)
+        const enrollmentCount = enrollmentStats[course.id] || 0 // 0 si no hay inscripciones reales
+        const revenue = enrollmentCount * (course.price || 0) // 0 si no hay estudiantes
 
         return {
           ...course,
           lessons: activeLessons,
           lessonsCount: activeLessons.length,
           tags: courseTags,
-          students: enrollmentCount,
-          revenue: revenue,
+          students: enrollmentCount, // Número real de estudiantes (0 si no hay inscripciones)
+          revenue: revenue, // Ingresos reales (0 si no hay estudiantes)
         }
       }) || []
 
