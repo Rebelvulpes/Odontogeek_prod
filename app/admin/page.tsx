@@ -97,7 +97,6 @@ const AdminPage = () => {
         setStats(result.data)
       } else {
         console.error("Error cargando estadísticas:", result.message)
-        // Usar datos por defecto si hay error
         setStats({
           totalUsers: 0,
           totalCourses: 0,
@@ -107,7 +106,6 @@ const AdminPage = () => {
       }
     } catch (error) {
       console.error("Error cargando estadísticas:", error)
-      // Usar datos por defecto si hay error
       setStats({
         totalUsers: 0,
         totalCourses: 0,
@@ -123,12 +121,11 @@ const AdminPage = () => {
       const response = await fetch("/api/admin/courses")
       const result = await response.json()
 
-      console.log("Respuesta de la API:", result) // Debug
+      console.log("Respuesta de la API:", result)
 
       if (result.success) {
-        // Ensure lessons array exists for each course and log the structure
         const coursesWithLessons = result.data.map((course) => {
-          console.log(`Curso ${course.title}:`, course.lessons) // Debug
+          console.log(`Curso ${course.title}:`, course.lessons)
           return {
             ...course,
             lessons: course.lessons || [],
@@ -188,8 +185,8 @@ const AdminPage = () => {
           tags: [],
         })
         setIsCreateCourseDialogOpen(false)
-        loadCourses() // Recargar cursos
-        loadStats() // Recargar estadísticas
+        loadCourses()
+        loadStats()
         alert("Curso creado exitosamente!")
       } else {
         alert(result.message)
@@ -211,7 +208,7 @@ const AdminPage = () => {
       if (result.success) {
         setNewTag({ name: "", color: "#3B82F6", description: "" })
         setIsCreateTagDialogOpen(false)
-        loadTags() // Recargar etiquetas
+        loadTags()
         alert("Etiqueta creada exitosamente!")
       } else {
         alert(result.message)
@@ -239,7 +236,7 @@ const AdminPage = () => {
       if (result.success) {
         setIsEditTagDialogOpen(false)
         setEditingTag(null)
-        loadTags() // Recargar etiquetas
+        loadTags()
         alert("Etiqueta actualizada exitosamente!")
       } else {
         alert(result.message)
@@ -260,7 +257,7 @@ const AdminPage = () => {
       if (result.success) {
         setIsDeleteTagDialogOpen(false)
         setTagToDelete(null)
-        loadTags() // Recargar etiquetas
+        loadTags()
         alert("Etiqueta eliminada exitosamente!")
       } else {
         alert(result.message)
@@ -300,8 +297,8 @@ const AdminPage = () => {
       if (result.success) {
         setIsLessonDialogOpen(false)
         setNewLesson({ title: "", description: "", videoUrl: "", duration: "", order: "", isFree: false })
-        loadCourses() // Recargar cursos
-        loadStats() // Recargar estadísticas
+        loadCourses()
+        loadStats()
         alert("Lección creada exitosamente!")
       } else {
         alert(result.message)
@@ -312,7 +309,7 @@ const AdminPage = () => {
   }
 
   const openLessonDialog = (courseId: number, lesson?: any) => {
-    console.log("Abriendo diálogo para curso:", courseId, "lección:", lesson) // Debug
+    console.log("Abriendo diálogo para curso:", courseId, "lección:", lesson)
 
     setSelectedCourse(courseId)
     if (lesson) {
@@ -320,10 +317,10 @@ const AdminPage = () => {
       setNewLesson({
         title: lesson.title || "",
         description: lesson.description || "",
-        videoUrl: lesson.video_url || "", // database uses video_url
-        duration: lesson.duration_minutes?.toString() || "", // database uses duration_minutes
-        order: lesson.order_index?.toString() || "", // database uses order_index
-        isFree: lesson.is_free || false, // database uses is_free
+        videoUrl: lesson.video_url || "",
+        duration: lesson.duration_minutes?.toString() || "",
+        order: lesson.order_index?.toString() || "",
+        isFree: lesson.is_free || false,
       })
     } else {
       setEditingLesson(null)
@@ -340,7 +337,7 @@ const AdminPage = () => {
   }
 
   const handleArchiveLesson = async (lessonId: string) => {
-    console.log("Intentando archivar lección con ID:", lessonId) // Debug
+    console.log("Intentando archivar lección con ID:", lessonId)
 
     if (!lessonId || lessonId === "undefined" || lessonId === "null") {
       alert("Error: ID de lección no válido")
@@ -371,7 +368,7 @@ const AdminPage = () => {
   }
 
   const handleDeleteLesson = async (lessonId: string) => {
-    console.log("Intentando eliminar lección con ID:", lessonId) // Debug
+    console.log("Intentando eliminar lección con ID:", lessonId)
 
     if (!lessonId || lessonId === "undefined" || lessonId === "null") {
       alert("Error: ID de lección no válido")
@@ -401,7 +398,6 @@ const AdminPage = () => {
     }
   }
 
-  // Nuevas funciones para cursos
   const handleArchiveCourse = async (courseId: string) => {
     console.log("Intentando archivar curso con ID:", courseId)
 
@@ -481,7 +477,7 @@ const AdminPage = () => {
       title: course.title || "",
       description: course.description || "",
       price: course.price?.toString() || "",
-      instructor: course.instructor_name || "", // Usar instructor_name
+      instructor: course.instructor_name || "",
       thumbnailUrl: course.thumbnail_url || "",
       durationHours: course.duration_hours?.toString() || "",
       tags: course.tags?.map((tag: any) => tag.id) || [],
@@ -501,7 +497,7 @@ const AdminPage = () => {
           title: newCourse.title,
           description: newCourse.description,
           price: Number.parseFloat(newCourse.price),
-          instructor: newCourse.instructor, // Se mapea a instructor_name en la API
+          instructor: newCourse.instructor,
           thumbnail_url: newCourse.thumbnailUrl,
           duration_hours: newCourse.durationHours ? Number.parseInt(newCourse.durationHours) : null,
           tags: newCourse.tags,
@@ -551,6 +547,12 @@ const AdminPage = () => {
       <Navigation user={{ name: "Admin", email: "admin@odontogeek.com", role: "admin" }} />
 
       <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
+        {/* Page Title */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">Panel de Administración</h1>
+          <p className="text-gray-600 mt-2">Gestiona cursos, lecciones, etiquetas y usuarios</p>
+        </div>
+
         {/* Stats Cards - Mobile optimized con datos reales */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 mb-6 sm:mb-8">
           <Card>
@@ -657,7 +659,6 @@ const AdminPage = () => {
                         <TableRow key={course.id}>
                           <TableCell>
                             <div className="flex items-start space-x-3">
-                              {/* Imagen del curso */}
                               <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
                                 {course.thumbnail_url ? (
                                   <img
@@ -824,7 +825,7 @@ const AdminPage = () => {
                     {course.lessons && course.lessons.length > 0 ? (
                       <div className="space-y-3">
                         {course.lessons.map((lesson) => {
-                          console.log("Renderizando lección:", lesson) // Debug
+                          console.log("Renderizando lección:", lesson)
                           return (
                             <div
                               key={lesson.id}

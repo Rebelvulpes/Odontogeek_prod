@@ -1,129 +1,84 @@
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
-import { NextResponse } from "next/server"
-import { cookies } from "next/headers"
+import { type NextRequest, NextResponse } from "next/server"
+import { createClient } from "@supabase/supabase-js"
 
-export const dynamic = "force-dynamic"
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
-export async function GET(request: Request) {
-  const supabase = createRouteHandlerClient({ cookies })
-
+export async function GET() {
   try {
-    // Obtener todos los cursos con lecciones
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+    // Obtener cursos con lecciones, etiquetas y estadísticas
     const { data: courses, error: coursesError } = await supabase
       .from("courses")
       .select(`
         *,
-        lessons (
-          id,
-          title,
-          description,
-          video_url,
-          duration_minutes,
-          order_index,
-          is_free,
-          archived,
-          created_at
+        lessons:lessons(*),
+        course_tags:course_tags(
+          tag:course_tag(*)
         )
       `)
       .order("created_at", { ascending: false })
 
     if (coursesError) {
       console.error("Error obteniendo cursos:", coursesError)
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Error obteniendo cursos",
-          error: coursesError,
-        },
-        { status: 500 },
-      )
+      return NextResponse.json({
+        success: false,
+        message: "Error obteniendo cursos: " + coursesError.message,
+      })
     }
 
-    // Obtener el número de inscripciones por curso usando la tabla correcta "enrollments"
-    const { data: enrollments, error: enrollmentsError } = await supabase
+    // Obtener estadísticas de inscripciones por curso
+    const { data: enrollmentStats, error: enrollmentError } = await supabase
       .from("enrollments")
-      .select("course_id")
-      .eq("payment_status", "completed")
+      .select("course_id, user_id, amount")
 
-    if (enrollmentsError) {
-      console.error("Error obteniendo inscripciones:", enrollmentsError)
-      // No fallar si no hay inscripciones, solo usar 0
-    }
-
-    // Crear un mapa de inscripciones por curso
-    const enrollmentsByCourse = new Map()
-    if (enrollments) {
-      enrollments.forEach((enrollment) => {
-        enrollmentsByCourse.set(enrollment.course_id, (enrollmentsByCourse.get(enrollment.course_id) || 0) + 1)
+    if (enrollmentError) {
+      console.error("Error obteniendo inscripciones:", enrollmentError)
+      return NextResponse.json({
+        success: false,
+        message: "Error obteniendo inscripciones: " + enrollmentError.message,
       })
     }
 
-    // Obtener etiquetas de cursos usando la relación correcta
-    const { data: courseTags, error: courseTagsError } = await supabase.from("course_tags").select(`
-        course_id,
-        tags!course_tags_tag_id_fkey (
-          id,
-          name,
-          color,
-          slug
-        )
-      `)
+    // Procesar datos de cursos
+    const processedCourses = courses?.map((course) => {
+      // Contar estudiantes y calcular ingresos
+      const courseEnrollments = enrollmentStats?.filter((e) => e.course_id === course.id) || []
+      const students = courseEnrollments.length
+      const revenue = courseEnrollments.reduce((sum, e) => sum + (e.amount || 0), 0)
 
-    if (courseTagsError) {
-      console.error("Error obteniendo etiquetas de cursos:", courseTagsError)
-    }
-
-    // Crear un mapa de etiquetas por curso
-    const tagsByCourse = new Map()
-    if (courseTags) {
-      courseTags.forEach((ct) => {
-        if (!tagsByCourse.has(ct.course_id)) {
-          tagsByCourse.set(ct.course_id, [])
-        }
-        if (ct.tags) {
-          tagsByCourse.get(ct.course_id).push(ct.tags)
-        }
-      })
-    }
-
-    // Procesar cursos y agregar datos calculados
-    const processedCourses = courses.map((course) => {
-      const studentCount = enrollmentsByCourse.get(course.id) || 0
-      const revenue = studentCount * (course.price || 0)
-      const lessonsCount = course.lessons ? course.lessons.filter((lesson) => !lesson.archived).length : 0
+      // Procesar etiquetas
+      const tags = course.course_tags?.map((ct: any) => ct.tag).filter(Boolean) || []
 
       return {
         ...course,
-        tags: tagsByCourse.get(course.id) || [],
-        students: studentCount,
-        revenue: revenue,
-        lessonsCount: lessonsCount,
-        status: course.archived ? "archived" : "published",
+        lessons: course.lessons || [],
+        lessonsCount: course.lessons?.length || 0,
+        tags,
+        students,
+        revenue,
       }
     })
 
     return NextResponse.json({
       success: true,
-      data: processedCourses,
+      data: processedCourses || [],
     })
   } catch (error) {
-    console.error("Error en la ruta de cursos admin:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Error interno del servidor",
-        error: error.message,
-      },
-      { status: 500 },
-    )
+    console.error("Error en API de cursos admin:", error)
+    return NextResponse.json({
+      success: false,
+      message: "Error interno del servidor",
+    })
   }
 }
 
-export async function POST(request: Request) {
-  const supabase = createRouteHandlerClient({ cookies })
-
+export async function POST(request: NextRequest) {
   try {
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
     const body = await request.json()
+
     const { title, description, price, instructor, thumbnail_url, duration_hours, tags } = body
 
     // Crear el curso
@@ -136,53 +91,44 @@ export async function POST(request: Request) {
         instructor_name: instructor,
         thumbnail_url,
         duration_hours: duration_hours ? Number.parseInt(duration_hours) : null,
-        status: "published",
-        archived: false,
+        status: "draft",
       })
       .select()
       .single()
 
     if (courseError) {
       console.error("Error creando curso:", courseError)
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Error creando curso",
-          error: courseError,
-        },
-        { status: 500 },
-      )
+      return NextResponse.json({
+        success: false,
+        message: "Error creando curso: " + courseError.message,
+      })
     }
 
     // Asociar etiquetas si se proporcionaron
-    if (tags && tags.length > 0) {
-      const courseTagsData = tags.map((tagId) => ({
+    if (tags && tags.length > 0 && course) {
+      const tagAssociations = tags.map((tagId: string) => ({
         course_id: course.id,
         tag_id: tagId,
       }))
 
-      const { error: tagsError } = await supabase.from("course_tags").insert(courseTagsData)
+      const { error: tagsError } = await supabase.from("course_tags").insert(tagAssociations)
 
       if (tagsError) {
         console.error("Error asociando etiquetas:", tagsError)
-        // No fallar por las etiquetas, el curso ya se creó
+        // No fallar completamente, solo log el error
       }
     }
 
     return NextResponse.json({
       success: true,
-      message: "Curso creado exitosamente",
       data: course,
+      message: "Curso creado exitosamente",
     })
   } catch (error) {
     console.error("Error en POST de cursos admin:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Error interno del servidor",
-        error: error.message,
-      },
-      { status: 500 },
-    )
+    return NextResponse.json({
+      success: false,
+      message: "Error interno del servidor",
+    })
   }
 }
