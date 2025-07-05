@@ -13,7 +13,7 @@ const slides = [
     title: "Nuevo Curso: Férulas Oclusales",
     subtitle: "Incrementa tus ingresos rápidamente imprimiendo tus propias férulas",
     description: "Olvídate de mandar a laboratorio y hazlas tú mismo",
-    image: "https://res.cloudinary.com/dxe6ugbzi/image/upload/v1746227801/fe%CC%81rulas_medit_qozti5.jpg",
+    image: "/placeholder.svg?height=400&width=600",
     badge: "Nuevo Curso",
     badgeColor: "bg-green-500",
     cta: "Ver Curso",
