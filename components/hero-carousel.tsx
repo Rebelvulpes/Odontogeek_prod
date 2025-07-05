@@ -10,9 +10,9 @@ const slides = [
   {
     id: 1,
     type: "course",
-    title: "Nuevo Curso: Implantología Avanzada",
-    subtitle: "Técnicas Revolucionarias en Implantes Dentales",
-    description: "Aprende las últimas técnicas en implantología con casos clínicos reales y protocolos actualizados.",
+    title: "Nuevo Curso: Férulas Oclusales",
+    subtitle: "Incrementa tus ingresos rápidamente imprimiendo tus propias férulas",
+    description: "Olvídate de mandar a laboratorio y hazlas tú mismo",
     image: "/placeholder.svg?height=400&width=600",
     badge: "Nuevo Curso",
     badgeColor: "bg-green-500",
