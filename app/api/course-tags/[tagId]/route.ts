@@ -84,7 +84,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { tagId: st
 
     // Verificar si la etiqueta está siendo usada
     const { count: usageCount } = await supabase
-      .from("course_tag_relations")
+      .from("course_tags")
       .select("*", { count: "exact", head: true })
       .eq("tag_id", tagId)
 
