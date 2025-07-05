@@ -30,11 +30,10 @@ export async function GET(request: NextRequest, { params }: { params: { courseId
       return NextResponse.json({ success: false, message: "Curso no encontrado" }, { status: 404 })
     }
 
-    // Obtener etiquetas del curso
+    // Obtener etiquetas del curso usando la relación correcta
     const { data: courseTags, error: courseTagsError } = await supabase
       .from("course_tags")
       .select(`
-        tag_id,
         tags (
           id,
           name,
@@ -66,8 +65,8 @@ export async function GET(request: NextRequest, { params }: { params: { courseId
     const processedCourse = {
       ...course,
       tags,
-      students: studentsCount, // Número real de estudiantes
-      revenue, // Ingresos reales
+      students: studentsCount,
+      revenue,
       lessonsCount: course.lessons?.length || 0,
     }
 
@@ -109,7 +108,7 @@ export async function PUT(request: NextRequest, { params }: { params: { courseId
       return NextResponse.json({ success: false, message: "Error actualizando curso" }, { status: 500 })
     }
 
-    // Actualizar etiquetas
+    // Actualizar etiquetas - CORREGIDO
     // Primero eliminar etiquetas existentes
     await supabase.from("course_tags").delete().eq("course_id", courseId)
 
@@ -124,6 +123,7 @@ export async function PUT(request: NextRequest, { params }: { params: { courseId
 
       if (tagsError) {
         console.error("Error actualizando etiquetas:", tagsError)
+        // No fallar completamente si las etiquetas fallan
       }
     }
 

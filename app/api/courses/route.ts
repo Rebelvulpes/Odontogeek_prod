@@ -1,114 +1,108 @@
-import { type NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
-export async function GET(req: NextRequest) {
+export async function GET(request: Request) {
   try {
-    const { searchParams } = new URL(req.url)
+    const { searchParams } = new URL(request.url)
     const page = Number.parseInt(searchParams.get("page") || "1")
     const limit = Number.parseInt(searchParams.get("limit") || "12")
     const search = searchParams.get("search") || ""
-    const tagsFilter = searchParams.get("tags") || ""
+    const tag = searchParams.get("tag") || ""
+    const priceFilter = searchParams.get("price") || ""
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    const offset = (page - 1) * limit
 
-    // Construir la consulta base
+    // Construir query base
     let query = supabase
       .from("courses")
       .select(`
-        id,
-        title,
-        description,
-        price,
-        duration_hours,
-        thumbnail_url,
-        created_at,
-        status,
-        instructor_name
+        *,
+        lessons (
+          id,
+          title,
+          duration_minutes,
+          is_free
+        )
       `)
       .eq("status", "published")
-      .neq("archived", true)
+      .eq("archived", false)
 
-    // Aplicar filtro de búsqueda si existe
+    // Aplicar filtros
     if (search) {
-      query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%`)
+      query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%,instructor_name.ilike.%${search}%`)
     }
 
-    // Obtener el total de cursos para paginación
-    const { count: totalCourses } = await supabase
-      .from("courses")
-      .select("*", { count: "exact", head: true })
-      .eq("status", "published")
-      .neq("archived", true)
+    if (priceFilter === "free") {
+      query = query.eq("price", 0)
+    } else if (priceFilter === "paid") {
+      query = query.gt("price", 0)
+    }
 
-    // Aplicar paginación
-    const offset = (page - 1) * limit
-    query = query.range(offset, offset + limit - 1).order("created_at", { ascending: false })
-
-    const { data: courses, error: coursesError } = await query
+    // Obtener cursos
+    const {
+      data: courses,
+      error: coursesError,
+      count: totalCourses,
+    } = await query.range(offset, offset + limit - 1).order("created_at", { ascending: false })
 
     if (coursesError) {
       console.error("Error obteniendo cursos:", coursesError)
-      return NextResponse.json({
-        success: false,
-        message: `Error obteniendo cursos: ${coursesError.message}`,
-      })
+      return NextResponse.json({ success: false, message: "Error obteniendo cursos" }, { status: 500 })
     }
 
-    // Procesar cada curso para obtener datos adicionales
-    const coursesWithDetails = await Promise.all(
+    // Obtener etiquetas para cada curso usando la relación correcta
+    const coursesWithTags = await Promise.all(
       (courses || []).map(async (course) => {
-        // Obtener etiquetas del curso usando la relación correcta
-        const { data: courseTags } = await supabase
-          .from("course_tag_relations")
+        // Obtener etiquetas del curso
+        const { data: courseTags, error: courseTagsError } = await supabase
+          .from("course_tags")
           .select(`
-            course_tags!course_tag_relations_tag_id_fkey(
+            tags (
               id,
               name,
-              slug,
-              color
+              color,
+              slug
             )
           `)
           .eq("course_id", course.id)
 
-        // Obtener lecciones del curso
-        const { data: lessons } = await supabase
-          .from("lessons")
-          .select(`
-            id,
-            title,
-            duration_minutes,
-            is_free
-          `)
-          .eq("course_id", course.id)
-          .neq("archived", true)
-          .order("order_index", { ascending: true })
+        if (courseTagsError) {
+          console.error(`Error obteniendo etiquetas para curso ${course.id}:`, courseTagsError)
+        }
 
-        // Obtener número de estudiantes inscritos
-        const { count: studentsCount } = await supabase
+        // Obtener inscripciones reales para este curso
+        const { data: enrollments, error: enrollmentsError } = await supabase
           .from("enrollments")
-          .select("*", { count: "exact", head: true })
+          .select("id")
           .eq("course_id", course.id)
+
+        if (enrollmentsError) {
+          console.error(`Error obteniendo inscripciones para curso ${course.id}:`, enrollmentsError)
+        }
+
+        // Procesar datos
+        const tags = courseTags?.map((ct) => ct.tags).filter(Boolean) || []
+        const studentsCount = enrollments?.length || 0
+        const lessonsCount = course.lessons?.length || 0
 
         return {
           ...course,
-          lessons: lessons || [],
-          students_count: studentsCount || 0,
-          tags: courseTags?.map((relation) => relation.course_tags).filter(Boolean) || [],
+          tags,
+          students: studentsCount,
+          lessonsCount,
         }
       }),
     )
 
-    // Filtrar por etiquetas si se especifica
-    let filteredCourses = coursesWithDetails
-    if (tagsFilter) {
-      const tagSlugs = tagsFilter.split(",")
-      filteredCourses = coursesWithDetails.filter((course) => course.tags.some((tag) => tagSlugs.includes(tag.slug)))
+    // Filtrar por etiqueta después de obtener las etiquetas
+    let filteredCourses = coursesWithTags
+    if (tag && tag !== "all") {
+      filteredCourses = coursesWithTags.filter((course) => course.tags?.some((courseTag: any) => courseTag.id === tag))
     }
 
-    // Calcular información de paginación
+    // Calcular paginación
     const totalPages = Math.ceil((totalCourses || 0) / limit)
     const hasNextPage = page < totalPages
     const hasPrevPage = page > 1
@@ -127,10 +121,7 @@ export async function GET(req: NextRequest) {
       },
     })
   } catch (error) {
-    console.error("Error interno en GET /api/courses:", error)
-    return NextResponse.json({
-      success: false,
-      message: `Error interno: ${(error as Error).message}`,
-    })
+    console.error("Error en GET /api/courses:", error)
+    return NextResponse.json({ success: false, message: "Error interno del servidor" }, { status: 500 })
   }
 }
