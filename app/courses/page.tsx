@@ -183,31 +183,31 @@ export default function CoursesPage() {
           </div>
         </div>
 
-        {/* Grid de cursos - Ajustado para cards más grandes */}
+        {/* Grid de cursos - Imágenes aún más grandes */}
         {filteredCourses.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8">
             {filteredCourses.map((course) => (
               <Card
                 key={course.id}
                 className="group hover:shadow-xl transition-all duration-300 overflow-hidden bg-white"
               >
-                {/* Imagen del curso - Más grande para 1080x1080 */}
-                <div className="relative h-72 sm:h-80 overflow-hidden">
+                {/* Imagen del curso - Mucho más grande para mostrar completamente 1080x1080 */}
+                <div className="relative h-96 sm:h-[400px] lg:h-[420px] overflow-hidden">
                   <img
-                    src={course.thumbnail_url || "/placeholder.svg?height=400&width=400&text=Curso"}
+                    src={course.thumbnail_url || "/placeholder.svg?height=500&width=500&text=Curso"}
                     alt={course.title}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     onError={(e) => {
-                      e.currentTarget.src = "/placeholder.svg?height=400&width=400&text=Curso+de+Odontología"
+                      e.currentTarget.src = "/placeholder.svg?height=500&width=500&text=Curso+de+Odontología"
                     }}
                   />
                   {course.price === 0 && (
-                    <Badge className="absolute top-4 left-4 bg-green-500 hover:bg-green-600 text-white font-medium px-3 py-1">
+                    <Badge className="absolute top-4 left-4 bg-green-500 hover:bg-green-600 text-white font-medium px-3 py-1.5 text-sm">
                       Gratuito
                     </Badge>
                   )}
                   {course.price > 0 && (
-                    <Badge className="absolute top-4 right-4 bg-blue-500 hover:bg-blue-600 text-white font-medium px-3 py-1">
+                    <Badge className="absolute top-4 right-4 bg-blue-500 hover:bg-blue-600 text-white font-medium px-3 py-1.5 text-sm">
                       ${course.price}
                     </Badge>
                   )}
@@ -215,8 +215,8 @@ export default function CoursesPage() {
                   {/* Overlay con botón de play */}
                   <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-300 flex items-center justify-center">
                     <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                      <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-lg">
-                        <Play className="w-6 h-6 text-blue-600 ml-1" />
+                      <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-lg">
+                        <Play className="w-8 h-8 text-blue-600 ml-1" />
                       </div>
                     </div>
                   </div>
@@ -245,7 +245,7 @@ export default function CoursesPage() {
                     )}
                   </div>
 
-                  <CardTitle className="text-xl font-bold line-clamp-2 group-hover:text-blue-600 transition-colors leading-tight mb-2">
+                  <CardTitle className="text-xl font-bold line-clamp-2 group-hover:text-blue-600 transition-colors leading-tight mb-3">
                     {course.title}
                   </CardTitle>
 
