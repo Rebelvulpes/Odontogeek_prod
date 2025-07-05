@@ -305,8 +305,11 @@ export default function AdminPanel() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...courseForm,
+          title: courseForm.title,
+          description: courseForm.description,
           price: Number.parseFloat(courseForm.price),
+          instructor: courseForm.instructor,
+          thumbnail_url: courseForm.thumbnail_url,
         }),
       })
 
@@ -317,9 +320,11 @@ export default function AdminPanel() {
         fetchCourses()
         fetchStats()
       } else {
-        throw new Error("Error al crear curso")
+        const errorData = await response.json()
+        throw new Error(errorData.message || "Error al crear curso")
       }
     } catch (error) {
+      console.error("Error creating course:", error)
       toast({ title: "Error", description: "Error al crear curso", variant: "destructive" })
     }
   }
@@ -332,8 +337,11 @@ export default function AdminPanel() {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...courseForm,
+          title: courseForm.title,
+          description: courseForm.description,
           price: Number.parseFloat(courseForm.price),
+          instructor: courseForm.instructor,
+          thumbnail_url: courseForm.thumbnail_url,
         }),
       })
 
@@ -408,13 +416,21 @@ export default function AdminPanel() {
   }
 
   const handleCreateLesson = async () => {
+    if (!lessonForm.course_id) {
+      toast({ title: "Error", description: "Debes seleccionar un curso", variant: "destructive" })
+      return
+    }
+
     try {
       const response = await fetch("/api/admin/lessons", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...lessonForm,
+          title: lessonForm.title,
+          description: lessonForm.description,
+          video_url: lessonForm.video_url,
           duration_minutes: Number.parseInt(lessonForm.duration_minutes),
+          course_id: lessonForm.course_id,
           order_index: Number.parseInt(lessonForm.order_index),
         }),
       })
@@ -433,9 +449,11 @@ export default function AdminPanel() {
         fetchLessons()
         fetchStats()
       } else {
-        throw new Error("Error al crear lección")
+        const errorData = await response.json()
+        throw new Error(errorData.message || "Error al crear lección")
       }
     } catch (error) {
+      console.error("Error creating lesson:", error)
       toast({ title: "Error", description: "Error al crear lección", variant: "destructive" })
     }
   }
@@ -448,8 +466,11 @@ export default function AdminPanel() {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...lessonForm,
+          title: lessonForm.title,
+          description: lessonForm.description,
+          video_url: lessonForm.video_url,
           duration_minutes: Number.parseInt(lessonForm.duration_minutes),
+          course_id: lessonForm.course_id,
           order_index: Number.parseInt(lessonForm.order_index),
         }),
       })
@@ -602,7 +623,11 @@ export default function AdminPanel() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...slideForm,
+          title: slideForm.title,
+          description: slideForm.description,
+          image_url: slideForm.image_url,
+          link_url: slideForm.link_url,
+          is_active: slideForm.is_active,
           order_index: Number.parseInt(slideForm.order_index),
         }),
       })
@@ -628,7 +653,11 @@ export default function AdminPanel() {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...slideForm,
+          title: slideForm.title,
+          description: slideForm.description,
+          image_url: slideForm.image_url,
+          link_url: slideForm.link_url,
+          is_active: slideForm.is_active,
           order_index: Number.parseInt(slideForm.order_index),
         }),
       })
@@ -881,6 +910,7 @@ export default function AdminPanel() {
                         <TableHead>Título</TableHead>
                         <TableHead>Instructor</TableHead>
                         <TableHead>Precio</TableHead>
+                        <TableHead>Lecciones</TableHead>
                         <TableHead>Estudiantes</TableHead>
                         <TableHead>Estado</TableHead>
                         <TableHead>Acciones</TableHead>
@@ -904,6 +934,7 @@ export default function AdminPanel() {
                             <TableCell className="font-medium">{course.title}</TableCell>
                             <TableCell>{course.instructor_name}</TableCell>
                             <TableCell>${course.price}</TableCell>
+                            <TableCell>{course.lessonsCount || 0}</TableCell>
                             <TableCell>{course.students || 0}</TableCell>
                             <TableCell>
                               <Badge variant={course.archived ? "secondary" : "default"}>
@@ -951,7 +982,7 @@ export default function AdminPanel() {
                         ))
                       ) : (
                         <TableRow>
-                          <TableCell colSpan={7} className="text-center py-8">
+                          <TableCell colSpan={8} className="text-center py-8">
                             No hay cursos disponibles
                           </TableCell>
                         </TableRow>
@@ -989,6 +1020,27 @@ export default function AdminPanel() {
                         </DialogHeader>
                         <div className="grid gap-4 py-4">
                           <div className="grid gap-2">
+                            <Label htmlFor="course-select">Curso *</Label>
+                            <Select
+                              value={lessonForm.course_id}
+                              onValueChange={(value) => setLessonForm({ ...lessonForm, course_id: value })}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Seleccionar curso" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {Array.isArray(courses) &&
+                                  courses
+                                    .filter((course) => !course.archived)
+                                    .map((course) => (
+                                      <SelectItem key={course.id} value={course.id}>
+                                        {course.title}
+                                      </SelectItem>
+                                    ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="grid gap-2">
                             <Label htmlFor="lesson-title">Título</Label>
                             <Input
                               id="lesson-title"
@@ -1016,7 +1068,7 @@ export default function AdminPanel() {
                               placeholder="https://ejemplo.com/video.mp4"
                             />
                           </div>
-                          <div className="grid grid-cols-3 gap-4">
+                          <div className="grid grid-cols-2 gap-4">
                             <div className="grid gap-2">
                               <Label htmlFor="duration">Duración (min)</Label>
                               <Input
@@ -1026,25 +1078,6 @@ export default function AdminPanel() {
                                 onChange={(e) => setLessonForm({ ...lessonForm, duration_minutes: e.target.value })}
                                 placeholder="30"
                               />
-                            </div>
-                            <div className="grid gap-2">
-                              <Label htmlFor="course-select">Curso</Label>
-                              <Select
-                                value={lessonForm.course_id}
-                                onValueChange={(value) => setLessonForm({ ...lessonForm, course_id: value })}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Seleccionar curso" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {Array.isArray(courses) &&
-                                    courses.map((course) => (
-                                      <SelectItem key={course.id} value={course.id}>
-                                        {course.title}
-                                      </SelectItem>
-                                    ))}
-                                </SelectContent>
-                              </Select>
                             </div>
                             <div className="grid gap-2">
                               <Label htmlFor="order">Orden</Label>
@@ -1089,7 +1122,16 @@ export default function AdminPanel() {
                           return (
                             <TableRow key={lesson.id}>
                               <TableCell className="font-medium">{lesson.title}</TableCell>
-                              <TableCell>{lesson.courses?.title || course?.title || "Curso no encontrado"}</TableCell>
+                              <TableCell>
+                                <div className="flex items-center space-x-2">
+                                  <span>{lesson.courses?.title || course?.title || "Curso no encontrado"}</span>
+                                  {course?.archived && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      Archivado
+                                    </Badge>
+                                  )}
+                                </div>
+                              </TableCell>
                               <TableCell>{lesson.duration_minutes} min</TableCell>
                               <TableCell>{lesson.order_index}</TableCell>
                               <TableCell>{new Date(lesson.created_at).toLocaleDateString()}</TableCell>
