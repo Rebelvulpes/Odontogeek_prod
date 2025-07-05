@@ -60,14 +60,14 @@ export async function GET() {
     }
 
     // Obtener etiquetas de cursos
-    const { data: courseTags, error: courseTagsError } = await supabase.from("course_tags").select("course_id, tag_id")
+    const { data: courseTags, error: courseTagsError } = await supabase.from("course_tags").select("*")
 
     if (courseTagsError) {
       console.error("Error obteniendo course_tags:", courseTagsError)
     }
 
     // Obtener todas las etiquetas
-    const { data: allTags, error: tagsError } = await supabase.from("course_tag").select("id, name, color, slug")
+    const { data: allTags, error: tagsError } = await supabase.from("tags").select("*")
 
     if (tagsError) {
       console.error("Error obteniendo tags:", tagsError)
