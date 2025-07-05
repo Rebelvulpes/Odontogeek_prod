@@ -4,80 +4,34 @@ import { createClient } from "@supabase/supabase-js"
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
-export async function GET(request: NextRequest, { params }: { params: { courseId: string } }) {
-  try {
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
-    const { courseId } = params
-
-    const { data: course, error } = await supabase
-      .from("courses")
-      .select(`
-        *,
-        lessons (
-          id,
-          title,
-          description,
-          video_url,
-          duration_minutes,
-          order_index,
-          is_free,
-          archived,
-          created_at
-        )
-      `)
-      .eq("id", courseId)
-      .single()
-
-    if (error) {
-      console.error("Error obteniendo curso:", error)
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Error obteniendo curso",
-          error: error,
-        },
-        { status: 500 },
-      )
-    }
-
-    return NextResponse.json({
-      success: true,
-      data: course,
-    })
-  } catch (error) {
-    console.error("Error en GET curso:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Error interno del servidor",
-        error: error instanceof Error ? error.message : "Error desconocido",
-      },
-      { status: 500 },
-    )
-  }
-}
-
 export async function PUT(request: NextRequest, { params }: { params: { courseId: string } }) {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
-    const { courseId } = params
     const body = await request.json()
+    const { courseId } = params
 
-    const { title, description, price, instructor, thumbnail_url, duration_hours, tags, archived } = body
+    const { title, description, price, instructor, thumbnail_url } = body
+
+    // Validar campos requeridos
+    if (!title || !description || !instructor) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Los campos título, descripción e instructor son requeridos",
+        },
+        { status: 400 },
+      )
+    }
 
     // Actualizar el curso
     const { data: course, error: courseError } = await supabase
       .from("courses")
       .update({
-        ...(title && { title }),
-        ...(description && { description }),
-        ...(price !== undefined && { price: Number.parseFloat(price) }),
-        ...(instructor && { instructor_name: instructor }),
-        ...(thumbnail_url && { thumbnail_url }),
-        ...(duration_hours !== undefined && {
-          duration_hours: duration_hours ? Number.parseInt(duration_hours) : null,
-        }),
-        ...(archived !== undefined && { archived }),
+        title,
+        description,
+        price: Number.parseFloat(price) || 0,
+        instructor_name: instructor,
+        thumbnail_url: thumbnail_url || null,
         updated_at: new Date().toISOString(),
       })
       .eq("id", courseId)
@@ -94,26 +48,6 @@ export async function PUT(request: NextRequest, { params }: { params: { courseId
         },
         { status: 500 },
       )
-    }
-
-    // Actualizar etiquetas si se proporcionaron
-    if (tags && Array.isArray(tags)) {
-      // Eliminar etiquetas existentes
-      await supabase.from("course_tags").delete().eq("course_id", courseId)
-
-      // Agregar nuevas etiquetas
-      if (tags.length > 0) {
-        const courseTagsData = tags.map((tagId: string) => ({
-          course_id: courseId,
-          tag_id: tagId,
-        }))
-
-        const { error: tagsError } = await supabase.from("course_tags").insert(courseTagsData)
-
-        if (tagsError) {
-          console.error("Error actualizando etiquetas:", tagsError)
-        }
-      }
     }
 
     return NextResponse.json({
@@ -134,81 +68,15 @@ export async function PUT(request: NextRequest, { params }: { params: { courseId
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { courseId: string } }) {
-  try {
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
-    const { courseId } = params
-
-    // Eliminar lecciones del curso
-    const { error: lessonsError } = await supabase.from("lessons").delete().eq("course_id", courseId)
-
-    if (lessonsError) {
-      console.error("Error eliminando lecciones:", lessonsError)
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Error eliminando lecciones del curso",
-          error: lessonsError,
-        },
-        { status: 500 },
-      )
-    }
-
-    // Eliminar etiquetas del curso
-    const { error: tagsError } = await supabase.from("course_tags").delete().eq("course_id", courseId)
-
-    if (tagsError) {
-      console.error("Error eliminando etiquetas:", tagsError)
-    }
-
-    // Eliminar inscripciones del curso
-    const { error: enrollmentsError } = await supabase.from("enrollments").delete().eq("course_id", courseId)
-
-    if (enrollmentsError) {
-      console.error("Error eliminando inscripciones:", enrollmentsError)
-    }
-
-    // Eliminar el curso
-    const { error: courseError } = await supabase.from("courses").delete().eq("id", courseId)
-
-    if (courseError) {
-      console.error("Error eliminando curso:", courseError)
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Error eliminando curso",
-          error: courseError,
-        },
-        { status: 500 },
-      )
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: "Curso eliminado exitosamente",
-    })
-  } catch (error) {
-    console.error("Error en DELETE curso:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Error interno del servidor",
-        error: error instanceof Error ? error.message : "Error desconocido",
-      },
-      { status: 500 },
-    )
-  }
-}
-
 export async function PATCH(request: NextRequest, { params }: { params: { courseId: string } }) {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
-    const { courseId } = params
     const body = await request.json()
+    const { courseId } = params
 
     const { archived } = body
 
-    // Actualizar solo el campo archived
+    // Actualizar el estado de archivado
     const { data: course, error: courseError } = await supabase
       .from("courses")
       .update({
@@ -238,6 +106,66 @@ export async function PATCH(request: NextRequest, { params }: { params: { course
     })
   } catch (error) {
     console.error("Error en PATCH curso:", error)
+    return NextResponse.json(
+      {
+        success: false,
+        message: "Error interno del servidor",
+        error: error instanceof Error ? error.message : "Error desconocido",
+      },
+      { status: 500 },
+    )
+  }
+}
+
+export async function DELETE(request: NextRequest, { params }: { params: { courseId: string } }) {
+  try {
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    const { courseId } = params
+
+    // Primero eliminar todas las lecciones del curso
+    const { error: lessonsError } = await supabase.from("lessons").delete().eq("course_id", courseId)
+
+    if (lessonsError) {
+      console.error("Error eliminando lecciones:", lessonsError)
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Error eliminando lecciones del curso",
+          error: lessonsError,
+        },
+        { status: 500 },
+      )
+    }
+
+    // Eliminar enrollments del curso
+    const { error: enrollmentsError } = await supabase.from("enrollments").delete().eq("course_id", courseId)
+
+    if (enrollmentsError) {
+      console.error("Error eliminando enrollments:", enrollmentsError)
+      // No fallar si no existe la tabla enrollments
+    }
+
+    // Finalmente eliminar el curso
+    const { error: courseError } = await supabase.from("courses").delete().eq("id", courseId)
+
+    if (courseError) {
+      console.error("Error eliminando curso:", courseError)
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Error eliminando curso",
+          error: courseError,
+        },
+        { status: 500 },
+      )
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: "Curso eliminado exitosamente",
+    })
+  } catch (error) {
+    console.error("Error en DELETE curso:", error)
     return NextResponse.json(
       {
         success: false,

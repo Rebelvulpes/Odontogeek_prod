@@ -4,60 +4,36 @@ import { createClient } from "@supabase/supabase-js"
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
-export async function GET(request: NextRequest, { params }: { params: { slideId: string } }) {
-  try {
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
-    const { slideId } = params
-
-    const { data: slide, error } = await supabase.from("carousel_slides").select("*").eq("id", slideId).single()
-
-    if (error) {
-      console.error("Error obteniendo slide:", error)
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Error obteniendo slide",
-          error: error,
-        },
-        { status: 500 },
-      )
-    }
-
-    return NextResponse.json({
-      success: true,
-      data: slide,
-    })
-  } catch (error) {
-    console.error("Error en GET slide:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Error interno del servidor",
-        error: error instanceof Error ? error.message : "Error desconocido",
-      },
-      { status: 500 },
-    )
-  }
-}
-
 export async function PUT(request: NextRequest, { params }: { params: { slideId: string } }) {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
-    const { slideId } = params
     const body = await request.json()
+    const { slideId } = params
 
     const { title, description, image_url, link_url, is_active, order_index } = body
+
+    // Validar campos requeridos
+    if (!title || !description || !image_url) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Los campos título, descripción e imagen son requeridos",
+        },
+        { status: 400 },
+      )
+    }
 
     // Actualizar el slide
     const { data: slide, error: slideError } = await supabase
       .from("carousel_slides")
       .update({
-        ...(title && { title }),
-        ...(description !== undefined && { description }),
-        ...(image_url && { image_url }),
-        ...(link_url !== undefined && { link_url }),
-        ...(is_active !== undefined && { is_active }),
-        ...(order_index !== undefined && { order_index: Number.parseInt(order_index) }),
+        title,
+        description,
+        image_url,
+        link_url: link_url || null,
+        is_active: is_active !== undefined ? is_active : true,
+        order_index: Number.parseInt(order_index) || 1,
+        updated_at: new Date().toISOString(),
       })
       .eq("id", slideId)
       .select()
@@ -96,27 +72,28 @@ export async function PUT(request: NextRequest, { params }: { params: { slideId:
 export async function PATCH(request: NextRequest, { params }: { params: { slideId: string } }) {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
-    const { slideId } = params
     const body = await request.json()
+    const { slideId } = params
 
     const { is_active } = body
 
-    // Actualizar solo el estado activo
+    // Actualizar el estado activo del slide
     const { data: slide, error: slideError } = await supabase
       .from("carousel_slides")
       .update({
         is_active: is_active,
+        updated_at: new Date().toISOString(),
       })
       .eq("id", slideId)
       .select()
       .single()
 
     if (slideError) {
-      console.error("Error actualizando estado del slide:", slideError)
+      console.error("Error cambiando estado del slide:", slideError)
       return NextResponse.json(
         {
           success: false,
-          message: "Error actualizando estado del slide",
+          message: "Error cambiando estado del slide",
           error: slideError,
         },
         { status: 500 },

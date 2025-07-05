@@ -57,24 +57,24 @@ export async function POST(request: NextRequest) {
     const { title, description, video_url, duration_minutes, course_id, order_index } = body
 
     // Validar campos requeridos
-    if (!title || !course_id) {
+    if (!title || !description || !video_url || !course_id) {
       return NextResponse.json(
         {
           success: false,
-          message: "Los campos título y curso son requeridos",
+          message: "Los campos título, descripción, URL del video y curso son requeridos",
         },
         { status: 400 },
       )
     }
 
     // Verificar que el curso existe
-    const { data: courseExists, error: courseError } = await supabase
+    const { data: course, error: courseError } = await supabase
       .from("courses")
       .select("id")
       .eq("id", course_id)
       .single()
 
-    if (courseError || !courseExists) {
+    if (courseError || !course) {
       return NextResponse.json(
         {
           success: false,
@@ -90,13 +90,11 @@ export async function POST(request: NextRequest) {
       .insert([
         {
           title,
-          description: description || "",
-          video_url: video_url || "",
-          duration_minutes: duration_minutes ? Number.parseInt(duration_minutes) : 0,
+          description,
+          video_url,
+          duration_minutes: Number.parseInt(duration_minutes) || 0,
           course_id,
-          order_index: order_index ? Number.parseInt(order_index) : 1,
-          is_free: false,
-          archived: false,
+          order_index: Number.parseInt(order_index) || 1,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         },

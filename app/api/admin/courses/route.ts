@@ -8,7 +8,7 @@ export async function GET() {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Obtener cursos básicos primero
+    // Obtener cursos básicos
     const { data: courses, error: coursesError } = await supabase
       .from("courses")
       .select("*")
@@ -26,8 +26,8 @@ export async function GET() {
       )
     }
 
-    // Obtener conteo de lecciones para cada curso
-    const coursesWithCounts = await Promise.all(
+    // Obtener conteos de lecciones y enrollments para cada curso
+    const coursesWithStats = await Promise.all(
       (courses || []).map(async (course) => {
         // Contar lecciones
         const { count: lessonsCount } = await supabase
@@ -36,7 +36,7 @@ export async function GET() {
           .eq("course_id", course.id)
 
         // Contar enrollments
-        const { count: enrollmentsCount } = await supabase
+        const { count: studentsCount } = await supabase
           .from("enrollments")
           .select("*", { count: "exact", head: true })
           .eq("course_id", course.id)
@@ -44,15 +44,15 @@ export async function GET() {
         return {
           ...course,
           lessonsCount: lessonsCount || 0,
-          students: enrollmentsCount || 0,
-          revenue: (enrollmentsCount || 0) * (course.price || 0),
+          students: studentsCount || 0,
+          revenue: (studentsCount || 0) * (course.price || 0),
         }
       }),
     )
 
     return NextResponse.json({
       success: true,
-      data: coursesWithCounts,
+      data: coursesWithStats,
     })
   } catch (error) {
     console.error("Error en GET cursos:", error)
@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
     const body = await request.json()
 
-    const { title, description, price, instructor, thumbnail_url, duration_hours } = body
+    const { title, description, price, instructor, thumbnail_url } = body
 
     // Validar campos requeridos
     if (!title || !description || !instructor) {
@@ -92,10 +92,10 @@ export async function POST(request: NextRequest) {
         {
           title,
           description,
-          price: price ? Number.parseFloat(price) : 0,
+          price: Number.parseFloat(price) || 0,
           instructor_name: instructor,
           thumbnail_url: thumbnail_url || null,
-          duration_hours: duration_hours ? Number.parseInt(duration_hours) : null,
+          status: "published",
           archived: false,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),

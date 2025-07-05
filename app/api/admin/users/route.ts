@@ -8,10 +8,7 @@ export async function GET() {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    const { data: users, error } = await supabase
-      .from("users")
-      .select("id, first_name, last_name, email, role, created_at")
-      .order("created_at", { ascending: false })
+    const { data: users, error } = await supabase.from("users").select("*").order("created_at", { ascending: false })
 
     if (error) {
       console.error("Error obteniendo usuarios:", error)

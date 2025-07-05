@@ -8,26 +8,34 @@ export async function GET() {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Obtener estadísticas básicas
-    const [usersResult, coursesResult, lessonsResult, enrollmentsResult] = await Promise.all([
-      supabase.from("users").select("*", { count: "exact", head: true }),
-      supabase.from("courses").select("*", { count: "exact", head: true }),
-      supabase.from("lessons").select("*", { count: "exact", head: true }),
-      supabase.from("enrollments").select("amount", { count: "exact" }),
-    ])
+    // Obtener conteo de usuarios
+    const { count: totalUsers } = await supabase.from("users").select("*", { count: "exact", head: true })
+
+    // Obtener conteo de cursos
+    const { count: totalCourses } = await supabase.from("courses").select("*", { count: "exact", head: true })
+
+    // Obtener conteo de lecciones
+    const { count: totalLessons } = await supabase.from("lessons").select("*", { count: "exact", head: true })
 
     // Calcular ingresos totales
+    const { data: courses } = await supabase.from("courses").select("id, price")
+
     let totalRevenue = 0
-    if (enrollmentsResult.data && Array.isArray(enrollmentsResult.data)) {
-      totalRevenue = enrollmentsResult.data.reduce((sum, enrollment) => {
-        return sum + (enrollment.amount || 0)
-      }, 0)
+    if (courses) {
+      for (const course of courses) {
+        const { count: enrollments } = await supabase
+          .from("enrollments")
+          .select("*", { count: "exact", head: true })
+          .eq("course_id", course.id)
+
+        totalRevenue += (enrollments || 0) * (course.price || 0)
+      }
     }
 
     const stats = {
-      totalUsers: usersResult.count || 0,
-      totalCourses: coursesResult.count || 0,
-      totalLessons: lessonsResult.count || 0,
+      totalUsers: totalUsers || 0,
+      totalCourses: totalCourses || 0,
+      totalLessons: totalLessons || 0,
       totalRevenue: totalRevenue,
     }
 

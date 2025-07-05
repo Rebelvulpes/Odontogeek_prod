@@ -8,7 +8,10 @@ export async function GET() {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    const { data: tags, error } = await supabase.from("tags").select("*").order("created_at", { ascending: false })
+    const { data: tags, error } = await supabase
+      .from("course_tags")
+      .select("*")
+      .order("created_at", { ascending: false })
 
     if (error) {
       console.error("Error obteniendo tags:", error)
@@ -57,12 +60,19 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Generar slug del nombre
+    const slug = name
+      .toLowerCase()
+      .replace(/\s+/g, "-")
+      .replace(/[^a-z0-9-]/g, "")
+
     // Crear el tag
     const { data: tag, error: tagError } = await supabase
-      .from("tags")
+      .from("course_tags")
       .insert([
         {
           name,
+          slug,
           color: color || "#3B82F6",
           created_at: new Date().toISOString(),
         },

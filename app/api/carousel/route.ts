@@ -50,11 +50,11 @@ export async function POST(request: NextRequest) {
     const { title, description, image_url, link_url, is_active, order_index } = body
 
     // Validar campos requeridos
-    if (!title || !image_url) {
+    if (!title || !description || !image_url) {
       return NextResponse.json(
         {
           success: false,
-          message: "Los campos título e imagen son requeridos",
+          message: "Los campos título, descripción e imagen son requeridos",
         },
         { status: 400 },
       )
@@ -66,12 +66,13 @@ export async function POST(request: NextRequest) {
       .insert([
         {
           title,
-          description: description || "",
+          description,
           image_url,
           link_url: link_url || null,
           is_active: is_active !== undefined ? is_active : true,
-          order_index: order_index ? Number.parseInt(order_index) : 1,
+          order_index: Number.parseInt(order_index) || 1,
           created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         },
       ])
       .select()
