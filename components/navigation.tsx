@@ -10,14 +10,15 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Menu, LogOut, Settings, BookOpen, Home, Shield, Users, Award, Phone, LogIn, UserPlus } from "lucide-react"
 import { useAuth } from "@/components/auth-provider"
 
-interface NavigationProps {
-  user?: { id: string; email: string; name: string; role: string } | null
-}
-
-export function Navigation({ user }: NavigationProps) {
+export function Navigation() {
   const [isOpen, setIsOpen] = useState(false)
   const pathname = usePathname()
-  const { logout } = useAuth()
+  const { user, logout } = useAuth()
+
+  // No mostrar navegación en páginas de auth y setup
+  if (pathname.startsWith("/auth") || pathname.startsWith("/setup")) {
+    return null
+  }
 
   const publicNavigationItems = [
     { name: "Inicio", href: "/", icon: Home },
@@ -41,7 +42,7 @@ export function Navigation({ user }: NavigationProps) {
   }
 
   return (
-    <nav className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-50">
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
@@ -74,49 +75,67 @@ export function Navigation({ user }: NavigationProps) {
           {/* User Menu */}
           <div className="flex items-center space-x-4">
             {user ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                    <Avatar className="h-8 w-8">
-                      <AvatarFallback className="bg-blue-600 text-white text-xs">
-                        {getUserInitials(user.name)}
-                      </AvatarFallback>
-                    </Avatar>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-56" align="end" forceMount>
-                  <div className="flex items-center justify-start gap-2 p-2">
-                    <div className="flex flex-col space-y-1 leading-none">
-                      <p className="font-medium">{user.name}</p>
-                      <p className="w-[200px] truncate text-sm text-muted-foreground">{user.email}</p>
-                    </div>
-                  </div>
-                  <DropdownMenuItem asChild>
-                    <Link href="/dashboard" className="flex items-center">
-                      <Home className="mr-2 h-4 w-4" />
-                      <span>Mi Dashboard</span>
+              <div className="flex items-center space-x-3">
+                {/* Dashboard Link */}
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href="/dashboard" className="flex items-center space-x-1">
+                    <Home className="w-4 h-4" />
+                    <span className="hidden sm:inline">Dashboard</span>
+                  </Link>
+                </Button>
+
+                {/* Admin Link (solo para admins) */}
+                {user.role === "admin" && (
+                  <Button variant="ghost" size="sm" asChild>
+                    <Link href="/admin" className="flex items-center space-x-1">
+                      <Shield className="w-4 h-4" />
+                      <span className="hidden sm:inline">Admin</span>
                     </Link>
-                  </DropdownMenuItem>
-                  {user.role === "admin" && (
+                  </Button>
+                )}
+
+                {/* User Avatar con Dropdown */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                      <Avatar className="h-8 w-8">
+                        <AvatarFallback className="bg-blue-600 text-white text-xs">
+                          {getUserInitials(user.name)}
+                        </AvatarFallback>
+                      </Avatar>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-56" align="end" forceMount>
+                    <div className="flex items-center justify-start gap-2 p-2">
+                      <div className="flex flex-col space-y-1 leading-none">
+                        <p className="font-medium">{user.name}</p>
+                        <p className="w-[200px] truncate text-sm text-muted-foreground">{user.email}</p>
+                      </div>
+                    </div>
                     <DropdownMenuItem asChild>
-                      <Link href="/admin" className="flex items-center">
-                        <Shield className="mr-2 h-4 w-4" />
-                        <span>Panel Admin</span>
+                      <Link href="/settings" className="flex items-center">
+                        <Settings className="mr-2 h-4 w-4" />
+                        <span>Configuración</span>
                       </Link>
                     </DropdownMenuItem>
-                  )}
-                  <DropdownMenuItem asChild>
-                    <Link href="/settings" className="flex items-center">
-                      <Settings className="mr-2 h-4 w-4" />
-                      <span>Configuración</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleLogout} className="text-red-600">
-                    <LogOut className="mr-2 h-4 w-4" />
-                    <span>Cerrar Sesión</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                    <DropdownMenuItem onClick={handleLogout} className="text-red-600">
+                      <LogOut className="mr-2 h-4 w-4" />
+                      <span>Cerrar Sesión</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                {/* Botón de Logout directo (visible en desktop) */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleLogout}
+                  className="hidden lg:flex items-center space-x-1 text-red-600 border-red-200 hover:bg-red-50 bg-transparent"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Salir</span>
+                </Button>
+              </div>
             ) : (
               <div className="flex items-center space-x-2">
                 <Button variant="ghost" asChild className="flex items-center space-x-1">
