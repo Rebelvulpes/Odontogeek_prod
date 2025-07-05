@@ -37,25 +37,28 @@ export async function GET() {
       console.error("Error obteniendo lecciones:", lessonsError)
     }
 
-    // Calcular ingresos totales basado en enrollments y precios de cursos
-    const { data: enrollments, error: enrollmentsError } = await supabase.from("enrollments").select(`
-        course_id,
-        courses (
-          price
-        )
-      `)
+    // Obtener enrollments
+    const { data: enrollments, error: enrollmentsError } = await supabase.from("enrollments").select("course_id")
 
-    if (enrollmentsError) {
-      console.error("Error obteniendo enrollments:", enrollmentsError)
-    }
-
-    // Calcular ingresos totales
     let totalRevenue = 0
-    if (enrollments) {
-      totalRevenue = enrollments.reduce((sum, enrollment) => {
-        const coursePrice = enrollment.courses?.price || 0
-        return sum + coursePrice
-      }, 0)
+    if (enrollments && !enrollmentsError) {
+      // Obtener precios de cursos por separado
+      const courseIds = [...new Set(enrollments.map((e) => e.course_id))]
+      if (courseIds.length > 0) {
+        const { data: courses, error: coursesRevenueError } = await supabase
+          .from("courses")
+          .select("id, price")
+          .in("id", courseIds)
+
+        if (courses && !coursesRevenueError) {
+          // Calcular revenue basado en enrollments y precios
+          const courseMap = new Map(courses.map((c) => [c.id, c.price]))
+          totalRevenue = enrollments.reduce((sum, enrollment) => {
+            const coursePrice = courseMap.get(enrollment.course_id) || 0
+            return sum + coursePrice
+          }, 0)
+        }
+      }
     }
 
     return NextResponse.json({
