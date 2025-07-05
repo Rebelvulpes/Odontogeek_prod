@@ -4,20 +4,12 @@ import { useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { Menu, BookOpen, Users, Award, Phone, LogIn, UserPlus } from "lucide-react"
+import { Menu, BookOpen, Users, Award, Phone, LogIn, UserPlus, LogOut } from "lucide-react"
+import { useAuth } from "@/contexts/auth-context"
 
-interface User {
-  name: string
-  email: string
-  role?: string
-}
-
-interface NavigationProps {
-  user: User | null
-}
-
-export function Navigation({ user }: NavigationProps) {
+export function Navigation() {
   const [isOpen, setIsOpen] = useState(false)
+  const { user, logout } = useAuth()
 
   const navigationItems = [
     { name: "Cursos", href: "/courses", icon: BookOpen },
@@ -25,6 +17,10 @@ export function Navigation({ user }: NavigationProps) {
     { name: "Certificaciones", href: "/certifications", icon: Award },
     { name: "Contacto", href: "/contact", icon: Phone },
   ]
+
+  const handleLogout = async () => {
+    await logout()
+  }
 
   return (
     <header className="bg-white border-b sticky top-0 z-50">
@@ -66,6 +62,10 @@ export function Navigation({ user }: NavigationProps) {
                     Mi Panel
                   </Button>
                 </Link>
+                <Button variant="ghost" size="sm" onClick={handleLogout} className="flex items-center space-x-1">
+                  <LogOut className="w-4 h-4" />
+                  <span>Salir</span>
+                </Button>
               </div>
             ) : (
               <>
@@ -137,6 +137,17 @@ export function Navigation({ user }: NavigationProps) {
                           Mi Panel
                         </Button>
                       </Link>
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start bg-transparent text-red-600 hover:text-red-700 hover:bg-red-50"
+                        onClick={() => {
+                          setIsOpen(false)
+                          handleLogout()
+                        }}
+                      >
+                        <LogOut className="w-4 h-4 mr-2" />
+                        Cerrar Sesión
+                      </Button>
                     </div>
                   ) : (
                     <>
