@@ -154,11 +154,25 @@ export async function DELETE(request: NextRequest, { params }: { params: { cours
       )
     }
 
-    // Eliminar etiquetas del curso
-    const { error: tagsError } = await supabase.from("course_tags").delete().eq("course_id", courseId)
+    // First check if course_tags table exists and what columns it has
+    const { data: courseTagsData, error: courseTagsCheckError } = await supabase
+      .from("course_tags")
+      .select("*")
+      .limit(1)
 
-    if (tagsError) {
-      console.error("Error eliminando etiquetas:", tagsError)
+    if (!courseTagsCheckError && courseTagsData) {
+      // Try to delete course tags - handle both possible column names
+      const { error: tagsError } = await supabase
+        .from("course_tags")
+        .delete()
+        .or(`course_id.eq.${courseId},id.eq.${courseId}`)
+
+      if (tagsError) {
+        console.error("Error eliminando etiquetas:", tagsError)
+        // Don't fail the entire deletion if tags cleanup fails
+      }
+    } else {
+      console.log("course_tags table not found or empty, skipping tag cleanup")
     }
 
     // Eliminar inscripciones del curso
