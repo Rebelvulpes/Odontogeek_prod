@@ -1,14 +1,14 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Clock, Users, DollarSign, Search, Filter, BookOpen, Star, Play } from "lucide-react"
-import Link from "next/link"
 import { Navigation } from "@/components/navigation"
+import { BookOpen, Clock, Users, Star, Search, Filter, Play, CheckCircle, ArrowRight } from "lucide-react"
 
 interface Course {
   id: string
@@ -17,15 +17,20 @@ interface Course {
   price: number
   instructor_name: string
   thumbnail_url: string
-  duration_hours: number
   status: string
-  archived: boolean
+  duration_hours: number
   created_at: string
-  lessons: any[]
-  tags: any[]
-  students: number
-  revenue: number
-  lessonsCount: number
+  lessons: Array<{
+    id: string
+    title: string
+    duration_minutes: number
+    is_free: boolean
+  }>
+  tags: Array<{
+    id: string
+    name: string
+    color: string
+  }>
 }
 
 interface Tag {
@@ -33,7 +38,6 @@ interface Tag {
   name: string
   color: string
   slug: string
-  description: string
 }
 
 export default function CoursesPage() {
@@ -41,9 +45,8 @@ export default function CoursesPage() {
   const [tags, setTags] = useState<Tag[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
-  const [selectedTag, setSelectedTag] = useState<string>("all")
-  const [priceFilter, setPriceFilter] = useState<string>("all")
-  const [sortBy, setSortBy] = useState<string>("newest")
+  const [selectedTag, setSelectedTag] = useState("all")
+  const [priceFilter, setPriceFilter] = useState("all")
 
   useEffect(() => {
     loadCourses()
@@ -52,18 +55,10 @@ export default function CoursesPage() {
 
   const loadCourses = async () => {
     try {
-      setLoading(true)
-      const response = await fetch("/api/admin/courses")
+      const response = await fetch("/api/courses")
       const result = await response.json()
-
       if (result.success) {
-        // Filtrar solo cursos publicados y no archivados
-        const publishedCourses = result.data.filter(
-          (course: Course) => course.status === "published" && !course.archived,
-        )
-        setCourses(publishedCourses)
-      } else {
-        console.error("Error cargando cursos:", result.message)
+        setCourses(result.data)
       }
     } catch (error) {
       console.error("Error cargando cursos:", error)
@@ -84,47 +79,22 @@ export default function CoursesPage() {
     }
   }
 
-  // Filtrar y ordenar cursos
-  const filteredCourses = courses
-    .filter((course) => {
-      // Filtro de búsqueda
-      const matchesSearch =
-        course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        course.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        course.instructor_name?.toLowerCase().includes(searchTerm.toLowerCase())
+  // Filtrar cursos
+  const filteredCourses = courses.filter((course) => {
+    const matchesSearch =
+      course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      course.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      course.instructor_name?.toLowerCase().includes(searchTerm.toLowerCase())
 
-      // Filtro de etiqueta
-      const matchesTag = selectedTag === "all" || course.tags?.some((tag) => tag.id === selectedTag)
+    const matchesTag = selectedTag === "all" || course.tags.some((tag) => tag.id === selectedTag)
 
-      // Filtro de precio
-      const matchesPrice =
-        priceFilter === "all" ||
-        (priceFilter === "free" && course.price === 0) ||
-        (priceFilter === "paid" && course.price > 0) ||
-        (priceFilter === "under-100" && course.price > 0 && course.price < 100) ||
-        (priceFilter === "100-300" && course.price >= 100 && course.price <= 300) ||
-        (priceFilter === "over-300" && course.price > 300)
+    const matchesPrice =
+      priceFilter === "all" ||
+      (priceFilter === "free" && course.price === 0) ||
+      (priceFilter === "paid" && course.price > 0)
 
-      return matchesSearch && matchesTag && matchesPrice
-    })
-    .sort((a, b) => {
-      switch (sortBy) {
-        case "newest":
-          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        case "oldest":
-          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-        case "price-low":
-          return a.price - b.price
-        case "price-high":
-          return b.price - a.price
-        case "popular":
-          return b.students - a.students
-        case "title":
-          return a.title.localeCompare(b.title)
-        default:
-          return 0
-      }
-    })
+    return matchesSearch && matchesTag && matchesPrice
+  })
 
   if (loading) {
     return (
@@ -144,23 +114,19 @@ export default function CoursesPage() {
     <div className="min-h-screen bg-gray-50">
       <Navigation />
 
-      {/* Header */}
-      <div className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center">
-            <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">Cursos de Odontología</h1>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              Descubre nuestra colección de cursos especializados en odontología, diseñados por expertos para
-              profesionales como tú.
-            </p>
-          </div>
-        </div>
-      </div>
-
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
+        <div className="text-center mb-12">
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">Cursos de Odontología</h1>
+          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+            Descubre nuestra colección de cursos especializados en odontología, diseñados por expertos para
+            profesionales como tú.
+          </p>
+        </div>
+
         {/* Filtros */}
         <div className="bg-white rounded-lg shadow-sm border p-6 mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {/* Búsqueda */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -194,66 +160,134 @@ export default function CoursesPage() {
             {/* Filtro por precio */}
             <Select value={priceFilter} onValueChange={setPriceFilter}>
               <SelectTrigger>
-                <DollarSign className="w-4 h-4 mr-2" />
                 <SelectValue placeholder="Todos los precios" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos los precios</SelectItem>
-                <SelectItem value="free">Gratis</SelectItem>
-                <SelectItem value="under-100">Menos de $100</SelectItem>
-                <SelectItem value="100-300">$100 - $300</SelectItem>
-                <SelectItem value="over-300">Más de $300</SelectItem>
+                <SelectItem value="free">Gratuitos</SelectItem>
+                <SelectItem value="paid">De pago</SelectItem>
               </SelectContent>
             </Select>
 
-            {/* Ordenar por */}
-            <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger>
-                <SelectValue placeholder="Ordenar por" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="newest">Más recientes</SelectItem>
-                <SelectItem value="oldest">Más antiguos</SelectItem>
-                <SelectItem value="price-low">Precio: menor a mayor</SelectItem>
-                <SelectItem value="price-high">Precio: mayor a menor</SelectItem>
-                <SelectItem value="popular">Más populares</SelectItem>
-                <SelectItem value="title">Título A-Z</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Resultados */}
-          <div className="mt-4 flex items-center justify-between text-sm text-gray-600">
-            <span>
-              {filteredCourses.length} curso{filteredCourses.length !== 1 ? "s" : ""} encontrado
-              {filteredCourses.length !== 1 ? "s" : ""}
-            </span>
-            {(searchTerm || selectedTag !== "all" || priceFilter !== "all") && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setSearchTerm("")
-                  setSelectedTag("all")
-                  setPriceFilter("all")
-                  setSortBy("newest")
-                }}
-              >
-                Limpiar filtros
-              </Button>
-            )}
+            {/* Estadísticas */}
+            <div className="flex items-center justify-center bg-blue-50 rounded-lg px-4 py-2">
+              <BookOpen className="w-4 h-4 text-blue-600 mr-2" />
+              <span className="text-sm font-medium text-blue-900">
+                {filteredCourses.length} curso{filteredCourses.length !== 1 ? "s" : ""} encontrado
+                {filteredCourses.length !== 1 ? "s" : ""}
+              </span>
+            </div>
           </div>
         </div>
 
-        {/* Lista de cursos */}
-        {filteredCourses.length === 0 ? (
-          <div className="text-center py-12">
+        {/* Grid de cursos */}
+        {filteredCourses.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {filteredCourses.map((course) => (
+              <Card key={course.id} className="group hover:shadow-lg transition-all duration-300 overflow-hidden">
+                {/* Imagen del curso */}
+                <div className="relative h-48 overflow-hidden">
+                  <img
+                    src={course.thumbnail_url || "/placeholder.svg?height=200&width=400&text=Curso"}
+                    alt={course.title}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    onError={(e) => {
+                      e.currentTarget.src = "/placeholder.svg?height=200&width=400&text=Curso+de+Odontología"
+                    }}
+                  />
+                  {course.price === 0 && (
+                    <Badge className="absolute top-3 left-3 bg-green-500 hover:bg-green-600">Gratuito</Badge>
+                  )}
+                  {course.price > 0 && (
+                    <Badge className="absolute top-3 right-3 bg-blue-500 hover:bg-blue-600">${course.price}</Badge>
+                  )}
+                </div>
+
+                <CardHeader className="pb-3">
+                  <div className="flex flex-wrap gap-1 mb-2">
+                    {course.tags.slice(0, 2).map((tag) => (
+                      <Badge
+                        key={tag.id}
+                        variant="secondary"
+                        className="text-xs"
+                        style={{
+                          backgroundColor: tag.color + "20",
+                          color: tag.color,
+                          borderColor: tag.color + "40",
+                        }}
+                      >
+                        {tag.name}
+                      </Badge>
+                    ))}
+                    {course.tags.length > 2 && (
+                      <Badge variant="secondary" className="text-xs">
+                        +{course.tags.length - 2}
+                      </Badge>
+                    )}
+                  </div>
+
+                  <CardTitle className="text-lg line-clamp-2 group-hover:text-blue-600 transition-colors">
+                    {course.title}
+                  </CardTitle>
+
+                  <CardDescription className="line-clamp-2">{course.description}</CardDescription>
+                </CardHeader>
+
+                <CardContent className="pt-0">
+                  {/* Información del instructor */}
+                  <div className="flex items-center space-x-2 mb-4">
+                    <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
+                      <Users className="w-4 h-4 text-gray-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">{course.instructor_name || "Instructor"}</p>
+                      <p className="text-xs text-gray-500">Especialista</p>
+                    </div>
+                  </div>
+
+                  {/* Estadísticas del curso */}
+                  <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
+                    <div className="flex items-center space-x-1">
+                      <Play className="w-4 h-4" />
+                      <span>{course.lessons?.length || 0} lecciones</span>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <Clock className="w-4 h-4" />
+                      <span>{course.duration_hours || 0}h</span>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <Star className="w-4 h-4 text-yellow-500" />
+                      <span>4.8</span>
+                    </div>
+                  </div>
+
+                  {/* Lecciones gratuitas */}
+                  {course.lessons?.some((lesson) => lesson.is_free) && (
+                    <div className="flex items-center space-x-1 text-green-600 text-sm mb-4">
+                      <CheckCircle className="w-4 h-4" />
+                      <span>Incluye lecciones gratuitas</span>
+                    </div>
+                  )}
+
+                  {/* Botón de acción */}
+                  <Button asChild className="w-full group">
+                    <Link href={`/courses/${course.id}`}>
+                      Ver Curso
+                      <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
+                    </Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-16">
             <BookOpen className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <h3 className="text-xl font-medium text-gray-900 mb-2">No se encontraron cursos</h3>
-            <p className="text-gray-600 mb-4">
+            <p className="text-gray-600 mb-6">
               {searchTerm || selectedTag !== "all" || priceFilter !== "all"
-                ? "Intenta ajustar los filtros para encontrar más cursos."
-                : "Aún no hay cursos disponibles. ¡Vuelve pronto!"}
+                ? "Intenta ajustar los filtros de búsqueda"
+                : "Aún no hay cursos disponibles"}
             </p>
             {(searchTerm || selectedTag !== "all" || priceFilter !== "all") && (
               <Button
@@ -264,122 +298,25 @@ export default function CoursesPage() {
                   setPriceFilter("all")
                 }}
               >
-                Ver todos los cursos
+                Limpiar filtros
               </Button>
             )}
           </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredCourses.map((course) => (
-              <Card key={course.id} className="hover:shadow-lg transition-shadow duration-200 overflow-hidden">
-                {/* Imagen del curso */}
-                <div className="aspect-video bg-gray-100 relative overflow-hidden">
-                  {course.thumbnail_url ? (
-                    <img
-                      src={course.thumbnail_url || "/placeholder.svg"}
-                      alt={course.title}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        e.currentTarget.src = "/placeholder.svg?height=200&width=300&text=Curso+de+Odontología"
-                      }}
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-                      <BookOpen className="w-12 h-12 text-blue-400" />
-                    </div>
-                  )}
+        )}
 
-                  {/* Overlay con botón de reproducir */}
-                  <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-30 transition-all duration-200 flex items-center justify-center">
-                    <div className="opacity-0 hover:opacity-100 transition-opacity duration-200">
-                      <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-lg">
-                        <Play className="w-5 h-5 text-blue-600 ml-1" />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Badge de precio */}
-                  <div className="absolute top-3 right-3">
-                    <Badge variant={course.price === 0 ? "secondary" : "default"} className="bg-white text-gray-900">
-                      {course.price === 0 ? "Gratis" : `$${course.price}`}
-                    </Badge>
-                  </div>
-                </div>
-
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <CardTitle className="text-lg font-semibold line-clamp-2 leading-tight">{course.title}</CardTitle>
-                    <div className="flex items-center text-yellow-500 flex-shrink-0">
-                      <Star className="w-4 h-4 fill-current" />
-                      <span className="text-sm text-gray-600 ml-1">4.8</span>
-                    </div>
-                  </div>
-
-                  <CardDescription className="line-clamp-2 text-sm">{course.description}</CardDescription>
-
-                  {/* Etiquetas */}
-                  {course.tags && course.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-2">
-                      {course.tags.slice(0, 3).map((tag) => (
-                        <Badge
-                          key={tag.id}
-                          variant="secondary"
-                          className="text-xs"
-                          style={{
-                            backgroundColor: tag.color + "20",
-                            color: tag.color,
-                            borderColor: tag.color + "30",
-                          }}
-                        >
-                          {tag.name}
-                        </Badge>
-                      ))}
-                      {course.tags.length > 3 && (
-                        <Badge variant="secondary" className="text-xs">
-                          +{course.tags.length - 3}
-                        </Badge>
-                      )}
-                    </div>
-                  )}
-                </CardHeader>
-
-                <CardContent className="pt-0">
-                  {/* Información del instructor */}
-                  <div className="text-sm text-gray-600 mb-3">
-                    <span className="font-medium">Instructor:</span> {course.instructor_name || "Por asignar"}
-                  </div>
-
-                  {/* Estadísticas del curso */}
-                  <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
-                    <div className="flex items-center space-x-4">
-                      <div className="flex items-center">
-                        <Clock className="w-4 h-4 mr-1" />
-                        <span>{course.duration_hours || 0}h</span>
-                      </div>
-                      <div className="flex items-center">
-                        <Users className="w-4 h-4 mr-1" />
-                        <span>
-                          {course.students} estudiante{course.students !== 1 ? "s" : ""}
-                        </span>
-                      </div>
-                      <div className="flex items-center">
-                        <BookOpen className="w-4 h-4 mr-1" />
-                        <span>
-                          {course.lessonsCount} lección{course.lessonsCount !== 1 ? "es" : ""}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Botón de acción */}
-                  <Link href={`/courses/${course.id}`}>
-                    <Button className="w-full">
-                      {course.price === 0 ? "Ver curso gratis" : `Comprar por $${course.price}`}
-                    </Button>
-                  </Link>
-                </CardContent>
-              </Card>
-            ))}
+        {/* Call to action */}
+        {filteredCourses.length > 0 && (
+          <div className="text-center mt-16 bg-white rounded-lg shadow-sm border p-8">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">¿No encuentras lo que buscas?</h2>
+            <p className="text-gray-600 mb-6">
+              Contáctanos para sugerir nuevos cursos o temas específicos que te interesen.
+            </p>
+            <Button asChild size="lg">
+              <Link href="/contact">
+                Contactar
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </Link>
+            </Button>
           </div>
         )}
       </div>
