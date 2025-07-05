@@ -14,6 +14,16 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Switch } from "@/components/ui/switch"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
   Video,
   Users,
   DollarSign,
@@ -689,7 +699,7 @@ const AdminPage = () => {
 
   const handleToggleSlideActive = async (slideId: string, isActive: boolean) => {
     try {
-      const slide = carouselSlides.find(s => s.id === slideId)
+      const slide = carouselSlides.find((s) => s.id === slideId)
       if (!slide) return
 
       const response = await fetch(`/api/carousel/${slideId}`, {
@@ -1153,10 +1163,7 @@ const AdminPage = () => {
                           </TableCell>
                           <TableCell className="text-sm sm:text-base">{slide.order_index}</TableCell>
                           <TableCell>
-                            <Badge
-                              variant={slide.is_active ? "default" : "secondary"}
-                              className="text-xs"
-                            >
+                            <Badge variant={slide.is_active ? "default" : "secondary"} className="text-xs">
                               {slide.is_active ? "Activo" : "Inactivo"}
                             </Badge>
                           </TableCell>
@@ -1174,7 +1181,11 @@ const AdminPage = () => {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleToggleSlideActive(slide.id, slide.is_active)}
-                                className={slide.is_active ? "text-orange-600 hover:text-orange-700 hover:bg-orange-50" : "text-green-600 hover:text-green-700 hover:bg-green-50"}
+                                className={
+                                  slide.is_active
+                                    ? "text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                                    : "text-green-600 hover:text-green-700 hover:bg-green-50"
+                                }
                                 title={slide.is_active ? "Desactivar slide" : "Activar slide"}
                               >
                                 {slide.is_active ? (
@@ -2187,4 +2198,149 @@ const AdminPage = () => {
                   <select
                     id="editSlideBadgeColor"
                     value={newSlide.badge_color}
-                    onChange={(e) => setNewSlide({ ...newSlide, badge_color: e.\
+                    onChange={(e) => setNewSlide({ ...newSlide, badge_color: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm sm:text-base"
+                  >
+                    <option value="bg-blue-500">Azul</option>
+                    <option value="bg-green-500">Verde</option>
+                    <option value="bg-red-500">Rojo</option>
+                    <option value="bg-purple-500">Púrpura</option>
+                    <option value="bg-orange-500">Naranja</option>
+                    <option value="bg-gray-500">Gris</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-2 pt-6 border-t">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsEditSlideDialogOpen(false)}
+                className="w-full sm:w-auto"
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" className="w-full sm:w-auto">
+                <Edit className="w-4 h-4 mr-2" />
+                Actualizar Slide
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para crear etiqueta */}
+      <Dialog open={isCreateTagDialogOpen} onOpenChange={setIsCreateTagDialogOpen}>
+        <DialogContent className="max-w-[95vw] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Crear Nueva Etiqueta</DialogTitle>
+            <DialogDescription>Crea una nueva etiqueta para clasificar tus cursos.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreateTag} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="tagName">Nombre de la Etiqueta</Label>
+              <Input
+                id="tagName"
+                placeholder="Ej: Implantología"
+                value={newTag.name}
+                onChange={(e) => setNewTag({ ...newTag, name: e.target.value })}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="tagColor">Color de la Etiqueta</Label>
+              <Input
+                type="color"
+                id="tagColor"
+                value={newTag.color}
+                onChange={(e) => setNewTag({ ...newTag, color: e.target.value })}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="tagDescription">Descripción</Label>
+              <Textarea
+                id="tagDescription"
+                placeholder="Describe esta etiqueta..."
+                value={newTag.description}
+                onChange={(e) => setNewTag({ ...newTag, description: e.target.value })}
+              />
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button type="button" variant="outline" onClick={() => setIsCreateTagDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit">Crear Etiqueta</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para editar etiqueta */}
+      <Dialog open={isEditTagDialogOpen} onOpenChange={setIsEditTagDialogOpen}>
+        <DialogContent className="max-w-[95vw] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar Etiqueta</DialogTitle>
+            <DialogDescription>Edita los detalles de la etiqueta "{editingTag?.name}".</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleEditTag} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="editTagName">Nombre de la Etiqueta</Label>
+              <Input
+                id="editTagName"
+                placeholder="Ej: Implantología"
+                value={editingTag?.name || ""}
+                onChange={(e) => setEditingTag({ ...editingTag, name: e.target.value })}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="editTagColor">Color de la Etiqueta</Label>
+              <Input
+                type="color"
+                id="editTagColor"
+                value={editingTag?.color || "#3B82F6"}
+                onChange={(e) => setEditingTag({ ...editingTag, color: e.target.value })}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="editTagDescription">Descripción</Label>
+              <Textarea
+                id="editTagDescription"
+                placeholder="Describe esta etiqueta..."
+                value={editingTag?.description || ""}
+                onChange={(e) => setEditingTag({ ...editingTag, description: e.target.value })}
+              />
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button type="button" variant="outline" onClick={() => setIsEditTagDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit">Guardar Cambios</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Alert Dialog para eliminar etiqueta */}
+      <AlertDialog open={isDeleteTagDialogOpen} onOpenChange={setIsDeleteTagDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar Etiqueta?</AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Estás seguro de que quieres eliminar la etiqueta "{tagToDelete?.name}"? Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setIsDeleteTagDialogOpen(false)}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteTag}>Eliminar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  )
+}
+
+export default AdminPage
