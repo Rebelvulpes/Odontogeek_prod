@@ -14,7 +14,7 @@ const slides = [
     subtitle: "Incrementa tus ingresos rápidamente imprimiendo tus propias férulas",
     description: "Olvídate de mandar a laboratorio y hazlas tú mismo",
     backgroundColor: "from-blue-900 to-indigo-900",
-    promoImage: "/placeholder.svg?height=500&width=400&text=Férulas+Oclusales",
+    promoImage: "https://res.cloudinary.com/dxe6ugbzi/image/upload/v1746227801/fe%CC%81rulas_medit_qozti5.jpg",
     badge: "Nuevo Curso",
     badgeColor: "bg-green-500",
     cta: "Ver Curso",
