@@ -190,10 +190,15 @@ export default function AdminPanel() {
         const result = await response.json()
         if (result.success && Array.isArray(result.data)) {
           setUsers(result.data)
+        } else {
+          setUsers([])
         }
+      } else {
+        setUsers([])
       }
     } catch (error) {
       console.error("Error fetching users:", error)
+      setUsers([])
     }
   }
 
@@ -208,6 +213,8 @@ export default function AdminPanel() {
           console.error("Courses data is not an array:", result)
           setCourses([])
         }
+      } else {
+        setCourses([])
       }
     } catch (error) {
       console.error("Error fetching courses:", error)
@@ -222,10 +229,15 @@ export default function AdminPanel() {
         const result = await response.json()
         if (result.success && Array.isArray(result.data)) {
           setLessons(result.data)
+        } else {
+          setLessons([])
         }
+      } else {
+        setLessons([])
       }
     } catch (error) {
       console.error("Error fetching lessons:", error)
+      setLessons([])
     }
   }
 
@@ -236,10 +248,15 @@ export default function AdminPanel() {
         const result = await response.json()
         if (result.success && Array.isArray(result.data)) {
           setCourseTags(result.data)
+        } else {
+          setCourseTags([])
         }
+      } else {
+        setCourseTags([])
       }
     } catch (error) {
       console.error("Error fetching course tags:", error)
+      setCourseTags([])
     }
   }
 
@@ -250,10 +267,15 @@ export default function AdminPanel() {
         const result = await response.json()
         if (result.success && Array.isArray(result.data)) {
           setCarouselSlides(result.data)
+        } else {
+          setCarouselSlides([])
         }
+      } else {
+        setCarouselSlides([])
       }
     } catch (error) {
       console.error("Error fetching carousel slides:", error)
+      setCarouselSlides([])
     }
   }
 
