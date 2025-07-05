@@ -34,11 +34,24 @@ import { Switch } from "@/components/ui/switch"
 import { toast } from "@/hooks/use-toast"
 import { Navigation } from "@/components/navigation"
 import { RouteGuard } from "@/components/route-guard"
-import { Users, BookOpen, DollarSign, TrendingUp, Plus, Edit, Trash2, EyeOff, Archive, Play, Pause } from "lucide-react"
+import {
+  Users,
+  BookOpen,
+  DollarSign,
+  GraduationCap,
+  Plus,
+  Edit,
+  Trash2,
+  EyeOff,
+  Archive,
+  Play,
+  Pause,
+} from "lucide-react"
 
 interface User {
   id: string
-  name: string
+  first_name: string
+  last_name: string
   email: string
   role: string
   created_at: string
@@ -49,10 +62,13 @@ interface Course {
   title: string
   description: string
   price: number
-  instructor: string
+  instructor_name: string
   thumbnail_url?: string
   created_at: string
   archived: boolean
+  students: number
+  revenue: number
+  lessonsCount: number
 }
 
 interface Lesson {
@@ -60,17 +76,21 @@ interface Lesson {
   title: string
   description: string
   video_url: string
-  duration: number
+  duration_minutes: number
   course_id: string
   order_index: number
   created_at: string
+  courses?: {
+    id: string
+    title: string
+  }
 }
 
 interface Stats {
   totalUsers: number
   totalCourses: number
+  totalLessons: number
   totalRevenue: number
-  monthlyGrowth: number
 }
 
 interface CourseTag {
@@ -92,7 +112,7 @@ interface CarouselSlide {
 }
 
 export default function AdminPanel() {
-  const [stats, setStats] = useState<Stats>({ totalUsers: 0, totalCourses: 0, totalRevenue: 0, monthlyGrowth: 0 })
+  const [stats, setStats] = useState<Stats>({ totalUsers: 0, totalCourses: 0, totalLessons: 0, totalRevenue: 0 })
   const [users, setUsers] = useState<User[]>([])
   const [courses, setCourses] = useState<Course[]>([])
   const [lessons, setLessons] = useState<Lesson[]>([])
@@ -123,7 +143,7 @@ export default function AdminPanel() {
     title: "",
     description: "",
     video_url: "",
-    duration: "",
+    duration_minutes: "",
     course_id: "",
     order_index: "",
   })
@@ -295,6 +315,7 @@ export default function AdminPanel() {
         setCourseDialogOpen(false)
         setCourseForm({ title: "", description: "", price: "", instructor: "", thumbnail_url: "" })
         fetchCourses()
+        fetchStats()
       } else {
         throw new Error("Error al crear curso")
       }
@@ -341,6 +362,7 @@ export default function AdminPanel() {
       if (response.ok) {
         toast({ title: "Éxito", description: "Curso archivado correctamente" })
         fetchCourses()
+        fetchStats()
       } else {
         throw new Error("Error al archivar curso")
       }
@@ -358,6 +380,7 @@ export default function AdminPanel() {
       if (response.ok) {
         toast({ title: "Éxito", description: "Curso eliminado correctamente" })
         fetchCourses()
+        fetchStats()
       } else {
         throw new Error("Error al eliminar curso")
       }
@@ -372,7 +395,7 @@ export default function AdminPanel() {
       title: course.title || "",
       description: course.description || "",
       price: course.price?.toString() || "",
-      instructor: course.instructor || "",
+      instructor: course.instructor_name || "",
       thumbnail_url: course.thumbnail_url || "",
     })
     setCourseDialogOpen(true)
@@ -385,7 +408,7 @@ export default function AdminPanel() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...lessonForm,
-          duration: Number.parseInt(lessonForm.duration),
+          duration_minutes: Number.parseInt(lessonForm.duration_minutes),
           order_index: Number.parseInt(lessonForm.order_index),
         }),
       })
@@ -393,8 +416,16 @@ export default function AdminPanel() {
       if (response.ok) {
         toast({ title: "Éxito", description: "Lección creada correctamente" })
         setLessonDialogOpen(false)
-        setLessonForm({ title: "", description: "", video_url: "", duration: "", course_id: "", order_index: "" })
+        setLessonForm({
+          title: "",
+          description: "",
+          video_url: "",
+          duration_minutes: "",
+          course_id: "",
+          order_index: "",
+        })
         fetchLessons()
+        fetchStats()
       } else {
         throw new Error("Error al crear lección")
       }
@@ -412,7 +443,7 @@ export default function AdminPanel() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...lessonForm,
-          duration: Number.parseInt(lessonForm.duration),
+          duration_minutes: Number.parseInt(lessonForm.duration_minutes),
           order_index: Number.parseInt(lessonForm.order_index),
         }),
       })
@@ -421,7 +452,14 @@ export default function AdminPanel() {
         toast({ title: "Éxito", description: "Lección actualizada correctamente" })
         setLessonDialogOpen(false)
         setEditingLesson(null)
-        setLessonForm({ title: "", description: "", video_url: "", duration: "", course_id: "", order_index: "" })
+        setLessonForm({
+          title: "",
+          description: "",
+          video_url: "",
+          duration_minutes: "",
+          course_id: "",
+          order_index: "",
+        })
         fetchLessons()
       } else {
         throw new Error("Error al actualizar lección")
@@ -440,6 +478,7 @@ export default function AdminPanel() {
       if (response.ok) {
         toast({ title: "Éxito", description: "Lección eliminada correctamente" })
         fetchLessons()
+        fetchStats()
       } else {
         throw new Error("Error al eliminar lección")
       }
@@ -454,7 +493,7 @@ export default function AdminPanel() {
       title: lesson.title || "",
       description: lesson.description || "",
       video_url: lesson.video_url || "",
-      duration: lesson.duration?.toString() || "",
+      duration_minutes: lesson.duration_minutes?.toString() || "",
       course_id: lesson.course_id || "",
       order_index: lesson.order_index?.toString() || "",
     })
@@ -681,21 +720,21 @@ export default function AdminPanel() {
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Ingresos Totales</CardTitle>
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                <CardTitle className="text-sm font-medium">Total Lecciones</CardTitle>
+                <GraduationCap className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">${stats.totalRevenue}</div>
+                <div className="text-2xl font-bold">{stats.totalLessons}</div>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Crecimiento Mensual</CardTitle>
-                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                <CardTitle className="text-sm font-medium">Ingresos Totales</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">+{stats.monthlyGrowth}%</div>
+                <div className="text-2xl font-bold">${stats.totalRevenue}</div>
               </CardContent>
             </Card>
           </div>
@@ -705,9 +744,9 @@ export default function AdminPanel() {
             <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="courses">Cursos</TabsTrigger>
               <TabsTrigger value="lessons">Lecciones</TabsTrigger>
-              <TabsTrigger value="users">Usuarios</TabsTrigger>
               <TabsTrigger value="tags">Tags</TabsTrigger>
               <TabsTrigger value="carousel">Carousel</TabsTrigger>
+              <TabsTrigger value="users">Usuarios</TabsTrigger>
             </TabsList>
 
             {/* Courses Tab */}
@@ -805,11 +844,12 @@ export default function AdminPanel() {
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead>Imagen</TableHead>
                         <TableHead>Título</TableHead>
                         <TableHead>Instructor</TableHead>
                         <TableHead>Precio</TableHead>
+                        <TableHead>Estudiantes</TableHead>
                         <TableHead>Estado</TableHead>
-                        <TableHead>Fecha</TableHead>
                         <TableHead>Acciones</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -817,15 +857,26 @@ export default function AdminPanel() {
                       {Array.isArray(courses) && courses.length > 0 ? (
                         courses.map((course) => (
                           <TableRow key={course.id}>
+                            <TableCell>
+                              <img
+                                src={course.thumbnail_url || "/placeholder.svg"}
+                                alt={course.title}
+                                className="w-16 h-12 object-cover rounded"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement
+                                  target.src = "/placeholder.jpg"
+                                }}
+                              />
+                            </TableCell>
                             <TableCell className="font-medium">{course.title}</TableCell>
-                            <TableCell>{course.instructor}</TableCell>
+                            <TableCell>{course.instructor_name}</TableCell>
                             <TableCell>${course.price}</TableCell>
+                            <TableCell>{course.students || 0}</TableCell>
                             <TableCell>
                               <Badge variant={course.archived ? "secondary" : "default"}>
                                 {course.archived ? "Archivado" : "Activo"}
                               </Badge>
                             </TableCell>
-                            <TableCell>{new Date(course.created_at).toLocaleDateString()}</TableCell>
                             <TableCell>
                               <div className="flex items-center space-x-2">
                                 <Button variant="ghost" size="sm" onClick={() => openEditCourseDialog(course)}>
@@ -867,7 +918,7 @@ export default function AdminPanel() {
                         ))
                       ) : (
                         <TableRow>
-                          <TableCell colSpan={6} className="text-center py-8">
+                          <TableCell colSpan={7} className="text-center py-8">
                             No hay cursos disponibles
                           </TableCell>
                         </TableRow>
@@ -896,7 +947,7 @@ export default function AdminPanel() {
                               title: "",
                               description: "",
                               video_url: "",
-                              duration: "",
+                              duration_minutes: "",
                               course_id: "",
                               order_index: "",
                             })
@@ -950,8 +1001,8 @@ export default function AdminPanel() {
                               <Input
                                 id="duration"
                                 type="number"
-                                value={lessonForm.duration}
-                                onChange={(e) => setLessonForm({ ...lessonForm, duration: e.target.value })}
+                                value={lessonForm.duration_minutes}
+                                onChange={(e) => setLessonForm({ ...lessonForm, duration_minutes: e.target.value })}
                                 placeholder="30"
                               />
                             </div>
@@ -1017,8 +1068,8 @@ export default function AdminPanel() {
                           return (
                             <TableRow key={lesson.id}>
                               <TableCell className="font-medium">{lesson.title}</TableCell>
-                              <TableCell>{course?.title || "Curso no encontrado"}</TableCell>
-                              <TableCell>{lesson.duration} min</TableCell>
+                              <TableCell>{lesson.courses?.title || course?.title || "Curso no encontrado"}</TableCell>
+                              <TableCell>{lesson.duration_minutes} min</TableCell>
                               <TableCell>{lesson.order_index}</TableCell>
                               <TableCell>{new Date(lesson.created_at).toLocaleDateString()}</TableCell>
                               <TableCell>
@@ -1056,48 +1107,6 @@ export default function AdminPanel() {
                         <TableRow>
                           <TableCell colSpan={6} className="text-center py-8">
                             No hay lecciones disponibles
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            {/* Users Tab */}
-            <TabsContent value="users">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Gestión de Usuarios</CardTitle>
-                  <CardDescription>Administra los usuarios registrados en la plataforma</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Nombre</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Rol</TableHead>
-                        <TableHead>Fecha de Registro</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {Array.isArray(users) && users.length > 0 ? (
-                        users.map((user) => (
-                          <TableRow key={user.id}>
-                            <TableCell className="font-medium">{user.name}</TableCell>
-                            <TableCell>{user.email}</TableCell>
-                            <TableCell>
-                              <Badge variant={user.role === "admin" ? "default" : "secondary"}>{user.role}</Badge>
-                            </TableCell>
-                            <TableCell>{new Date(user.created_at).toLocaleDateString()}</TableCell>
-                          </TableRow>
-                        ))
-                      ) : (
-                        <TableRow>
-                          <TableCell colSpan={4} className="text-center py-8">
-                            No hay usuarios registrados
                           </TableCell>
                         </TableRow>
                       )}
@@ -1414,6 +1423,50 @@ export default function AdminPanel() {
                         <TableRow>
                           <TableCell colSpan={6} className="text-center py-8">
                             No hay slides disponibles
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Users Tab */}
+            <TabsContent value="users">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Gestión de Usuarios</CardTitle>
+                  <CardDescription>Administra los usuarios registrados en la plataforma</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nombre</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Rol</TableHead>
+                        <TableHead>Fecha de Registro</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {Array.isArray(users) && users.length > 0 ? (
+                        users.map((user) => (
+                          <TableRow key={user.id}>
+                            <TableCell className="font-medium">
+                              {user.first_name} {user.last_name}
+                            </TableCell>
+                            <TableCell>{user.email}</TableCell>
+                            <TableCell>
+                              <Badge variant={user.role === "admin" ? "default" : "secondary"}>{user.role}</Badge>
+                            </TableCell>
+                            <TableCell>{new Date(user.created_at).toLocaleDateString()}</TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={4} className="text-center py-8">
+                            No hay usuarios registrados
                           </TableCell>
                         </TableRow>
                       )}
