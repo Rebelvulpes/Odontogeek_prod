@@ -8,35 +8,33 @@ export async function GET() {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Obtener cursos con estadísticas
-    const { data: courses, error: coursesError } = await supabase
+    const { data: courses, error } = await supabase
       .from("courses")
       .select(`
         *,
-        lessons!inner(id),
-        enrollments!inner(id)
+        lessons!inner(count)
       `)
       .order("created_at", { ascending: false })
 
-    if (coursesError) {
-      console.error("Error obteniendo cursos:", coursesError)
+    if (error) {
+      console.error("Error obteniendo cursos:", error)
       return NextResponse.json(
         {
           success: false,
           message: "Error obteniendo cursos",
-          error: coursesError,
+          error: error,
         },
         { status: 500 },
       )
     }
 
-    // Procesar datos para incluir conteos
+    // Procesar los datos para incluir el conteo de lecciones
     const processedCourses =
       courses?.map((course) => ({
         ...course,
         lessonsCount: course.lessons?.length || 0,
-        students: course.enrollments?.length || 0,
-        revenue: (course.enrollments?.length || 0) * (course.price || 0),
+        students: 0, // Placeholder - implementar cuando tengamos enrollments
+        revenue: 0, // Placeholder - implementar cuando tengamos payments
       })) || []
 
     return NextResponse.json({
@@ -63,28 +61,33 @@ export async function POST(request: NextRequest) {
 
     const { title, description, price, instructor, thumbnail_url } = body
 
+    // Validar campos requeridos
     if (!title || !description || !instructor) {
       return NextResponse.json(
         {
           success: false,
-          message: "Faltan campos requeridos: título, descripción e instructor",
+          message: "Faltan campos requeridos: title, description, instructor",
         },
         { status: 400 },
       )
     }
 
+    // Crear el curso
     const { data: course, error: courseError } = await supabase
       .from("courses")
-      .insert({
-        title,
-        description,
-        price: price ? Number.parseFloat(price) : 0,
-        instructor_name: instructor,
-        thumbnail_url: thumbnail_url || null,
-        archived: false,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
+      .insert([
+        {
+          title,
+          description,
+          price: price ? Number.parseFloat(price) : 0,
+          instructor_name: instructor,
+          thumbnail_url: thumbnail_url || null,
+          status: "published",
+          archived: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      ])
       .select()
       .single()
 

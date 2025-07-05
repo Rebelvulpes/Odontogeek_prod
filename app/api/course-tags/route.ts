@@ -46,24 +46,28 @@ export async function POST(request: NextRequest) {
 
     const { name, color } = body
 
+    // Validar campos requeridos
     if (!name) {
       return NextResponse.json(
         {
           success: false,
-          message: "El nombre del tag es requerido",
+          message: "El campo 'name' es requerido",
         },
         { status: 400 },
       )
     }
 
+    // Crear el tag
     const { data: tag, error: tagError } = await supabase
       .from("tags")
-      .insert({
-        name,
-        color: color || "#3B82F6",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
+      .insert([
+        {
+          name,
+          color: color || "#3B82F6",
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      ])
       .select()
       .single()
 

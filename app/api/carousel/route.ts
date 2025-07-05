@@ -11,6 +11,7 @@ export async function GET() {
     const { data: slides, error } = await supabase
       .from("carousel_slides")
       .select("*")
+      .eq("is_active", true)
       .order("order_index", { ascending: true })
 
     if (error) {
@@ -25,12 +26,33 @@ export async function GET() {
       )
     }
 
+    // Transformar los datos para que coincidan con la interfaz del carousel
+    const transformedSlides =
+      slides?.map((slide) => ({
+        id: slide.id,
+        title: slide.title || "",
+        subtitle: slide.subtitle || "",
+        description: slide.description || "",
+        backgroundColor: slide.background_color || "from-blue-900 to-indigo-900",
+        promoImage: slide.image_url || "",
+        badge: slide.badge_text || "Nuevo",
+        badgeColor: slide.badge_color || "bg-green-500",
+        cta: slide.cta_text || "Ver más",
+        ctaLink: slide.cta_link || "/courses",
+        type: slide.slide_type || "course",
+        stats: [
+          { icon: "Users", label: "Estudiantes", value: "1,000+" },
+          { icon: "Play", label: "Lecciones", value: "20+" },
+          { icon: "Award", label: "Certificado", value: "Incluido" },
+        ],
+      })) || []
+
     return NextResponse.json({
       success: true,
-      data: slides || [],
+      data: transformedSlides,
     })
   } catch (error) {
-    console.error("Error en GET slides:", error)
+    console.error("Error en GET carousel:", error)
     return NextResponse.json(
       {
         success: false,
@@ -49,34 +71,38 @@ export async function POST(request: NextRequest) {
 
     const { title, description, image_url, link_url, is_active, order_index } = body
 
-    if (!title || !image_url) {
+    // Validar campos requeridos
+    if (!title) {
       return NextResponse.json(
         {
           success: false,
-          message: "Título e imagen son requeridos",
+          message: "El campo 'title' es requerido",
         },
         { status: 400 },
       )
     }
 
+    // Crear el slide
     const { data: slide, error: slideError } = await supabase
       .from("carousel_slides")
-      .insert({
-        title,
-        subtitle: null,
-        description: description || null,
-        image_url,
-        cta_text: null,
-        cta_link: link_url || null,
-        background_color: null,
-        badge_text: null,
-        badge_color: null,
-        order_index: order_index ? Number.parseInt(order_index) : 1,
-        slide_type: "default",
-        is_active: is_active !== undefined ? is_active : true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
+      .insert([
+        {
+          title,
+          subtitle: "",
+          description: description || "",
+          image_url: image_url || "",
+          cta_text: "Ver más",
+          cta_link: link_url || "/courses",
+          background_color: "from-blue-900 to-indigo-900",
+          badge_text: "Nuevo",
+          badge_color: "bg-green-500",
+          order_index: order_index ? Number.parseInt(order_index) : 1,
+          slide_type: "course",
+          is_active: is_active !== undefined ? is_active : true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      ])
       .select()
       .single()
 
