@@ -401,6 +401,12 @@ export default function AdminPanel() {
     setCourseDialogOpen(true)
   }
 
+  const openNewCourseDialog = () => {
+    setEditingCourse(null)
+    setCourseForm({ title: "", description: "", price: "", instructor: "", thumbnail_url: "" })
+    setCourseDialogOpen(true)
+  }
+
   const handleCreateLesson = async () => {
     try {
       const response = await fetch("/api/admin/lessons", {
@@ -500,6 +506,19 @@ export default function AdminPanel() {
     setLessonDialogOpen(true)
   }
 
+  const openNewLessonDialog = () => {
+    setEditingLesson(null)
+    setLessonForm({
+      title: "",
+      description: "",
+      video_url: "",
+      duration_minutes: "",
+      course_id: "",
+      order_index: "",
+    })
+    setLessonDialogOpen(true)
+  }
+
   const handleCreateTag = async () => {
     try {
       const response = await fetch("/api/course-tags", {
@@ -568,6 +587,12 @@ export default function AdminPanel() {
       name: tag.name || "",
       color: tag.color || "#3B82F6",
     })
+    setTagDialogOpen(true)
+  }
+
+  const openNewTagDialog = () => {
+    setEditingTag(null)
+    setTagForm({ name: "", color: "#3B82F6" })
     setTagDialogOpen(true)
   }
 
@@ -671,6 +696,19 @@ export default function AdminPanel() {
     setSlideDialogOpen(true)
   }
 
+  const openNewSlideDialog = () => {
+    setEditingSlide(null)
+    setSlideForm({
+      title: "",
+      description: "",
+      image_url: "",
+      link_url: "",
+      is_active: true,
+      order_index: "",
+    })
+    setSlideDialogOpen(true)
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -760,12 +798,7 @@ export default function AdminPanel() {
                     </div>
                     <Dialog open={courseDialogOpen} onOpenChange={setCourseDialogOpen}>
                       <DialogTrigger asChild>
-                        <Button
-                          onClick={() => {
-                            setEditingCourse(null)
-                            setCourseForm({ title: "", description: "", price: "", instructor: "", thumbnail_url: "" })
-                          }}
-                        >
+                        <Button onClick={openNewCourseDialog}>
                           <Plus className="w-4 h-4 mr-2" />
                           Nuevo Curso
                         </Button>
@@ -940,19 +973,7 @@ export default function AdminPanel() {
                     </div>
                     <Dialog open={lessonDialogOpen} onOpenChange={setLessonDialogOpen}>
                       <DialogTrigger asChild>
-                        <Button
-                          onClick={() => {
-                            setEditingLesson(null)
-                            setLessonForm({
-                              title: "",
-                              description: "",
-                              video_url: "",
-                              duration_minutes: "",
-                              course_id: "",
-                              order_index: "",
-                            })
-                          }}
-                        >
+                        <Button onClick={openNewLessonDialog}>
                           <Plus className="w-4 h-4 mr-2" />
                           Nueva Lección
                         </Button>
@@ -1127,12 +1148,7 @@ export default function AdminPanel() {
                     </div>
                     <Dialog open={tagDialogOpen} onOpenChange={setTagDialogOpen}>
                       <DialogTrigger asChild>
-                        <Button
-                          onClick={() => {
-                            setEditingTag(null)
-                            setTagForm({ name: "", color: "#3B82F6" })
-                          }}
-                        >
+                        <Button onClick={openNewTagDialog}>
                           <Plus className="w-4 h-4 mr-2" />
                           Nuevo Tag
                         </Button>
@@ -1252,19 +1268,7 @@ export default function AdminPanel() {
                     </div>
                     <Dialog open={slideDialogOpen} onOpenChange={setSlideDialogOpen}>
                       <DialogTrigger asChild>
-                        <Button
-                          onClick={() => {
-                            setEditingSlide(null)
-                            setSlideForm({
-                              title: "",
-                              description: "",
-                              image_url: "",
-                              link_url: "",
-                              is_active: true,
-                              order_index: "",
-                            })
-                          }}
-                        >
+                        <Button onClick={openNewSlideDialog}>
                           <Plus className="w-4 h-4 mr-2" />
                           Nuevo Slide
                         </Button>
