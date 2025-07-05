@@ -18,7 +18,7 @@ export async function GET() {
       return NextResponse.json(
         {
           success: false,
-          message: "Error obteniendo slides del carousel",
+          message: "Error obteniendo slides",
           error: error,
         },
         { status: 500 },
@@ -30,7 +30,7 @@ export async function GET() {
       data: slides || [],
     })
   } catch (error) {
-    console.error("Error en GET carousel:", error)
+    console.error("Error en GET slides:", error)
     return NextResponse.json(
       {
         success: false,
@@ -47,27 +47,14 @@ export async function POST(request: NextRequest) {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
     const body = await request.json()
 
-    const {
-      title,
-      subtitle,
-      description,
-      image_url,
-      cta_text,
-      cta_link,
-      background_color,
-      badge_text,
-      badge_color,
-      order_index,
-      slide_type,
-      is_active,
-    } = body
+    const { title, description, image_url, link_url, is_active, order_index } = body
 
     // Validar campos requeridos
-    if (!title) {
+    if (!title || !image_url) {
       return NextResponse.json(
         {
           success: false,
-          message: "El campo título es requerido",
+          message: "Los campos título e imagen son requeridos",
         },
         { status: 400 },
       )
@@ -79,19 +66,12 @@ export async function POST(request: NextRequest) {
       .insert([
         {
           title,
-          subtitle: subtitle || "",
           description: description || "",
-          image_url: image_url || "/placeholder.svg?height=400&width=600",
-          cta_text: cta_text || "Ver más",
-          cta_link: cta_link || "/courses",
-          background_color: background_color || "from-blue-900 to-indigo-900",
-          badge_text: badge_text || "Nuevo",
-          badge_color: badge_color || "bg-green-500",
-          order_index: Number.parseInt(order_index) || 1,
-          slide_type: slide_type || "course",
+          image_url,
+          link_url: link_url || null,
           is_active: is_active !== undefined ? is_active : true,
+          order_index: order_index ? Number.parseInt(order_index) : 1,
           created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
         },
       ])
       .select()

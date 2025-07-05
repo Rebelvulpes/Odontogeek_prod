@@ -4,45 +4,71 @@ import { createClient } from "@supabase/supabase-js"
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
+export async function GET(request: NextRequest, { params }: { params: { tagId: string } }) {
+  try {
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    const { tagId } = params
+
+    const { data: tag, error } = await supabase.from("tags").select("*").eq("id", tagId).single()
+
+    if (error) {
+      console.error("Error obteniendo tag:", error)
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Error obteniendo tag",
+          error: error,
+        },
+        { status: 500 },
+      )
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: tag,
+    })
+  } catch (error) {
+    console.error("Error en GET tag:", error)
+    return NextResponse.json(
+      {
+        success: false,
+        message: "Error interno del servidor",
+        error: error instanceof Error ? error.message : "Error desconocido",
+      },
+      { status: 500 },
+    )
+  }
+}
+
 export async function PUT(request: NextRequest, { params }: { params: { tagId: string } }) {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
-    const body = await request.json()
     const { tagId } = params
+    const body = await request.json()
 
     const { name, color } = body
 
-    // Intentar actualizar en la tabla 'tags' primero
-    let { data: tag, error } = await supabase
+    // Actualizar el tag
+    const { data: tag, error: tagError } = await supabase
       .from("tags")
       .update({
-        name: name,
-        color: color,
-        updated_at: new Date().toISOString(),
+        ...(name && { name }),
+        ...(color && { color }),
       })
       .eq("id", tagId)
       .select()
       .single()
 
-    // Si la tabla 'tags' no existe, usar 'course_tags'
-    if (error && error.message.includes("does not exist")) {
-      const result = await supabase
-        .from("course_tags")
-        .update({
-          name: name,
-          color: color,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", tagId)
-        .select()
-        .single()
-
-      tag = result.data
-      error = result.error
-    }
-
-    if (error) {
-      return NextResponse.json({ success: false, message: "Error actualizando tag", error }, { status: 500 })
+    if (tagError) {
+      console.error("Error actualizando tag:", tagError)
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Error actualizando tag",
+          error: tagError,
+        },
+        { status: 500 },
+      )
     }
 
     return NextResponse.json({
@@ -51,7 +77,15 @@ export async function PUT(request: NextRequest, { params }: { params: { tagId: s
       data: tag,
     })
   } catch (error) {
-    return NextResponse.json({ success: false, message: "Error interno del servidor" }, { status: 500 })
+    console.error("Error en PUT tag:", error)
+    return NextResponse.json(
+      {
+        success: false,
+        message: "Error interno del servidor",
+        error: error instanceof Error ? error.message : "Error desconocido",
+      },
+      { status: 500 },
+    )
   }
 }
 
@@ -60,17 +94,22 @@ export async function DELETE(request: NextRequest, { params }: { params: { tagId
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
     const { tagId } = params
 
-    // Intentar eliminar de la tabla 'tags' primero
-    let { error } = await supabase.from("tags").delete().eq("id", tagId)
+    // Eliminar relaciones del tag primero
+    await supabase.from("course_tags").delete().eq("tag_id", tagId)
 
-    // Si la tabla 'tags' no existe, usar 'course_tags'
-    if (error && error.message.includes("does not exist")) {
-      const result = await supabase.from("course_tags").delete().eq("id", tagId)
-      error = result.error
-    }
+    // Eliminar el tag
+    const { error: tagError } = await supabase.from("tags").delete().eq("id", tagId)
 
-    if (error) {
-      return NextResponse.json({ success: false, message: "Error eliminando tag", error }, { status: 500 })
+    if (tagError) {
+      console.error("Error eliminando tag:", tagError)
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Error eliminando tag",
+          error: tagError,
+        },
+        { status: 500 },
+      )
     }
 
     return NextResponse.json({
@@ -78,6 +117,14 @@ export async function DELETE(request: NextRequest, { params }: { params: { tagId
       message: "Tag eliminado exitosamente",
     })
   } catch (error) {
-    return NextResponse.json({ success: false, message: "Error interno del servidor" }, { status: 500 })
+    console.error("Error en DELETE tag:", error)
+    return NextResponse.json(
+      {
+        success: false,
+        message: "Error interno del servidor",
+        error: error instanceof Error ? error.message : "Error desconocido",
+      },
+      { status: 500 },
+    )
   }
 }

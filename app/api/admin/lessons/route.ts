@@ -8,17 +8,17 @@ export async function GET() {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
+    // Obtener lecciones con información del curso
     const { data: lessons, error } = await supabase
       .from("lessons")
       .select(`
         *,
-        courses (
+        courses!inner (
           id,
           title
         )
       `)
-      .order("course_id", { ascending: true })
-      .order("order_index", { ascending: true })
+      .order("created_at", { ascending: false })
 
     if (error) {
       console.error("Error obteniendo lecciones:", error)
@@ -57,11 +57,11 @@ export async function POST(request: NextRequest) {
     const { title, description, video_url, duration_minutes, course_id, order_index } = body
 
     // Validar campos requeridos
-    if (!title || !description || !course_id) {
+    if (!title || !course_id) {
       return NextResponse.json(
         {
           success: false,
-          message: "Los campos título, descripción y curso son requeridos",
+          message: "Los campos título y curso son requeridos",
         },
         { status: 400 },
       )

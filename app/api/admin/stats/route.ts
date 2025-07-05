@@ -8,74 +8,39 @@ export async function GET() {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Obtener total de usuarios
-    const { count: totalUsers, error: usersError } = await supabase
-      .from("users")
-      .select("*", { count: "exact", head: true })
+    // Obtener estadísticas básicas
+    const [usersResult, coursesResult, lessonsResult, enrollmentsResult] = await Promise.all([
+      supabase.from("users").select("*", { count: "exact", head: true }),
+      supabase.from("courses").select("*", { count: "exact", head: true }),
+      supabase.from("lessons").select("*", { count: "exact", head: true }),
+      supabase.from("enrollments").select("amount", { count: "exact" }),
+    ])
 
-    if (usersError) {
-      console.error("Error obteniendo usuarios:", usersError)
-    }
-
-    // Obtener total de cursos
-    const { count: totalCourses, error: coursesError } = await supabase
-      .from("courses")
-      .select("*", { count: "exact", head: true })
-      .eq("archived", false)
-
-    if (coursesError) {
-      console.error("Error obteniendo cursos:", coursesError)
-    }
-
-    // Obtener total de lecciones
-    const { count: totalLessons, error: lessonsError } = await supabase
-      .from("lessons")
-      .select("*", { count: "exact", head: true })
-      .eq("archived", false)
-
-    if (lessonsError) {
-      console.error("Error obteniendo lecciones:", lessonsError)
-    }
-
-    // Obtener enrollments
-    const { data: enrollments, error: enrollmentsError } = await supabase.from("enrollments").select("course_id")
-
+    // Calcular ingresos totales
     let totalRevenue = 0
-    if (enrollments && !enrollmentsError) {
-      // Obtener precios de cursos por separado
-      const courseIds = [...new Set(enrollments.map((e) => e.course_id))]
-      if (courseIds.length > 0) {
-        const { data: courses, error: coursesRevenueError } = await supabase
-          .from("courses")
-          .select("id, price")
-          .in("id", courseIds)
+    if (enrollmentsResult.data && Array.isArray(enrollmentsResult.data)) {
+      totalRevenue = enrollmentsResult.data.reduce((sum, enrollment) => {
+        return sum + (enrollment.amount || 0)
+      }, 0)
+    }
 
-        if (courses && !coursesRevenueError) {
-          // Calcular revenue basado en enrollments y precios
-          const courseMap = new Map(courses.map((c) => [c.id, c.price]))
-          totalRevenue = enrollments.reduce((sum, enrollment) => {
-            const coursePrice = courseMap.get(enrollment.course_id) || 0
-            return sum + coursePrice
-          }, 0)
-        }
-      }
+    const stats = {
+      totalUsers: usersResult.count || 0,
+      totalCourses: coursesResult.count || 0,
+      totalLessons: lessonsResult.count || 0,
+      totalRevenue: totalRevenue,
     }
 
     return NextResponse.json({
       success: true,
-      data: {
-        totalUsers: totalUsers || 0,
-        totalCourses: totalCourses || 0,
-        totalLessons: totalLessons || 0,
-        totalRevenue: totalRevenue,
-      },
+      data: stats,
     })
   } catch (error) {
-    console.error("Error en la ruta de estadísticas:", error)
+    console.error("Error obteniendo estadísticas:", error)
     return NextResponse.json(
       {
         success: false,
-        message: "Error interno del servidor",
+        message: "Error obteniendo estadísticas",
         error: error instanceof Error ? error.message : "Error desconocido",
       },
       { status: 500 },

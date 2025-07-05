@@ -8,40 +8,51 @@ export async function GET() {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Obtener cursos con conteo de lecciones y enrollments
-    const { data: courses, error } = await supabase
+    // Obtener cursos básicos primero
+    const { data: courses, error: coursesError } = await supabase
       .from("courses")
-      .select(`
-        *,
-        lessons(count),
-        enrollments(count)
-      `)
+      .select("*")
       .order("created_at", { ascending: false })
 
-    if (error) {
-      console.error("Error obteniendo cursos:", error)
+    if (coursesError) {
+      console.error("Error obteniendo cursos:", coursesError)
       return NextResponse.json(
         {
           success: false,
           message: "Error obteniendo cursos",
-          error: error,
+          error: coursesError,
         },
         { status: 500 },
       )
     }
 
-    // Procesar datos para incluir conteos
-    const processedCourses =
-      courses?.map((course) => ({
-        ...course,
-        lessonsCount: course.lessons?.[0]?.count || 0,
-        students: course.enrollments?.[0]?.count || 0,
-        revenue: (course.enrollments?.[0]?.count || 0) * (course.price || 0),
-      })) || []
+    // Obtener conteo de lecciones para cada curso
+    const coursesWithCounts = await Promise.all(
+      (courses || []).map(async (course) => {
+        // Contar lecciones
+        const { count: lessonsCount } = await supabase
+          .from("lessons")
+          .select("*", { count: "exact", head: true })
+          .eq("course_id", course.id)
+
+        // Contar enrollments
+        const { count: enrollmentsCount } = await supabase
+          .from("enrollments")
+          .select("*", { count: "exact", head: true })
+          .eq("course_id", course.id)
+
+        return {
+          ...course,
+          lessonsCount: lessonsCount || 0,
+          students: enrollmentsCount || 0,
+          revenue: (enrollmentsCount || 0) * (course.price || 0),
+        }
+      }),
+    )
 
     return NextResponse.json({
       success: true,
-      data: processedCourses,
+      data: coursesWithCounts,
     })
   } catch (error) {
     console.error("Error en GET cursos:", error)
