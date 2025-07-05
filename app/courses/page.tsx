@@ -183,36 +183,52 @@ export default function CoursesPage() {
           </div>
         </div>
 
-        {/* Grid de cursos */}
+        {/* Grid de cursos - Ajustado para cards más grandes */}
         {filteredCourses.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
             {filteredCourses.map((course) => (
-              <Card key={course.id} className="group hover:shadow-lg transition-all duration-300 overflow-hidden">
-                {/* Imagen del curso */}
-                <div className="relative h-48 overflow-hidden">
+              <Card
+                key={course.id}
+                className="group hover:shadow-xl transition-all duration-300 overflow-hidden bg-white"
+              >
+                {/* Imagen del curso - Más grande para 1080x1080 */}
+                <div className="relative h-72 sm:h-80 overflow-hidden">
                   <img
-                    src={course.thumbnail_url || "/placeholder.svg?height=200&width=400&text=Curso"}
+                    src={course.thumbnail_url || "/placeholder.svg?height=400&width=400&text=Curso"}
                     alt={course.title}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     onError={(e) => {
-                      e.currentTarget.src = "/placeholder.svg?height=200&width=400&text=Curso+de+Odontología"
+                      e.currentTarget.src = "/placeholder.svg?height=400&width=400&text=Curso+de+Odontología"
                     }}
                   />
                   {course.price === 0 && (
-                    <Badge className="absolute top-3 left-3 bg-green-500 hover:bg-green-600">Gratuito</Badge>
+                    <Badge className="absolute top-4 left-4 bg-green-500 hover:bg-green-600 text-white font-medium px-3 py-1">
+                      Gratuito
+                    </Badge>
                   )}
                   {course.price > 0 && (
-                    <Badge className="absolute top-3 right-3 bg-blue-500 hover:bg-blue-600">${course.price}</Badge>
+                    <Badge className="absolute top-4 right-4 bg-blue-500 hover:bg-blue-600 text-white font-medium px-3 py-1">
+                      ${course.price}
+                    </Badge>
                   )}
+
+                  {/* Overlay con botón de play */}
+                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-300 flex items-center justify-center">
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                      <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-lg">
+                        <Play className="w-6 h-6 text-blue-600 ml-1" />
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
-                <CardHeader className="pb-3">
-                  <div className="flex flex-wrap gap-1 mb-2">
+                <CardHeader className="pb-4 px-6 pt-6">
+                  <div className="flex flex-wrap gap-2 mb-3">
                     {course.tags.slice(0, 2).map((tag) => (
                       <Badge
                         key={tag.id}
                         variant="secondary"
-                        className="text-xs"
+                        className="text-xs font-medium px-2 py-1"
                         style={{
                           backgroundColor: tag.color + "20",
                           color: tag.color,
@@ -223,60 +239,68 @@ export default function CoursesPage() {
                       </Badge>
                     ))}
                     {course.tags.length > 2 && (
-                      <Badge variant="secondary" className="text-xs">
+                      <Badge variant="secondary" className="text-xs font-medium px-2 py-1">
                         +{course.tags.length - 2}
                       </Badge>
                     )}
                   </div>
 
-                  <CardTitle className="text-lg line-clamp-2 group-hover:text-blue-600 transition-colors">
+                  <CardTitle className="text-xl font-bold line-clamp-2 group-hover:text-blue-600 transition-colors leading-tight mb-2">
                     {course.title}
                   </CardTitle>
 
-                  <CardDescription className="line-clamp-2">{course.description}</CardDescription>
+                  <CardDescription className="line-clamp-3 text-gray-600 text-sm leading-relaxed">
+                    {course.description}
+                  </CardDescription>
                 </CardHeader>
 
-                <CardContent className="pt-0">
+                <CardContent className="pt-0 px-6 pb-6">
                   {/* Información del instructor */}
-                  <div className="flex items-center space-x-2 mb-4">
-                    <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
-                      <Users className="w-4 h-4 text-gray-600" />
+                  <div className="flex items-center space-x-3 mb-5">
+                    <div className="w-10 h-10 bg-gradient-to-br from-blue-100 to-blue-200 rounded-full flex items-center justify-center">
+                      <Users className="w-5 h-5 text-blue-600" />
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-gray-900">{course.instructor_name || "Instructor"}</p>
-                      <p className="text-xs text-gray-500">Especialista</p>
+                      <p className="text-sm font-semibold text-gray-900">{course.instructor_name || "Instructor"}</p>
+                      <p className="text-xs text-gray-500">Especialista en Odontología</p>
                     </div>
                   </div>
 
                   {/* Estadísticas del curso */}
-                  <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
+                  <div className="flex items-center justify-between text-sm text-gray-600 mb-5">
                     <div className="flex items-center space-x-1">
                       <Play className="w-4 h-4" />
-                      <span>{course.lessons?.length || 0} lecciones</span>
+                      <span className="font-medium">{course.lessons?.length || 0} lecciones</span>
                     </div>
                     <div className="flex items-center space-x-1">
                       <Clock className="w-4 h-4" />
-                      <span>{course.duration_hours || 0}h</span>
+                      <span className="font-medium">{course.duration_hours || 0}h</span>
                     </div>
                     <div className="flex items-center space-x-1">
-                      <Star className="w-4 h-4 text-yellow-500" />
-                      <span>4.8</span>
+                      <Star className="w-4 h-4 text-yellow-500 fill-current" />
+                      <span className="font-medium">4.8</span>
                     </div>
+                  </div>
+
+                  {/* Estudiantes inscritos */}
+                  <div className="flex items-center space-x-2 text-sm text-gray-600 mb-5">
+                    <Users className="w-4 h-4" />
+                    <span>{course.students_count || 0} estudiantes inscritos</span>
                   </div>
 
                   {/* Lecciones gratuitas */}
                   {course.lessons?.some((lesson) => lesson.is_free) && (
-                    <div className="flex items-center space-x-1 text-green-600 text-sm mb-4">
+                    <div className="flex items-center space-x-2 text-green-600 text-sm mb-5 bg-green-50 rounded-lg px-3 py-2">
                       <CheckCircle className="w-4 h-4" />
-                      <span>Incluye lecciones gratuitas</span>
+                      <span className="font-medium">Incluye lecciones gratuitas</span>
                     </div>
                   )}
 
                   {/* Botón de acción */}
-                  <Button asChild className="w-full group">
+                  <Button asChild className="w-full h-12 text-base font-semibold group/btn">
                     <Link href={`/courses/${course.id}`}>
-                      Ver Curso
-                      <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
+                      {course.price === 0 ? "Ver Curso Gratis" : `Comprar por $${course.price}`}
+                      <ArrowRight className="w-5 h-5 ml-2 group-hover/btn:translate-x-1 transition-transform" />
                     </Link>
                   </Button>
                 </CardContent>
@@ -284,10 +308,10 @@ export default function CoursesPage() {
             ))}
           </div>
         ) : (
-          <div className="text-center py-16">
-            <BookOpen className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-xl font-medium text-gray-900 mb-2">No se encontraron cursos</h3>
-            <p className="text-gray-600 mb-6">
+          <div className="text-center py-20">
+            <BookOpen className="w-20 h-20 text-gray-300 mx-auto mb-6" />
+            <h3 className="text-2xl font-medium text-gray-900 mb-3">No se encontraron cursos</h3>
+            <p className="text-gray-600 mb-8 text-lg">
               {searchTerm || selectedTag !== "all" || priceFilter !== "all"
                 ? "Intenta ajustar los filtros de búsqueda"
                 : "Aún no hay cursos disponibles"}
@@ -295,6 +319,7 @@ export default function CoursesPage() {
             {(searchTerm || selectedTag !== "all" || priceFilter !== "all") && (
               <Button
                 variant="outline"
+                size="lg"
                 onClick={() => {
                   setSearchTerm("")
                   setSelectedTag("all")
@@ -309,15 +334,15 @@ export default function CoursesPage() {
 
         {/* Call to action */}
         {filteredCourses.length > 0 && (
-          <div className="text-center mt-16 bg-white rounded-lg shadow-sm border p-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">¿No encuentras lo que buscas?</h2>
-            <p className="text-gray-600 mb-6">
+          <div className="text-center mt-20 bg-white rounded-xl shadow-sm border p-10">
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">¿No encuentras lo que buscas?</h2>
+            <p className="text-gray-600 mb-8 text-lg">
               Contáctanos para sugerir nuevos cursos o temas específicos que te interesen.
             </p>
-            <Button asChild size="lg">
+            <Button asChild size="lg" className="h-12 px-8 text-base">
               <Link href="/contact">
                 Contactar
-                <ArrowRight className="w-4 h-4 ml-2" />
+                <ArrowRight className="w-5 h-5 ml-2" />
               </Link>
             </Button>
           </div>
