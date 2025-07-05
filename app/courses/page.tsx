@@ -183,7 +183,7 @@ export default function CoursesPage() {
           </div>
         </div>
 
-        {/* Grid de cursos - Imágenes aún más grandes */}
+        {/* Grid de cursos */}
         {filteredCourses.length > 0 ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8">
             {filteredCourses.map((course) => (
@@ -191,16 +191,46 @@ export default function CoursesPage() {
                 key={course.id}
                 className="group hover:shadow-xl transition-all duration-300 overflow-hidden bg-white"
               >
-                {/* Imagen del curso - Mucho más grande para mostrar completamente 1080x1080 */}
-                <div className="relative h-96 sm:h-[400px] lg:h-[420px] overflow-hidden">
-                  <img
-                    src={course.thumbnail_url || "/placeholder.svg?height=500&width=500&text=Curso"}
-                    alt={course.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    onError={(e) => {
-                      e.currentTarget.src = "/placeholder.svg?height=500&width=500&text=Curso+de+Odontología"
-                    }}
-                  />
+                {/* Imagen del curso con manejo de errores mejorado */}
+                <div className="relative h-64 sm:h-72 lg:h-80 overflow-hidden bg-gray-100">
+                  {course.thumbnail_url ? (
+                    <img
+                      src={course.thumbnail_url || "/placeholder.svg"}
+                      alt={course.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement
+                        target.style.display = "none"
+                        const parent = target.parentElement
+                        if (parent) {
+                          parent.innerHTML = `
+                            <div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-blue-100">
+                              <div class="text-center">
+                                <div class="w-16 h-16 mx-auto mb-4 bg-blue-200 rounded-full flex items-center justify-center">
+                                  <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                                  </svg>
+                                </div>
+                                <p class="text-sm font-medium text-blue-800">${course.title}</p>
+                                <p class="text-xs text-blue-600">Curso de Odontología</p>
+                              </div>
+                            </div>
+                          `
+                        }
+                      }}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-blue-100">
+                      <div className="text-center">
+                        <div className="w-16 h-16 mx-auto mb-4 bg-blue-200 rounded-full flex items-center justify-center">
+                          <BookOpen className="w-8 h-8 text-blue-600" />
+                        </div>
+                        <p className="text-sm font-medium text-blue-800">{course.title}</p>
+                        <p className="text-xs text-blue-600">Curso de Odontología</p>
+                      </div>
+                    </div>
+                  )}
+
                   {course.price === 0 && (
                     <Badge className="absolute top-4 left-4 bg-green-500 hover:bg-green-600 text-white font-medium px-3 py-1.5 text-sm">
                       Gratuito

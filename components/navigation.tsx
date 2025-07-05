@@ -1,6 +1,4 @@
 "use client"
-
-import { useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -15,23 +13,19 @@ interface NavigationProps {
 }
 
 export function Navigation({ user }: NavigationProps) {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-
-  const toggleMobileMenu = () => {
-    setIsMobileMenuOpen(!isMobileMenuOpen)
-  }
-
   return (
     <header className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
       <div className="container mx-auto px-4 py-3 sm:py-4">
         <div className="flex items-center justify-between">
           {/* Logo - Mobile optimized */}
           <div className="flex-shrink-0">
-            <img
-              src="/images/odontogeek-logo-new.png"
-              alt="OdontoGeek"
-              className="h-8 sm:h-10 md:h-12 w-auto max-w-[120px] sm:max-w-[150px] md:max-w-[200px]"
-            />
+            <Link href="/">
+              <img
+                src="/images/odontogeek-logo-new.png"
+                alt="OdontoGeek"
+                className="h-8 sm:h-10 md:h-12 w-auto max-w-[120px] sm:max-w-[150px] md:max-w-[200px]"
+              />
+            </Link>
           </div>
 
           {/* Desktop Navigation */}
