@@ -52,18 +52,17 @@ export function HeroCarousel() {
     }, 5000)
 
     return () => clearInterval(interval)
-  }, [isAutoPlaying, slides.length])
+  }, [isAutoPlaying, slides])
 
   const loadSlides = async () => {
     try {
       const response = await fetch("/api/carousel")
       const result = await response.json()
 
-      if (result.success && result.data) {
+      if (result.success && result.data && Array.isArray(result.data)) {
         setSlides(result.data)
       } else {
-        console.error("Error cargando slides:", result.message)
-        // Fallback a slides por defecto si hay error
+        console.error("Error cargando slides:", result.message || "Datos inválidos")
         setSlides(getDefaultSlides())
       }
     } catch (error) {
@@ -122,7 +121,7 @@ export function HeroCarousel() {
     )
   }
 
-  if (slides.length === 0) {
+  if (!slides || slides.length === 0) {
     return (
       <div className="relative min-h-[500px] sm:min-h-[600px] lg:min-h-[700px] bg-gradient-to-br from-blue-900 to-indigo-900 flex items-center justify-center">
         <div className="text-center text-white max-w-2xl mx-auto px-4">
@@ -136,7 +135,7 @@ export function HeroCarousel() {
     )
   }
 
-  const currentSlideData = slides[currentSlide]
+  const currentSlideData = slides && slides[currentSlide] ? slides[currentSlide] : getDefaultSlides()[0]
 
   return (
     <div className="relative min-h-[500px] sm:min-h-[600px] lg:min-h-[700px] overflow-hidden">
@@ -257,7 +256,7 @@ export function HeroCarousel() {
       </div>
 
       {/* Navigation Arrows - Mobile optimized */}
-      {slides.length > 1 && (
+      {slides && slides.length > 1 && (
         <>
           <button
             onClick={prevSlide}
@@ -278,23 +277,20 @@ export function HeroCarousel() {
       )}
 
       {/* Dots Indicator - Mobile optimized */}
-      {slides.length > 1 && (
-        <div className="absolute bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-20 flex space-x-2">
-          {slides.map((_, index) => (
-            <button
-              key={index}
-              onClick={() => goToSlide(index)}
-              className={`w-2 h-2 sm:w-3 sm:h-3 rounded-full transition-all duration-300 ${
-                index === currentSlide ? "bg-white scale-125" : "bg-white/50 hover:bg-white/75"
-              }`}
-              aria-label={`Ir al slide ${index + 1}`}
-            />
-          ))}
-        </div>
-      )}
+      {slides &&
+        slides.map((_, index) => (
+          <button
+            key={index}
+            onClick={() => goToSlide(index)}
+            className={`w-2 h-2 sm:w-3 sm:h-3 rounded-full transition-all duration-300 ${
+              index === currentSlide ? "bg-white scale-125" : "bg-white/50 hover:bg-white/75"
+            }`}
+            aria-label={`Ir al slide ${index + 1}`}
+          />
+        ))}
 
       {/* Progress Bar */}
-      {slides.length > 1 && (
+      {slides && slides.length > 1 && (
         <div className="absolute bottom-0 left-0 w-full h-1 bg-white/20">
           <div
             className="h-full bg-white transition-all duration-300 ease-linear"
@@ -306,7 +302,7 @@ export function HeroCarousel() {
       )}
 
       {/* Auto-play indicator - Hidden on mobile */}
-      {isAutoPlaying && slides.length > 1 && (
+      {isAutoPlaying && slides && slides.length > 1 && (
         <div className="hidden sm:flex absolute top-4 right-4 z-20 items-center space-x-2 text-white/80 text-sm">
           <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
           <span>Auto</span>
