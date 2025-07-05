@@ -6,97 +6,95 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ChevronLeft, ChevronRight, Play, Calendar, Users, Award, TrendingUp } from "lucide-react"
 
-const slides = [
-  {
-    id: 1,
-    type: "course",
-    title: "Nuevo Curso: Férulas Oclusales",
-    subtitle: "Incrementa tus ingresos rápidamente imprimiendo tus propias férulas",
-    description: "Olvídate de mandar a laboratorio y hazlas tú mismo",
-    backgroundColor: "from-blue-900 to-indigo-900",
-    promoImage: "https://res.cloudinary.com/dxe6ugbzi/image/upload/v1746227801/fe%CC%81rulas_medit_qozti5.jpg",
-    badge: "Nuevo Curso",
-    badgeColor: "bg-green-500",
-    cta: "Ver Curso",
-    ctaLink: "/courses/1",
-    stats: [
-      { icon: Users, label: "1,250+ estudiantes", value: "1,250+" },
-      { icon: Play, label: "24 lecciones", value: "24" },
-      { icon: Award, label: "Certificado incluido", value: "Certificado" },
-    ],
-  },
-  {
-    id: 2,
-    type: "news",
-    title: "Congreso Internacional de Odontología 2024",
-    subtitle: "Participa en el Evento Dental del Año",
-    description: "Únete a más de 5,000 profesionales dentales en el congreso más importante de Latinoamérica.",
-    backgroundColor: "from-purple-900 to-blue-900",
-    promoImage: "/placeholder.svg?height=500&width=400&text=Congreso+2024",
-    badge: "Evento Especial",
-    badgeColor: "bg-blue-500",
-    cta: "Más Información",
-    ctaLink: "/events/congress-2024",
-    stats: [
-      { icon: Calendar, label: "15-17 Marzo", value: "3 días" },
-      { icon: Users, label: "5,000+ asistentes", value: "5,000+" },
-      { icon: Award, label: "50+ ponentes", value: "50+" },
-    ],
-  },
-  {
-    id: 3,
-    type: "promotion",
-    title: "Oferta Especial: 40% de Descuento",
-    subtitle: "Acceso Completo a Todos los Cursos",
-    description:
-      "Por tiempo limitado, obtén acceso a nuestra biblioteca completa de cursos dentales con un descuento exclusivo.",
-    backgroundColor: "from-red-900 to-pink-900",
-    promoImage: "/placeholder.svg?height=500&width=400&text=40%+Descuento",
-    badge: "Oferta Limitada",
-    badgeColor: "bg-red-500",
-    cta: "Aprovechar Oferta",
-    ctaLink: "/courses?promo=special40",
-    stats: [
-      { icon: TrendingUp, label: "40% descuento", value: "40%" },
-      { icon: Play, label: "15+ cursos", value: "15+" },
-      { icon: Calendar, label: "Válido hasta fin de mes", value: "Limitado" },
-    ],
-  },
-  {
-    id: 4,
-    type: "success",
-    title: "Más de 10,000 Profesionales Capacitados",
-    subtitle: "Únete a la Comunidad OdontoGeek",
-    description:
-      "Miles de dentistas ya han mejorado sus habilidades con nuestros cursos. Forma parte de la comunidad más grande.",
-    backgroundColor: "from-green-900 to-teal-900",
-    promoImage: "/placeholder.svg?height=500&width=400&text=10K+Profesionales",
-    badge: "Comunidad",
-    badgeColor: "bg-purple-500",
-    cta: "Únete Ahora",
-    ctaLink: "/auth/register",
-    stats: [
-      { icon: Users, label: "10,000+ profesionales", value: "10,000+" },
-      { icon: Award, label: "5,000+ certificados", value: "5,000+" },
-      { icon: TrendingUp, label: "95% satisfacción", value: "95%" },
-    ],
-  },
-]
+interface CarouselSlide {
+  id: string
+  title: string
+  subtitle: string
+  description: string
+  backgroundColor: string
+  promoImage: string
+  badge: string
+  badgeColor: string
+  cta: string
+  ctaLink: string
+  type: string
+  stats: Array<{
+    icon: string
+    label: string
+    value: string
+  }>
+}
+
+// Mapeo de iconos
+const iconMap = {
+  Users,
+  Play,
+  Award,
+  Calendar,
+  TrendingUp,
+}
 
 export function HeroCarousel() {
+  const [slides, setSlides] = useState<CarouselSlide[]>([])
   const [currentSlide, setCurrentSlide] = useState(0)
   const [isAutoPlaying, setIsAutoPlaying] = useState(true)
+  const [loading, setLoading] = useState(true)
 
-  // Auto-play functionality
   useEffect(() => {
-    if (!isAutoPlaying) return
+    loadSlides()
+  }, [])
+
+  useEffect(() => {
+    if (!isAutoPlaying || slides.length === 0) return
 
     const interval = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % slides.length)
     }, 5000)
 
     return () => clearInterval(interval)
-  }, [isAutoPlaying])
+  }, [isAutoPlaying, slides.length])
+
+  const loadSlides = async () => {
+    try {
+      const response = await fetch("/api/carousel")
+      const result = await response.json()
+
+      if (result.success && result.data) {
+        setSlides(result.data)
+      } else {
+        console.error("Error cargando slides:", result.message)
+        // Fallback a slides por defecto si hay error
+        setSlides(getDefaultSlides())
+      }
+    } catch (error) {
+      console.error("Error cargando slides del carrusel:", error)
+      // Fallback a slides por defecto si hay error
+      setSlides(getDefaultSlides())
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const getDefaultSlides = (): CarouselSlide[] => [
+    {
+      id: "1",
+      title: "Nuevo Curso: Férulas Oclusales",
+      subtitle: "Incrementa tus ingresos rápidamente imprimiendo tus propias férulas",
+      description: "Olvídate de mandar a laboratorio y hazlas tú mismo",
+      backgroundColor: "from-blue-900 to-indigo-900",
+      promoImage: "https://res.cloudinary.com/dxe6ugbzi/image/upload/v1746227801/fe%CC%81rulas_medit_qozti5.jpg",
+      badge: "Nuevo Curso",
+      badgeColor: "bg-green-500",
+      cta: "Ver Curso",
+      ctaLink: "/courses/1",
+      type: "course",
+      stats: [
+        { icon: "Users", label: "1,250+ estudiantes", value: "1,250+" },
+        { icon: "Play", label: "24 lecciones", value: "24" },
+        { icon: "Award", label: "Certificado incluido", value: "Certificado" },
+      ],
+    },
+  ]
 
   const nextSlide = () => {
     setCurrentSlide((prev) => (prev + 1) % slides.length)
@@ -111,6 +109,31 @@ export function HeroCarousel() {
   const goToSlide = (index: number) => {
     setCurrentSlide(index)
     setIsAutoPlaying(false)
+  }
+
+  if (loading) {
+    return (
+      <div className="relative min-h-[500px] sm:min-h-[600px] lg:min-h-[700px] bg-gradient-to-br from-blue-900 to-indigo-900 flex items-center justify-center">
+        <div className="text-center text-white">
+          <div className="animate-spin w-8 h-8 border-4 border-white border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p>Cargando carrusel...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (slides.length === 0) {
+    return (
+      <div className="relative min-h-[500px] sm:min-h-[600px] lg:min-h-[700px] bg-gradient-to-br from-blue-900 to-indigo-900 flex items-center justify-center">
+        <div className="text-center text-white max-w-2xl mx-auto px-4">
+          <h2 className="text-4xl font-bold mb-4">Bienvenido a OdontoGeek</h2>
+          <p className="text-xl mb-8 opacity-90">Plataforma de educación especializada en odontología</p>
+          <Button asChild size="lg" className="bg-white text-blue-600 hover:bg-gray-100">
+            <Link href="/courses">Explorar Cursos</Link>
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   const currentSlideData = slides[currentSlide]
@@ -162,15 +185,21 @@ export function HeroCarousel() {
 
             {/* Stats - Mobile optimized */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 max-w-lg mx-auto lg:mx-0">
-              {currentSlideData.stats.map((stat, index) => (
-                <div key={index} className="flex items-center justify-center lg:justify-start space-x-2 text-blue-100">
-                  <stat.icon className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
-                  <div className="text-center lg:text-left">
-                    <div className="font-bold text-white text-sm sm:text-base">{stat.value}</div>
-                    <div className="text-xs sm:text-sm">{stat.label}</div>
+              {currentSlideData.stats.map((stat, index) => {
+                const IconComponent = iconMap[stat.icon as keyof typeof iconMap] || Users
+                return (
+                  <div
+                    key={index}
+                    className="flex items-center justify-center lg:justify-start space-x-2 text-blue-100"
+                  >
+                    <IconComponent className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+                    <div className="text-center lg:text-left">
+                      <div className="font-bold text-white text-sm sm:text-base">{stat.value}</div>
+                      <div className="text-xs sm:text-sm">{stat.label}</div>
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
 
             {/* CTA Buttons - Mobile optimized */}
@@ -228,48 +257,56 @@ export function HeroCarousel() {
       </div>
 
       {/* Navigation Arrows - Mobile optimized */}
-      <button
-        onClick={prevSlide}
-        className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 sm:w-12 sm:h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-white/30 transition-colors"
-        aria-label="Slide anterior"
-      >
-        <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
-      </button>
+      {slides.length > 1 && (
+        <>
+          <button
+            onClick={prevSlide}
+            className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 sm:w-12 sm:h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-white/30 transition-colors"
+            aria-label="Slide anterior"
+          >
+            <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
+          </button>
 
-      <button
-        onClick={nextSlide}
-        className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 sm:w-12 sm:h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-white/30 transition-colors"
-        aria-label="Siguiente slide"
-      >
-        <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
-      </button>
+          <button
+            onClick={nextSlide}
+            className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 sm:w-12 sm:h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-white/30 transition-colors"
+            aria-label="Siguiente slide"
+          >
+            <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
+          </button>
+        </>
+      )}
 
       {/* Dots Indicator - Mobile optimized */}
-      <div className="absolute bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-20 flex space-x-2">
-        {slides.map((_, index) => (
-          <button
-            key={index}
-            onClick={() => goToSlide(index)}
-            className={`w-2 h-2 sm:w-3 sm:h-3 rounded-full transition-all duration-300 ${
-              index === currentSlide ? "bg-white scale-125" : "bg-white/50 hover:bg-white/75"
-            }`}
-            aria-label={`Ir al slide ${index + 1}`}
-          />
-        ))}
-      </div>
+      {slides.length > 1 && (
+        <div className="absolute bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-20 flex space-x-2">
+          {slides.map((_, index) => (
+            <button
+              key={index}
+              onClick={() => goToSlide(index)}
+              className={`w-2 h-2 sm:w-3 sm:h-3 rounded-full transition-all duration-300 ${
+                index === currentSlide ? "bg-white scale-125" : "bg-white/50 hover:bg-white/75"
+              }`}
+              aria-label={`Ir al slide ${index + 1}`}
+            />
+          ))}
+        </div>
+      )}
 
       {/* Progress Bar */}
-      <div className="absolute bottom-0 left-0 w-full h-1 bg-white/20">
-        <div
-          className="h-full bg-white transition-all duration-300 ease-linear"
-          style={{
-            width: `${((currentSlide + 1) / slides.length) * 100}%`,
-          }}
-        />
-      </div>
+      {slides.length > 1 && (
+        <div className="absolute bottom-0 left-0 w-full h-1 bg-white/20">
+          <div
+            className="h-full bg-white transition-all duration-300 ease-linear"
+            style={{
+              width: `${((currentSlide + 1) / slides.length) * 100}%`,
+            }}
+          />
+        </div>
+      )}
 
       {/* Auto-play indicator - Hidden on mobile */}
-      {isAutoPlaying && (
+      {isAutoPlaying && slides.length > 1 && (
         <div className="hidden sm:flex absolute top-4 right-4 z-20 items-center space-x-2 text-white/80 text-sm">
           <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
           <span>Auto</span>

@@ -14,16 +14,6 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Switch } from "@/components/ui/switch"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import {
   Video,
   Users,
   DollarSign,
@@ -39,6 +29,7 @@ import {
   Tag,
   ImageIcon,
   ExternalLink,
+  Presentation,
 } from "lucide-react"
 import { Navigation } from "@/components/navigation"
 
@@ -80,6 +71,28 @@ interface CourseTag {
   description: string
 }
 
+interface CarouselSlide {
+  id: string
+  title: string
+  subtitle: string
+  description: string
+  image_url: string
+  cta_text: string
+  cta_link: string
+  background_color: string
+  badge_text: string
+  badge_color: string
+  order_index: number
+  is_active: boolean
+  slide_type: string
+  stats: Array<{
+    icon_name: string
+    label: string
+    value: string
+    order_index: number
+  }>
+}
+
 interface Stats {
   totalUsers: number
   totalCourses: number
@@ -91,6 +104,7 @@ const AdminPage = () => {
   const [courses, setCourses] = useState<Course[]>([])
   const [users, setUsers] = useState<any[]>([])
   const [tags, setTags] = useState<CourseTag[]>([])
+  const [carouselSlides, setCarouselSlides] = useState<CarouselSlide[]>([])
   const [stats, setStats] = useState<Stats>({
     totalUsers: 0,
     totalCourses: 0,
@@ -132,6 +146,23 @@ const AdminPage = () => {
   const [isEditCourseDialogOpen, setIsEditCourseDialogOpen] = useState(false)
   const [editingCourse, setEditingCourse] = useState<Course | null>(null)
 
+  // Carousel management states
+  const [isCreateSlideDialogOpen, setIsCreateSlideDialogOpen] = useState(false)
+  const [isEditSlideDialogOpen, setIsEditSlideDialogOpen] = useState(false)
+  const [editingSlide, setEditingSlide] = useState<CarouselSlide | null>(null)
+  const [newSlide, setNewSlide] = useState({
+    title: "",
+    subtitle: "",
+    description: "",
+    image_url: "",
+    cta_text: "Ver Más",
+    cta_link: "/courses",
+    background_color: "from-blue-900 to-indigo-900",
+    badge_text: "",
+    badge_color: "bg-blue-500",
+    slide_type: "general",
+  })
+
   const loadStats = async () => {
     try {
       const response = await fetch("/api/admin/stats")
@@ -165,7 +196,7 @@ const AdminPage = () => {
       const result = await response.json()
 
       if (result.success) {
-        setCourses(result.data)
+        setCourses(Array.isArray(result.data) ? result.data : [])
       } else {
         console.error("Error loading courses:", result.message)
         alert(`Error cargando cursos: ${result.message}`)
@@ -183,10 +214,22 @@ const AdminPage = () => {
       const response = await fetch("/api/course-tags")
       const result = await response.json()
       if (result.success) {
-        setTags(result.data)
+        setTags(Array.isArray(result.data) ? result.data : [])
       }
     } catch (error) {
       console.error("Error cargando etiquetas:", error)
+    }
+  }
+
+  const loadCarouselSlides = async () => {
+    try {
+      const response = await fetch("/api/carousel")
+      const result = await response.json()
+      if (result.success) {
+        setCarouselSlides(Array.isArray(result.data) ? result.data : [])
+      }
+    } catch (error) {
+      console.error("Error cargando slides del carrusel:", error)
     }
   }
 
@@ -194,6 +237,7 @@ const AdminPage = () => {
     loadStats()
     loadCourses()
     loadTags()
+    loadCarouselSlides()
   }, [])
 
   const handleCreateCourse = async (e: React.FormEvent) => {
@@ -550,6 +594,140 @@ const AdminPage = () => {
     }
   }
 
+  // Carousel management functions
+  const handleCreateSlide = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      const response = await fetch("/api/carousel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...newSlide,
+          order_index: carouselSlides.length + 1,
+        }),
+      })
+      const result = await response.json()
+      if (result.success) {
+        setNewSlide({
+          title: "",
+          subtitle: "",
+          description: "",
+          image_url: "",
+          cta_text: "Ver Más",
+          cta_link: "/courses",
+          background_color: "from-blue-900 to-indigo-900",
+          badge_text: "",
+          badge_color: "bg-blue-500",
+          slide_type: "general",
+        })
+        setIsCreateSlideDialogOpen(false)
+        loadCarouselSlides()
+        alert("Slide creado exitosamente!")
+      } else {
+        alert(result.message)
+      }
+    } catch (error) {
+      alert("Error creando slide")
+    }
+  }
+
+  const handleUpdateSlide = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingSlide) return
+
+    try {
+      const response = await fetch(`/api/carousel/${editingSlide.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: newSlide.title,
+          subtitle: newSlide.subtitle,
+          description: newSlide.description,
+          image_url: newSlide.image_url,
+          cta_text: newSlide.cta_text,
+          cta_link: newSlide.cta_link,
+          background_color: newSlide.background_color,
+          badge_text: newSlide.badge_text,
+          badge_color: newSlide.badge_color,
+          slide_type: newSlide.slide_type,
+          is_active: editingSlide.is_active,
+          order_index: editingSlide.order_index,
+        }),
+      })
+      const result = await response.json()
+      if (result.success) {
+        setIsEditSlideDialogOpen(false)
+        setEditingSlide(null)
+        loadCarouselSlides()
+        alert("Slide actualizado exitosamente!")
+      } else {
+        alert(result.message)
+      }
+    } catch (error) {
+      alert("Error actualizando slide")
+    }
+  }
+
+  const handleDeleteSlide = async (slideId: string) => {
+    if (confirm("¿Estás seguro de que quieres eliminar este slide del carrusel?")) {
+      try {
+        const response = await fetch(`/api/carousel/${slideId}`, {
+          method: "DELETE",
+        })
+        const result = await response.json()
+        if (result.success) {
+          loadCarouselSlides()
+          alert("Slide eliminado exitosamente!")
+        } else {
+          alert(result.message)
+        }
+      } catch (error) {
+        alert("Error eliminando slide")
+      }
+    }
+  }
+
+  const handleToggleSlideActive = async (slideId: string, isActive: boolean) => {
+    try {
+      const slide = carouselSlides.find(s => s.id === slideId)
+      if (!slide) return
+
+      const response = await fetch(`/api/carousel/${slideId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...slide,
+          is_active: !isActive,
+        }),
+      })
+      const result = await response.json()
+      if (result.success) {
+        loadCarouselSlides()
+      } else {
+        alert(result.message)
+      }
+    } catch (error) {
+      alert("Error actualizando slide")
+    }
+  }
+
+  const openEditSlideDialog = (slide: CarouselSlide) => {
+    setEditingSlide(slide)
+    setNewSlide({
+      title: slide.title,
+      subtitle: slide.subtitle,
+      description: slide.description,
+      image_url: slide.image_url,
+      cta_text: slide.cta_text,
+      cta_link: slide.cta_link,
+      background_color: slide.background_color,
+      badge_text: slide.badge_text,
+      badge_color: slide.badge_color,
+      slide_type: slide.slide_type,
+    })
+    setIsEditSlideDialogOpen(true)
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -572,7 +750,7 @@ const AdminPage = () => {
         {/* Page Title */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Panel de Administración</h1>
-          <p className="text-gray-600 mt-2">Gestiona cursos, lecciones, etiquetas y usuarios</p>
+          <p className="text-gray-600 mt-2">Gestiona cursos, lecciones, etiquetas, carrusel y usuarios</p>
         </div>
 
         {/* Stats Cards */}
@@ -633,7 +811,7 @@ const AdminPage = () => {
         {/* Tabs */}
         <Tabs defaultValue="courses" className="space-y-4 sm:space-y-6">
           <div className="overflow-x-auto">
-            <TabsList className="grid w-full grid-cols-4 min-w-[400px] sm:min-w-0">
+            <TabsList className="grid w-full grid-cols-5 min-w-[500px] sm:min-w-0">
               <TabsTrigger value="courses" className="text-xs sm:text-sm">
                 <BookOpen className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
                 <span className="hidden sm:inline">Gestión de </span>Cursos
@@ -641,6 +819,10 @@ const AdminPage = () => {
               <TabsTrigger value="lessons" className="text-xs sm:text-sm">
                 <Video className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
                 <span className="hidden sm:inline">Gestión de </span>Lecciones
+              </TabsTrigger>
+              <TabsTrigger value="carousel" className="text-xs sm:text-sm">
+                <Presentation className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                Carrusel
               </TabsTrigger>
               <TabsTrigger value="tags" className="text-xs sm:text-sm">
                 <Tag className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
@@ -902,6 +1084,123 @@ const AdminPage = () => {
                 </Card>
               ))}
             </div>
+          </TabsContent>
+
+          <TabsContent value="carousel" className="space-y-4 sm:space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Gestión del Carrusel</h2>
+              <Button size="sm" className="w-full sm:w-auto" onClick={() => setIsCreateSlideDialogOpen(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                Crear Slide
+              </Button>
+            </div>
+
+            <Card>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="min-w-[300px]">Slide</TableHead>
+                        <TableHead className="min-w-[100px]">Tipo</TableHead>
+                        <TableHead className="min-w-[80px]">Orden</TableHead>
+                        <TableHead className="min-w-[80px]">Estado</TableHead>
+                        <TableHead className="min-w-[150px]">Acciones</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {carouselSlides.map((slide) => (
+                        <TableRow key={slide.id}>
+                          <TableCell>
+                            <div className="flex items-start space-x-3">
+                              <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+                                {slide.image_url ? (
+                                  <img
+                                    src={slide.image_url || "/placeholder.svg"}
+                                    alt={slide.title}
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                      const target = e.target as HTMLImageElement
+                                      target.src = "/placeholder.svg?height=80&width=80&text=No+Image"
+                                    }}
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center bg-gray-200">
+                                    <Presentation className="w-6 h-6 text-gray-400" />
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center space-x-2">
+                                  <p className="font-medium text-sm sm:text-base truncate">{slide.title}</p>
+                                  {slide.badge_text && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      {slide.badge_text}
+                                    </Badge>
+                                  )}
+                                </div>
+                                <p className="text-xs sm:text-sm text-gray-500 mt-1 truncate">{slide.subtitle}</p>
+                                <p className="text-xs text-gray-400 mt-1">CTA: {slide.cta_text}</p>
+                                <p className="text-xs text-gray-400">Link: {slide.cta_link}</p>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="text-xs capitalize">
+                              {slide.slide_type}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-sm sm:text-base">{slide.order_index}</TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={slide.is_active ? "default" : "secondary"}
+                              className="text-xs"
+                            >
+                              {slide.is_active ? "Activo" : "Inactivo"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center space-x-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => openEditSlideDialog(slide)}
+                                title="Editar slide"
+                              >
+                                <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleToggleSlideActive(slide.id, slide.is_active)}
+                                className={slide.is_active ? "text-orange-600 hover:text-orange-700 hover:bg-orange-50" : "text-green-600 hover:text-green-700 hover:bg-green-50"}
+                                title={slide.is_active ? "Desactivar slide" : "Activar slide"}
+                              >
+                                {slide.is_active ? (
+                                  <EyeOff className="w-3 h-3 sm:w-4 sm:h-4" />
+                                ) : (
+                                  <Eye className="w-3 h-3 sm:w-4 sm:h-4" />
+                                )}
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteSlide(slide.id)}
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                title="Eliminar slide"
+                              >
+                                <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="tags" className="space-y-4 sm:space-y-6">
@@ -1486,182 +1785,406 @@ const AdminPage = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Dialog para crear etiqueta */}
-      <Dialog open={isCreateTagDialogOpen} onOpenChange={setIsCreateTagDialogOpen}>
-        <DialogContent className="max-w-[95vw] sm:max-w-md">
+      {/* Dialog para crear slide del carrusel */}
+      <Dialog open={isCreateSlideDialogOpen} onOpenChange={setIsCreateSlideDialogOpen}>
+        <DialogContent className="max-w-[95vw] sm:max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-base sm:text-lg">Crear Nueva Etiqueta</DialogTitle>
+            <DialogTitle className="text-base sm:text-lg">Crear Nuevo Slide</DialogTitle>
             <DialogDescription className="text-sm">
-              Crea una nueva etiqueta para categorizar los cursos
+              Crea un nuevo slide para el carrusel de la página principal
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleCreateTag} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="tagName" className="text-sm">
-                Nombre de la Etiqueta
-              </Label>
-              <Input
-                id="tagName"
-                placeholder="Ej: Cirugía Oral"
-                value={newTag.name}
-                onChange={(e) => setNewTag({ ...newTag, name: e.target.value })}
-                required
-              />
-            </div>
+          <form onSubmit={handleCreateSlide} className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="slideTitle" className="text-sm sm:text-base">
+                    Título del Slide
+                  </Label>
+                  <Input
+                    id="slideTitle"
+                    placeholder="Ej: Nuevo Curso Disponible"
+                    value={newSlide.title}
+                    onChange={(e) => setNewSlide({ ...newSlide, title: e.target.value })}
+                    className="text-sm sm:text-base"
+                    required
+                  />
+                </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="tagColor" className="text-sm">
-                Color
-              </Label>
-              <div className="flex items-center space-x-2">
-                <Input
-                  id="tagColor"
-                  type="color"
-                  value={newTag.color}
-                  onChange={(e) => setNewTag({ ...newTag, color: e.target.value })}
-                  className="w-16 h-10 p-1"
-                />
-                <Input
-                  type="text"
-                  value={newTag.color}
-                  onChange={(e) => setNewTag({ ...newTag, color: e.target.value })}
-                  placeholder="#3B82F6"
-                  className="flex-1"
-                />
+                <div className="space-y-2">
+                  <Label htmlFor="slideSubtitle" className="text-sm sm:text-base">
+                    Subtítulo
+                  </Label>
+                  <Input
+                    id="slideSubtitle"
+                    placeholder="Ej: Aprende las técnicas más avanzadas"
+                    value={newSlide.subtitle}
+                    onChange={(e) => setNewSlide({ ...newSlide, subtitle: e.target.value })}
+                    className="text-sm sm:text-base"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="slideDescription" className="text-sm sm:text-base">
+                    Descripción
+                  </Label>
+                  <Textarea
+                    id="slideDescription"
+                    placeholder="Describe el contenido del slide..."
+                    value={newSlide.description}
+                    onChange={(e) => setNewSlide({ ...newSlide, description: e.target.value })}
+                    className="text-sm sm:text-base"
+                    rows={3}
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="slideCtaText" className="text-sm sm:text-base">
+                      Texto del Botón
+                    </Label>
+                    <Input
+                      id="slideCtaText"
+                      placeholder="Ver Más"
+                      value={newSlide.cta_text}
+                      onChange={(e) => setNewSlide({ ...newSlide, cta_text: e.target.value })}
+                      className="text-sm sm:text-base"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="slideCtaLink" className="text-sm sm:text-base">
+                      Enlace del Botón
+                    </Label>
+                    <Input
+                      id="slideCtaLink"
+                      placeholder="/courses"
+                      value={newSlide.cta_link}
+                      onChange={(e) => setNewSlide({ ...newSlide, cta_link: e.target.value })}
+                      className="text-sm sm:text-base"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="slideBadgeText" className="text-sm sm:text-base">
+                      Texto del Badge
+                    </Label>
+                    <Input
+                      id="slideBadgeText"
+                      placeholder="Nuevo"
+                      value={newSlide.badge_text}
+                      onChange={(e) => setNewSlide({ ...newSlide, badge_text: e.target.value })}
+                      className="text-sm sm:text-base"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="slideType" className="text-sm sm:text-base">
+                      Tipo de Slide
+                    </Label>
+                    <select
+                      id="slideType"
+                      value={newSlide.slide_type}
+                      onChange={(e) => setNewSlide({ ...newSlide, slide_type: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm sm:text-base"
+                    >
+                      <option value="general">General</option>
+                      <option value="course">Curso</option>
+                      <option value="promotion">Promoción</option>
+                      <option value="news">Noticia</option>
+                      <option value="success">Éxito</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="slideImageUrl" className="text-sm sm:text-base flex items-center">
+                    <ImageIcon className="w-4 h-4 mr-2" />
+                    Imagen del Slide
+                  </Label>
+                  <Input
+                    id="slideImageUrl"
+                    type="url"
+                    placeholder="https://res.cloudinary.com/tu-cuenta/image/upload/v123/slide.jpg"
+                    value={newSlide.image_url}
+                    onChange={(e) => setNewSlide({ ...newSlide, image_url: e.target.value })}
+                    className="text-sm sm:text-base"
+                  />
+                  <div className="flex items-start space-x-2 text-xs text-gray-500">
+                    <ExternalLink className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p>Sube tu imagen a Cloudinary, Imgur, o cualquier servicio de hosting de imágenes.</p>
+                      <p className="mt-1">Tamaño recomendado: 1080x1080px (1:1)</p>
+                    </div>
+                  </div>
+                </div>
+
+                {newSlide.image_url && (
+                  <div className="space-y-2">
+                    <Label className="text-sm">Vista Previa</Label>
+                    <div className="w-full max-w-sm">
+                      <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden border">
+                        <img
+                          src={newSlide.image_url || "/placeholder.svg"}
+                          alt="Vista previa del slide"
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement
+                            target.src = "/placeholder.svg?height=300&width=300&text=Error+cargando+imagen"
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label htmlFor="slideBackgroundColor" className="text-sm sm:text-base">
+                    Color de Fondo (Gradiente)
+                  </Label>
+                  <select
+                    id="slideBackgroundColor"
+                    value={newSlide.background_color}
+                    onChange={(e) => setNewSlide({ ...newSlide, background_color: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm sm:text-base"
+                  >
+                    <option value="from-blue-900 to-indigo-900">Azul a Índigo</option>
+                    <option value="from-purple-900 to-blue-900">Púrpura a Azul</option>
+                    <option value="from-red-900 to-pink-900">Rojo a Rosa</option>
+                    <option value="from-green-900 to-teal-900">Verde a Teal</option>
+                    <option value="from-orange-900 to-red-900">Naranja a Rojo</option>
+                    <option value="from-gray-900 to-gray-800">Gris Oscuro</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="slideBadgeColor" className="text-sm sm:text-base">
+                    Color del Badge
+                  </Label>
+                  <select
+                    id="slideBadgeColor"
+                    value={newSlide.badge_color}
+                    onChange={(e) => setNewSlide({ ...newSlide, badge_color: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm sm:text-base"
+                  >
+                    <option value="bg-blue-500">Azul</option>
+                    <option value="bg-green-500">Verde</option>
+                    <option value="bg-red-500">Rojo</option>
+                    <option value="bg-purple-500">Púrpura</option>
+                    <option value="bg-orange-500">Naranja</option>
+                    <option value="bg-gray-500">Gris</option>
+                  </select>
+                </div>
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="tagDescription" className="text-sm">
-                Descripción (Opcional)
-              </Label>
-              <Textarea
-                id="tagDescription"
-                placeholder="Describe el tipo de cursos que incluye esta etiqueta..."
-                value={newTag.description}
-                onChange={(e) => setNewTag({ ...newTag, description: e.target.value })}
-                rows={3}
-              />
-            </div>
-
-            <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-2 pt-4">
+            <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-2 pt-6 border-t">
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setIsCreateTagDialogOpen(false)}
+                onClick={() => setIsCreateSlideDialogOpen(false)}
                 className="w-full sm:w-auto"
               >
                 Cancelar
               </Button>
               <Button type="submit" className="w-full sm:w-auto">
-                Crear Etiqueta
+                <Plus className="w-4 h-4 mr-2" />
+                Crear Slide
               </Button>
             </div>
           </form>
         </DialogContent>
       </Dialog>
 
-      {/* Dialog para editar etiqueta */}
-      <Dialog open={isEditTagDialogOpen} onOpenChange={setIsEditTagDialogOpen}>
-        <DialogContent className="max-w-[95vw] sm:max-w-md">
+      {/* Dialog para editar slide del carrusel */}
+      <Dialog open={isEditSlideDialogOpen} onOpenChange={setIsEditSlideDialogOpen}>
+        <DialogContent className="max-w-[95vw] sm:max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-base sm:text-lg">Editar Etiqueta</DialogTitle>
-            <DialogDescription className="text-sm">Modifica los detalles de la etiqueta</DialogDescription>
+            <DialogTitle className="text-base sm:text-lg">Editar Slide</DialogTitle>
+            <DialogDescription className="text-sm">
+              Modifica los detalles del slide "{editingSlide?.title}"
+            </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleEditTag} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="editTagName" className="text-sm">
-                Nombre de la Etiqueta
-              </Label>
-              <Input
-                id="editTagName"
-                placeholder="Ej: Cirugía Oral"
-                value={editingTag?.name || ""}
-                onChange={(e) => setEditingTag({ ...editingTag!, name: e.target.value })}
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="editTagColor" className="text-sm">
-                Color
-              </Label>
-              <div className="flex items-center space-x-2">
-                <Input
-                  id="editTagColor"
-                  type="color"
-                  value={editingTag?.color || "#3B82F6"}
-                  onChange={(e) => setEditingTag({ ...editingTag!, color: e.target.value })}
-                  className="w-16 h-10 p-1"
-                />
-                <Input
-                  type="text"
-                  value={editingTag?.color || "#3B82F6"}
-                  onChange={(e) => setEditingTag({ ...editingTag!, color: e.target.value })}
-                  placeholder="#3B82F6"
-                  className="flex-1"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="editTagDescription" className="text-sm">
-                Descripción (Opcional)
-              </Label>
-              <Textarea
-                id="editTagDescription"
-                placeholder="Describe el tipo de cursos que incluye esta etiqueta..."
-                value={editingTag?.description || ""}
-                onChange={(e) => setEditingTag({ ...editingTag!, description: e.target.value })}
-                rows={3}
-              />
-            </div>
-
-            <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-2 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setIsEditTagDialogOpen(false)}
-                className="w-full sm:w-auto"
-              >
-                Cancelar
-              </Button>
-              <Button type="submit" className="w-full sm:w-auto">
-                Actualizar Etiqueta
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Dialog de confirmación para eliminar etiqueta */}
-      <AlertDialog open={isDeleteTagDialogOpen} onOpenChange={setIsDeleteTagDialogOpen}>
-        <AlertDialogContent className="max-w-[95vw] sm:max-w-md">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-base sm:text-lg">¿Eliminar Etiqueta?</AlertDialogTitle>
-            <AlertDialogDescription className="text-sm">
-              ¿Estás seguro de que quieres eliminar la etiqueta "{tagToDelete?.name}"? Esta acción no se puede deshacer.
-              {tagToDelete && (
-                <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-md">
-                  <span className="text-xs text-yellow-800">
-                    <strong>Nota:</strong> Si esta etiqueta está siendo usada por algún curso, no podrá ser eliminada.
-                  </span>
+          <form onSubmit={handleUpdateSlide} className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="editSlideTitle" className="text-sm sm:text-base">
+                    Título del Slide
+                  </Label>
+                  <Input
+                    id="editSlideTitle"
+                    placeholder="Ej: Nuevo Curso Disponible"
+                    value={newSlide.title}
+                    onChange={(e) => setNewSlide({ ...newSlide, title: e.target.value })}
+                    className="text-sm sm:text-base"
+                    required
+                  />
                 </div>
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="flex flex-col sm:flex-row gap-2">
-            <AlertDialogCancel className="w-full sm:w-auto">Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteTag} className="w-full sm:w-auto bg-red-600 hover:bg-red-700">
-              Eliminar Etiqueta
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
-  )
-}
 
-export default AdminPage
+                <div className="space-y-2">
+                  <Label htmlFor="editSlideSubtitle" className="text-sm sm:text-base">
+                    Subtítulo
+                  </Label>
+                  <Input
+                    id="editSlideSubtitle"
+                    placeholder="Ej: Aprende las técnicas más avanzadas"
+                    value={newSlide.subtitle}
+                    onChange={(e) => setNewSlide({ ...newSlide, subtitle: e.target.value })}
+                    className="text-sm sm:text-base"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="editSlideDescription" className="text-sm sm:text-base">
+                    Descripción
+                  </Label>
+                  <Textarea
+                    id="editSlideDescription"
+                    placeholder="Describe el contenido del slide..."
+                    value={newSlide.description}
+                    onChange={(e) => setNewSlide({ ...newSlide, description: e.target.value })}
+                    className="text-sm sm:text-base"
+                    rows={3}
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="editSlideCtaText" className="text-sm sm:text-base">
+                      Texto del Botón
+                    </Label>
+                    <Input
+                      id="editSlideCtaText"
+                      placeholder="Ver Más"
+                      value={newSlide.cta_text}
+                      onChange={(e) => setNewSlide({ ...newSlide, cta_text: e.target.value })}
+                      className="text-sm sm:text-base"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="editSlideCtaLink" className="text-sm sm:text-base">
+                      Enlace del Botón
+                    </Label>
+                    <Input
+                      id="editSlideCtaLink"
+                      placeholder="/courses"
+                      value={newSlide.cta_link}
+                      onChange={(e) => setNewSlide({ ...newSlide, cta_link: e.target.value })}
+                      className="text-sm sm:text-base"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="editSlideBadgeText" className="text-sm sm:text-base">
+                      Texto del Badge
+                    </Label>
+                    <Input
+                      id="editSlideBadgeText"
+                      placeholder="Nuevo"
+                      value={newSlide.badge_text}
+                      onChange={(e) => setNewSlide({ ...newSlide, badge_text: e.target.value })}
+                      className="text-sm sm:text-base"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="editSlideType" className="text-sm sm:text-base">
+                      Tipo de Slide
+                    </Label>
+                    <select
+                      id="editSlideType"
+                      value={newSlide.slide_type}
+                      onChange={(e) => setNewSlide({ ...newSlide, slide_type: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm sm:text-base"
+                    >
+                      <option value="general">General</option>
+                      <option value="course">Curso</option>
+                      <option value="promotion">Promoción</option>
+                      <option value="news">Noticia</option>
+                      <option value="success">Éxito</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="editSlideImageUrl" className="text-sm sm:text-base flex items-center">
+                    <ImageIcon className="w-4 h-4 mr-2" />
+                    Imagen del Slide
+                  </Label>
+                  <Input
+                    id="editSlideImageUrl"
+                    type="url"
+                    placeholder="https://res.cloudinary.com/tu-cuenta/image/upload/v123/slide.jpg"
+                    value={newSlide.image_url}
+                    onChange={(e) => setNewSlide({ ...newSlide, image_url: e.target.value })}
+                    className="text-sm sm:text-base"
+                  />
+                  <div className="flex items-start space-x-2 text-xs text-gray-500">
+                    <ExternalLink className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p>Sube tu imagen a Cloudinary, Imgur, o cualquier servicio de hosting de imágenes.</p>
+                      <p className="mt-1">Tamaño recomendado: 1080x1080px (1:1)</p>
+                    </div>
+                  </div>
+                </div>
+
+                {newSlide.image_url && (
+                  <div className="space-y-2">
+                    <Label className="text-sm">Vista Previa</Label>
+                    <div className="w-full max-w-sm">
+                      <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden border">
+                        <img
+                          src={newSlide.image_url || "/placeholder.svg"}
+                          alt="Vista previa del slide"
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement
+                            target.src = "/placeholder.svg?height=300&width=300&text=Error+cargando+imagen"
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label htmlFor="editSlideBackgroundColor" className="text-sm sm:text-base">
+                    Color de Fondo (Gradiente)
+                  </Label>
+                  <select
+                    id="editSlideBackgroundColor"
+                    value={newSlide.background_color}
+                    onChange={(e) => setNewSlide({ ...newSlide, background_color: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm sm:text-base"
+                  >
+                    <option value="from-blue-900 to-indigo-900">Azul a Índigo</option>
+                    <option value="from-purple-900 to-blue-900">Púrpura a Azul</option>
+                    <option value="from-red-900 to-pink-900">Rojo a Rosa</option>
+                    <option value="from-green-900 to-teal-900">Verde a Teal</option>
+                    <option value="from-orange-900 to-red-900">Naranja a Rojo</option>
+                    <option value="from-gray-900 to-gray-800">Gris Oscuro</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="editSlideBadgeColor" className="text-sm sm:text-base">
+                    Color del Badge
+                  </Label>
+                  <select
+                    id="editSlideBadgeColor"
+                    value={newSlide.badge_color}
+                    onChange={(e) => setNewSlide({ ...newSlide, badge_color: e.\
