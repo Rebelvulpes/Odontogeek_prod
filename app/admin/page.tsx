@@ -540,6 +540,19 @@ export default function AdminPanel() {
     setLessonDialogOpen(true)
   }
 
+  const openNewLessonDialogForCourse = (courseId: string) => {
+    setEditingLesson(null)
+    setLessonForm({
+      title: "",
+      description: "",
+      video_url: "",
+      duration_minutes: "",
+      course_id: courseId,
+      order_index: "",
+    })
+    setLessonDialogOpen(true)
+  }
+
   const handleCreateTag = async () => {
     try {
       const response = await fetch("/api/course-tags", {
@@ -934,7 +947,19 @@ export default function AdminPanel() {
                             <TableCell className="font-medium">{course.title}</TableCell>
                             <TableCell>{course.instructor_name}</TableCell>
                             <TableCell>${course.price}</TableCell>
-                            <TableCell>{course.lessonsCount || 0}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center space-x-2">
+                                <span>{course.lessonsCount || 0} lecciones</span>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => openNewLessonDialogForCourse(course.id)}
+                                >
+                                  <Plus className="w-4 h-4 mr-1" />
+                                  Agregar
+                                </Button>
+                              </div>
+                            </TableCell>
                             <TableCell>{course.students || 0}</TableCell>
                             <TableCell>
                               <Badge variant={course.archived ? "secondary" : "default"}>
@@ -1040,6 +1065,14 @@ export default function AdminPanel() {
                               </SelectContent>
                             </Select>
                           </div>
+                          {lessonForm.course_id && (
+                            <div className="grid gap-2">
+                              <Label>Curso seleccionado</Label>
+                              <div className="rounded-md border px-3 py-2 text-sm">
+                                {courses.find((c) => c.id === lessonForm.course_id)?.title}
+                              </div>
+                            </div>
+                          )}
                           <div className="grid gap-2">
                             <Label htmlFor="lesson-title">Título</Label>
                             <Input
