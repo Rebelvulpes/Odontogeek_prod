@@ -1,98 +1,103 @@
-import { NextResponse } from "next/server"
+import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
-
-    // Obtener total de usuarios reales
-    const { count: totalUsers, error: usersError } = await supabase
-      .from("users")
-      .select("*", { count: "exact", head: true })
+    // Obtener estadísticas de usuarios
+    const { data: usersData, error: usersError } = await supabase.from("users").select("id")
 
     if (usersError) {
       console.error("Error obteniendo usuarios:", usersError)
     }
 
-    // Obtener total de cursos no archivados
-    const { count: totalCourses, error: coursesError } = await supabase
-      .from("courses")
-      .select("*", { count: "exact", head: true })
-      .eq("archived", false)
+    // Obtener estadísticas de cursos
+    const { data: coursesData, error: coursesError } = await supabase.from("courses").select("id, price")
 
     if (coursesError) {
       console.error("Error obteniendo cursos:", coursesError)
+      return NextResponse.json({ success: false, message: "Error obteniendo cursos" }, { status: 500 })
     }
 
-    // Obtener total de lecciones no archivadas
-    const { count: totalLessons, error: lessonsError } = await supabase
-      .from("lessons")
-      .select("*", { count: "exact", head: true })
-      .eq("archived", false)
+    // Obtener estadísticas de lecciones
+    const { data: lessonsData, error: lessonsError } = await supabase.from("lessons").select("id")
 
     if (lessonsError) {
       console.error("Error obteniendo lecciones:", lessonsError)
     }
 
-    // Calcular ingresos reales (solo si hay inscripciones reales)
+    // Obtener inscripciones reales (debería ser 0)
+    const { data: enrollmentsData, error: enrollmentsError } = await supabase
+      .from("enrollments")
+      .select("id, course_id")
+
+    if (enrollmentsError) {
+      console.error("Error obteniendo inscripciones:", enrollmentsError)
+    }
+
+    // Calcular estadísticas reales
+    const totalUsers = usersData?.length || 0
+    const totalCourses = coursesData?.length || 0
+    const totalLessons = lessonsData?.length || 0
+    const totalEnrollments = enrollmentsData?.length || 0
+
+    // Calcular ingresos reales basados en inscripciones reales
     let totalRevenue = 0
-    try {
-      // Verificar si la tabla enrollments existe y tiene datos
-      const { data: enrollments, error: enrollmentsError } = await supabase.from("enrollments").select("course_id")
+    if (enrollmentsData && enrollmentsData.length > 0 && coursesData) {
+      const courseMap = new Map(coursesData.map((course) => [course.id, course.price]))
+      totalRevenue = enrollmentsData.reduce((sum, enrollment) => {
+        const coursePrice = courseMap.get(enrollment.course_id) || 0
+        return sum + coursePrice
+      }, 0)
+    }
 
-      if (!enrollmentsError && enrollments && enrollments.length > 0) {
-        // Solo calcular si hay inscripciones reales
-        const uniqueCourseIds = [...new Set(enrollments.map((e) => e.course_id))]
+    // Estadísticas por curso (solo datos reales)
+    const courseStats = []
+    if (coursesData) {
+      for (const course of coursesData) {
+        const courseEnrollments = enrollmentsData?.filter((e) => e.course_id === course.id) || []
+        const courseRevenue = courseEnrollments.length * (course.price || 0)
 
-        if (uniqueCourseIds.length > 0) {
-          const { data: courses, error: coursePricesError } = await supabase
-            .from("courses")
-            .select("id, price")
-            .in("id", uniqueCourseIds)
-
-          if (!coursePricesError && courses) {
-            const priceMap = courses.reduce((acc, course) => {
-              acc[course.id] = course.price || 0
-              return acc
-            }, {})
-
-            totalRevenue = enrollments.reduce((total, enrollment) => {
-              return total + (priceMap[enrollment.course_id] || 0)
-            }, 0)
-          }
-        }
-      } else {
-        // No hay inscripciones, ingresos = 0
-        totalRevenue = 0
+        courseStats.push({
+          courseId: course.id,
+          students: courseEnrollments.length, // Número real de estudiantes
+          revenue: courseRevenue, // Ingresos reales
+        })
       }
-    } catch (revenueError) {
-      console.error("Error calculando ingresos:", revenueError)
-      totalRevenue = 0
+    }
+
+    // Datos de crecimiento (últimos 7 días) - solo datos reales
+    const sevenDaysAgo = new Date()
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+
+    const { data: recentEnrollments } = await supabase
+      .from("enrollments")
+      .select("enrolled_at")
+      .gte("enrolled_at", sevenDaysAgo.toISOString())
+
+    const recentEnrollmentsCount = recentEnrollments?.length || 0
+
+    const stats = {
+      totalUsers,
+      totalCourses,
+      totalLessons,
+      totalEnrollments,
+      totalRevenue,
+      recentEnrollments: recentEnrollmentsCount,
+      courseStats,
+      // Métricas adicionales
+      averageRevenuePerCourse: totalCourses > 0 ? totalRevenue / totalCourses : 0,
+      averageStudentsPerCourse: totalCourses > 0 ? totalEnrollments / totalCourses : 0,
     }
 
     return NextResponse.json({
       success: true,
-      data: {
-        totalUsers: totalUsers || 0,
-        totalCourses: totalCourses || 0,
-        totalLessons: totalLessons || 0,
-        totalRevenue: totalRevenue,
-      },
+      data: stats,
+      message: "Estadísticas obtenidas correctamente (solo datos reales)",
     })
   } catch (error) {
-    console.error("Error interno en GET /api/admin/stats:", error)
-    return NextResponse.json({
-      success: false,
-      message: `Error interno: ${(error as Error).message}`,
-      data: {
-        totalUsers: 0,
-        totalCourses: 0,
-        totalLessons: 0,
-        totalRevenue: 0,
-      },
-    })
+    console.error("Error obteniendo estadísticas:", error)
+    return NextResponse.json({ success: false, message: "Error interno del servidor" }, { status: 500 })
   }
 }

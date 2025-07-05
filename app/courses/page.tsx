@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Clock, Users, DollarSign, Search, Filter, BookOpen, Star, Play } from "lucide-react"
 import Link from "next/link"
+import { Navigation } from "@/components/navigation"
 
 interface Course {
   id: string
@@ -127,10 +128,13 @@ export default function CoursesPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p className="text-gray-600">Cargando cursos...</p>
+      <div className="min-h-screen bg-gray-50">
+        <Navigation />
+        <div className="flex items-center justify-center py-20">
+          <div className="text-center">
+            <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
+            <p className="text-gray-600">Cargando cursos...</p>
+          </div>
         </div>
       </div>
     )
@@ -138,6 +142,8 @@ export default function CoursesPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <Navigation />
+
       {/* Header */}
       <div className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
