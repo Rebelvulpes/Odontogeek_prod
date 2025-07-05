@@ -183,7 +183,7 @@ export default function CoursesPage() {
           </div>
         </div>
 
-        {/* Grid de cursos - Optimizado para imágenes 1080x1080 */}
+        {/* Grid de cursos - Optimizado para mostrar imágenes 1080x1080 completas */}
         {filteredCourses.length > 0 ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8">
             {filteredCourses.map((course) => (
@@ -191,62 +191,64 @@ export default function CoursesPage() {
                 key={course.id}
                 className="group hover:shadow-xl transition-all duration-300 overflow-hidden bg-white"
               >
-                {/* Imagen del curso - Aspect ratio 1:1 para imágenes 1080x1080 */}
-                <div className="relative aspect-square overflow-hidden bg-gray-100">
-                  {course.thumbnail_url ? (
-                    <img
-                      src={course.thumbnail_url || "/placeholder.svg"}
-                      alt={course.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement
-                        target.style.display = "none"
-                        const parent = target.parentElement
-                        if (parent) {
-                          parent.innerHTML = `
-                            <div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-blue-100">
-                              <div class="text-center">
-                                <div class="w-16 h-16 mx-auto mb-4 bg-blue-200 rounded-full flex items-center justify-center">
-                                  <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
-                                  </svg>
+                {/* Imagen del curso - Contenedor cuadrado para mostrar imagen completa 1080x1080 */}
+                <div className="relative w-full" style={{ paddingBottom: "100%" }}>
+                  <div className="absolute inset-0 bg-gray-100">
+                    {course.thumbnail_url ? (
+                      <img
+                        src={course.thumbnail_url || "/placeholder.svg"}
+                        alt={course.title}
+                        className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement
+                          target.style.display = "none"
+                          const parent = target.parentElement
+                          if (parent) {
+                            parent.innerHTML = `
+                              <div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-blue-100">
+                                <div class="text-center">
+                                  <div class="w-16 h-16 mx-auto mb-4 bg-blue-200 rounded-full flex items-center justify-center">
+                                    <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                                    </svg>
+                                  </div>
+                                  <p class="text-sm font-medium text-blue-800">${course.title}</p>
+                                  <p class="text-xs text-blue-600">Curso de Odontología</p>
                                 </div>
-                                <p class="text-sm font-medium text-blue-800">${course.title}</p>
-                                <p class="text-xs text-blue-600">Curso de Odontología</p>
                               </div>
-                            </div>
-                          `
-                        }
-                      }}
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-blue-100">
-                      <div className="text-center">
-                        <div className="w-16 h-16 mx-auto mb-4 bg-blue-200 rounded-full flex items-center justify-center">
-                          <BookOpen className="w-8 h-8 text-blue-600" />
+                            `
+                          }
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-blue-100">
+                        <div className="text-center">
+                          <div className="w-16 h-16 mx-auto mb-4 bg-blue-200 rounded-full flex items-center justify-center">
+                            <BookOpen className="w-8 h-8 text-blue-600" />
+                          </div>
+                          <p className="text-sm font-medium text-blue-800">{course.title}</p>
+                          <p className="text-xs text-blue-600">Curso de Odontología</p>
                         </div>
-                        <p className="text-sm font-medium text-blue-800">{course.title}</p>
-                        <p className="text-xs text-blue-600">Curso de Odontología</p>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {course.price === 0 && (
-                    <Badge className="absolute top-4 left-4 bg-green-500 hover:bg-green-600 text-white font-medium px-3 py-1.5 text-sm">
-                      Gratuito
-                    </Badge>
-                  )}
-                  {course.price > 0 && (
-                    <Badge className="absolute top-4 right-4 bg-blue-500 hover:bg-blue-600 text-white font-medium px-3 py-1.5 text-sm">
-                      ${course.price}
-                    </Badge>
-                  )}
+                    {course.price === 0 && (
+                      <Badge className="absolute top-4 left-4 bg-green-500 hover:bg-green-600 text-white font-medium px-3 py-1.5 text-sm">
+                        Gratuito
+                      </Badge>
+                    )}
+                    {course.price > 0 && (
+                      <Badge className="absolute top-4 right-4 bg-blue-500 hover:bg-blue-600 text-white font-medium px-3 py-1.5 text-sm">
+                        ${course.price}
+                      </Badge>
+                    )}
 
-                  {/* Overlay con botón de play */}
-                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-300 flex items-center justify-center">
-                    <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                      <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-lg">
-                        <Play className="w-8 h-8 text-blue-600 ml-1" />
+                    {/* Overlay con botón de play */}
+                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-300 flex items-center justify-center">
+                      <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                        <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-lg">
+                          <Play className="w-8 h-8 text-blue-600 ml-1" />
+                        </div>
                       </div>
                     </div>
                   </div>
