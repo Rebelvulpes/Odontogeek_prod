@@ -14,16 +14,6 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Switch } from "@/components/ui/switch"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import {
   Video,
   Users,
   DollarSign,
@@ -42,6 +32,16 @@ import {
   Presentation,
 } from "lucide-react"
 import { Navigation } from "@/components/navigation"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 interface Course {
   id: string
@@ -2291,7 +2291,7 @@ const AdminPage = () => {
                 id="editTagName"
                 placeholder="Ej: Implantología"
                 value={editingTag?.name || ""}
-                onChange={(e) => setEditingTag({ ...editingTag, name: e.target.value })}
+                onChange={(e) => setEditingTag({ ...editingTag!, name: e.target.value })}
                 required
               />
             </div>
@@ -2301,7 +2301,7 @@ const AdminPage = () => {
                 type="color"
                 id="editTagColor"
                 value={editingTag?.color || "#3B82F6"}
-                onChange={(e) => setEditingTag({ ...editingTag, color: e.target.value })}
+                onChange={(e) => setEditingTag({ ...editingTag!, color: e.target.value })}
                 required
               />
             </div>
@@ -2311,7 +2311,7 @@ const AdminPage = () => {
                 id="editTagDescription"
                 placeholder="Describe esta etiqueta..."
                 value={editingTag?.description || ""}
-                onChange={(e) => setEditingTag({ ...editingTag, description: e.target.value })}
+                onChange={(e) => setEditingTag({ ...editingTag!, description: e.target.value })}
               />
             </div>
             <div className="flex justify-end space-x-2">
