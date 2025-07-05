@@ -14,7 +14,10 @@ export async function PUT(req: NextRequest, { params }: { params: { lessonId: st
     // Actualizar la lección
     const { data: lesson, error: lessonError } = await supabase
       .from("lessons")
-      .update(body)
+      .update({
+        ...body,
+        updated_at: new Date().toISOString(),
+      })
       .eq("id", lessonId)
       .select()
       .single()

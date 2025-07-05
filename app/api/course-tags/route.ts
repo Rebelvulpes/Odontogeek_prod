@@ -8,7 +8,15 @@ export async function GET() {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    const { data: tags, error } = await supabase.from("course_tags").select("*").order("name", { ascending: true })
+    // Primero intentamos obtener de la tabla 'tags'
+    let { data: tags, error } = await supabase.from("tags").select("*").order("created_at", { ascending: false })
+
+    // Si la tabla 'tags' no existe, intentamos con 'course_tags'
+    if (error && error.message.includes("does not exist")) {
+      const result = await supabase.from("course_tags").select("*").order("created_at", { ascending: false })
+      tags = result.data
+      error = result.error
+    }
 
     if (error) {
       console.error("Error obteniendo tags:", error)
@@ -51,15 +59,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          message: "El campo nombre es requerido",
+          message: "El campo 'name' es requerido",
         },
         { status: 400 },
       )
     }
 
-    // Crear el tag
-    const { data: tag, error: tagError } = await supabase
-      .from("course_tags")
+    // Intentar crear en la tabla 'tags' primero
+    let { data: tag, error: tagError } = await supabase
+      .from("tags")
       .insert([
         {
           name,
@@ -70,6 +78,25 @@ export async function POST(request: NextRequest) {
       ])
       .select()
       .single()
+
+    // Si la tabla 'tags' no existe, usar 'course_tags'
+    if (tagError && tagError.message.includes("does not exist")) {
+      const result = await supabase
+        .from("course_tags")
+        .insert([
+          {
+            name,
+            color: color || "#3B82F6",
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ])
+        .select()
+        .single()
+
+      tag = result.data
+      tagError = result.error
+    }
 
     if (tagError) {
       console.error("Error creando tag:", tagError)

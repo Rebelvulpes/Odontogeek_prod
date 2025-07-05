@@ -12,39 +12,37 @@ export async function PUT(request: NextRequest, { params }: { params: { tagId: s
 
     const { name, color } = body
 
-    // Validar campos requeridos
-    if (!name) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "El campo nombre es requerido",
-        },
-        { status: 400 },
-      )
-    }
-
-    // Actualizar el tag
-    const { data: tag, error: tagError } = await supabase
-      .from("course_tags")
+    // Intentar actualizar en la tabla 'tags' primero
+    let { data: tag, error } = await supabase
+      .from("tags")
       .update({
-        name,
-        color: color || "#3B82F6",
+        name: name,
+        color: color,
         updated_at: new Date().toISOString(),
       })
       .eq("id", tagId)
       .select()
       .single()
 
-    if (tagError) {
-      console.error("Error actualizando tag:", tagError)
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Error actualizando tag",
-          error: tagError,
-        },
-        { status: 500 },
-      )
+    // Si la tabla 'tags' no existe, usar 'course_tags'
+    if (error && error.message.includes("does not exist")) {
+      const result = await supabase
+        .from("course_tags")
+        .update({
+          name: name,
+          color: color,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", tagId)
+        .select()
+        .single()
+
+      tag = result.data
+      error = result.error
+    }
+
+    if (error) {
+      return NextResponse.json({ success: false, message: "Error actualizando tag", error }, { status: 500 })
     }
 
     return NextResponse.json({
@@ -53,15 +51,7 @@ export async function PUT(request: NextRequest, { params }: { params: { tagId: s
       data: tag,
     })
   } catch (error) {
-    console.error("Error en PUT tag:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Error interno del servidor",
-        error: error instanceof Error ? error.message : "Error desconocido",
-      },
-      { status: 500 },
-    )
+    return NextResponse.json({ success: false, message: "Error interno del servidor" }, { status: 500 })
   }
 }
 
@@ -70,19 +60,17 @@ export async function DELETE(request: NextRequest, { params }: { params: { tagId
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
     const { tagId } = params
 
-    // Eliminar el tag
-    const { error: tagError } = await supabase.from("course_tags").delete().eq("id", tagId)
+    // Intentar eliminar de la tabla 'tags' primero
+    let { error } = await supabase.from("tags").delete().eq("id", tagId)
 
-    if (tagError) {
-      console.error("Error eliminando tag:", tagError)
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Error eliminando tag",
-          error: tagError,
-        },
-        { status: 500 },
-      )
+    // Si la tabla 'tags' no existe, usar 'course_tags'
+    if (error && error.message.includes("does not exist")) {
+      const result = await supabase.from("course_tags").delete().eq("id", tagId)
+      error = result.error
+    }
+
+    if (error) {
+      return NextResponse.json({ success: false, message: "Error eliminando tag", error }, { status: 500 })
     }
 
     return NextResponse.json({
@@ -90,14 +78,6 @@ export async function DELETE(request: NextRequest, { params }: { params: { tagId
       message: "Tag eliminado exitosamente",
     })
   } catch (error) {
-    console.error("Error en DELETE tag:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Error interno del servidor",
-        error: error instanceof Error ? error.message : "Error desconocido",
-      },
-      { status: 500 },
-    )
+    return NextResponse.json({ success: false, message: "Error interno del servidor" }, { status: 500 })
   }
 }

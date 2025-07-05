@@ -11,7 +11,6 @@ export async function GET() {
     const { data: slides, error } = await supabase
       .from("carousel_slides")
       .select("*")
-      .eq("is_active", true)
       .order("order_index", { ascending: true })
 
     if (error) {
@@ -64,11 +63,11 @@ export async function POST(request: NextRequest) {
     } = body
 
     // Validar campos requeridos
-    if (!title || !image_url) {
+    if (!title) {
       return NextResponse.json(
         {
           success: false,
-          message: "Los campos título e imagen son requeridos",
+          message: "El campo título es requerido",
         },
         { status: 400 },
       )
@@ -82,7 +81,7 @@ export async function POST(request: NextRequest) {
           title,
           subtitle: subtitle || "",
           description: description || "",
-          image_url,
+          image_url: image_url || "/placeholder.svg?height=400&width=600",
           cta_text: cta_text || "Ver más",
           cta_link: cta_link || "/courses",
           background_color: background_color || "from-blue-900 to-indigo-900",

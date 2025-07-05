@@ -8,11 +8,13 @@ export async function GET() {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
+    // Obtener cursos con conteo de lecciones y enrollments
     const { data: courses, error } = await supabase
       .from("courses")
       .select(`
         *,
-        lessons:lessons(count)
+        lessons(count),
+        enrollments(count)
       `)
       .order("created_at", { ascending: false })
 
@@ -28,16 +30,18 @@ export async function GET() {
       )
     }
 
-    // Transformar los datos para incluir el conteo de lecciones
-    const coursesWithLessonCount =
+    // Procesar datos para incluir conteos
+    const processedCourses =
       courses?.map((course) => ({
         ...course,
-        lesson_count: course.lessons?.[0]?.count || 0,
+        lessonsCount: course.lessons?.[0]?.count || 0,
+        students: course.enrollments?.[0]?.count || 0,
+        revenue: (course.enrollments?.[0]?.count || 0) * (course.price || 0),
       })) || []
 
     return NextResponse.json({
       success: true,
-      data: coursesWithLessonCount,
+      data: processedCourses,
     })
   } catch (error) {
     console.error("Error en GET cursos:", error)
@@ -57,14 +61,14 @@ export async function POST(request: NextRequest) {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
     const body = await request.json()
 
-    const { title, description, price, instructor, thumbnail_url, category } = body
+    const { title, description, price, instructor, thumbnail_url, duration_hours } = body
 
     // Validar campos requeridos
-    if (!title || !description || !price || !instructor) {
+    if (!title || !description || !instructor) {
       return NextResponse.json(
         {
           success: false,
-          message: "Los campos título, descripción, precio e instructor son requeridos",
+          message: "Los campos título, descripción e instructor son requeridos",
         },
         { status: 400 },
       )
@@ -77,10 +81,10 @@ export async function POST(request: NextRequest) {
         {
           title,
           description,
-          price: Number.parseFloat(price),
-          instructor,
+          price: price ? Number.parseFloat(price) : 0,
+          instructor_name: instructor,
           thumbnail_url: thumbnail_url || null,
-          category: category || "General",
+          duration_hours: duration_hours ? Number.parseInt(duration_hours) : null,
           archived: false,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
