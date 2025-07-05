@@ -64,16 +64,18 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const userData = {
+      id: user.id,
+      email: user.email,
+      name: `${user.first_name} ${user.last_name}`,
+      role: user.role,
+    }
+
     // Crear respuesta con cookie simple
     const response = NextResponse.json({
       success: true,
       message: "Login exitoso",
-      user: {
-        id: user.id,
-        email: user.email,
-        name: `${user.first_name} ${user.last_name}`,
-        role: user.role,
-      },
+      user: userData,
       redirectTo: user.role === "admin" ? "/admin" : "/dashboard",
     })
 
@@ -81,16 +83,14 @@ export async function POST(req: NextRequest) {
     response.cookies.set(
       "user-session",
       JSON.stringify({
-        id: user.id,
-        email: user.email,
-        role: user.role,
+        ...userData,
         sessionId,
       }),
       {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
-        maxAge: 7 * 24 * 60 * 60, // 7 días
+        maxAge: 30 * 24 * 60 * 60, // 30 días
       },
     )
 

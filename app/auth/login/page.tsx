@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Eye, EyeOff, Shield } from "lucide-react"
+import { useAuth } from "@/components/auth-provider"
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
@@ -22,6 +23,7 @@ export default function LoginPage() {
   })
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { login } = useAuth()
   const isAdminLogin = searchParams.get("admin") === "true"
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -36,11 +38,14 @@ export default function LoginPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(formData),
+        credentials: "include",
       })
 
       const result = await response.json()
 
       if (result.success) {
+        // Actualizar el contexto de autenticación
+        login(result.user)
         // Redirigir según el rol del usuario
         router.push(result.redirectTo)
       } else {

@@ -1,7 +1,7 @@
 import type React from "react"
 import type { Metadata } from "next"
 import "./globals.css"
-import { Navigation } from "@/components/navigation"
+import { AuthProvider } from "@/components/auth-provider"
 
 export const metadata: Metadata = {
   title: "OdontoGeek - Cursos Dentales",
@@ -17,8 +17,7 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body>
-        <Navigation user={null} />
-        <main>{children}</main>
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
   )
