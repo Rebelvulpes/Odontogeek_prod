@@ -2,107 +2,141 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import Image from "next/image"
 import { Button } from "@/components/ui/button"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { Menu, BookOpen, Users, Award, Phone, Home } from "lucide-react"
+import { Menu, X } from "lucide-react"
 
 export function Navigation() {
-  const [isOpen, setIsOpen] = useState(false)
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
 
-  const navItems = [
-    { name: "Inicio", href: "/", icon: Home },
-    { name: "Cursos", href: "/courses", icon: BookOpen },
-    { name: "Nosotros", href: "/about", icon: Users },
-    { name: "Certificaciones", href: "/certifications", icon: Award },
-    { name: "Contacto", href: "/contact", icon: Phone },
-  ]
+  const toggleMenu = () => {
+    setIsMenuOpen(!isMenuOpen)
+  }
 
   return (
     <nav className="bg-white shadow-sm border-b sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="container mx-auto px-4">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-2">
-            <div className="relative w-10 h-10">
-              <Image src="/images/odontogeek-logo-new.png" alt="OdontoGeek" fill className="object-contain" priority />
-            </div>
-            <span className="text-xl font-bold text-gray-900">OdontoGeek</span>
+            <img
+              src="/images/odontogeek-logo-new.png"
+              alt="OdontoGeek"
+              className="h-8 w-auto"
+              onError={(e) => {
+                e.currentTarget.style.display = "none"
+                const parent = e.currentTarget.parentElement
+                if (parent) {
+                  const fallback = document.createElement("div")
+                  fallback.className = "flex items-center space-x-2"
+                  fallback.innerHTML = `
+                    <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
+                      <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                      </svg>
+                    </div>
+                    <span class="text-xl font-bold text-gray-900">OdontoGeek</span>
+                  `
+                  parent.appendChild(fallback)
+                }
+              }}
+            />
           </Link>
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-8">
-            {navItems.map((item) => (
-              <Link
-                key={item.name}
-                href={item.href}
-                className="text-gray-600 hover:text-blue-600 font-medium transition-colors duration-200 flex items-center space-x-1"
-              >
-                <item.icon className="w-4 h-4" />
-                <span>{item.name}</span>
-              </Link>
-            ))}
+            <Link
+              href="/"
+              className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-colors"
+            >
+              Inicio
+            </Link>
+            <Link
+              href="/courses"
+              className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-colors"
+            >
+              Cursos
+            </Link>
+            <Link
+              href="/about"
+              className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-colors"
+            >
+              Nosotros
+            </Link>
+            <Link
+              href="/contact"
+              className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-colors"
+            >
+              Contacto
+            </Link>
           </div>
 
           {/* Desktop Auth Buttons */}
           <div className="hidden md:flex items-center space-x-4">
-            <Link href="/auth/login">
-              <Button variant="ghost" className="text-gray-600 hover:text-blue-600">
-                Iniciar Sesión
-              </Button>
-            </Link>
-            <Link href="/auth/register">
-              <Button className="bg-blue-600 hover:bg-blue-700 text-white">Registrarse</Button>
-            </Link>
+            <Button variant="ghost" asChild>
+              <Link href="/auth/login">Iniciar Sesión</Link>
+            </Button>
+            <Button asChild>
+              <Link href="/auth/register">Registrarse</Link>
+            </Button>
           </div>
 
           {/* Mobile menu button */}
-          <Sheet open={isOpen} onOpenChange={setIsOpen}>
-            <SheetTrigger asChild className="md:hidden">
-              <Button variant="ghost" size="sm">
-                <Menu className="w-6 h-6" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="right" className="w-[300px] sm:w-[400px]">
-              <div className="flex flex-col h-full">
-                {/* Mobile Logo */}
-                <div className="flex items-center space-x-2 pb-6 border-b">
-                  <div className="relative w-8 h-8">
-                    <Image src="/images/odontogeek-logo-new.png" alt="OdontoGeek" fill className="object-contain" />
-                  </div>
-                  <span className="text-lg font-bold text-gray-900">OdontoGeek</span>
-                </div>
+          <div className="md:hidden">
+            <Button variant="ghost" size="sm" onClick={toggleMenu}>
+              {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+            </Button>
+          </div>
+        </div>
 
-                {/* Mobile Navigation */}
-                <div className="flex flex-col space-y-4 py-6">
-                  {navItems.map((item) => (
-                    <Link
-                      key={item.name}
-                      href={item.href}
-                      onClick={() => setIsOpen(false)}
-                      className="flex items-center space-x-3 text-gray-600 hover:text-blue-600 font-medium transition-colors duration-200 py-2"
-                    >
-                      <item.icon className="w-5 h-5" />
-                      <span>{item.name}</span>
-                    </Link>
-                  ))}
-                </div>
-
-                {/* Mobile Auth Buttons */}
-                <div className="mt-auto space-y-4 pt-6 border-t">
-                  <Link href="/auth/login" onClick={() => setIsOpen(false)}>
-                    <Button variant="outline" className="w-full bg-transparent">
+        {/* Mobile Navigation */}
+        {isMenuOpen && (
+          <div className="md:hidden">
+            <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 border-t">
+              <Link
+                href="/"
+                className="text-gray-700 hover:text-blue-600 block px-3 py-2 text-base font-medium"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                Inicio
+              </Link>
+              <Link
+                href="/courses"
+                className="text-gray-700 hover:text-blue-600 block px-3 py-2 text-base font-medium"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                Cursos
+              </Link>
+              <Link
+                href="/about"
+                className="text-gray-700 hover:text-blue-600 block px-3 py-2 text-base font-medium"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                Nosotros
+              </Link>
+              <Link
+                href="/contact"
+                className="text-gray-700 hover:text-blue-600 block px-3 py-2 text-base font-medium"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                Contacto
+              </Link>
+              <div className="pt-4 pb-3 border-t border-gray-200">
+                <div className="flex items-center px-3 space-y-2 flex-col">
+                  <Button variant="ghost" asChild className="w-full">
+                    <Link href="/auth/login" onClick={() => setIsMenuOpen(false)}>
                       Iniciar Sesión
-                    </Button>
-                  </Link>
-                  <Link href="/auth/register" onClick={() => setIsOpen(false)}>
-                    <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white">Registrarse</Button>
-                  </Link>
+                    </Link>
+                  </Button>
+                  <Button asChild className="w-full">
+                    <Link href="/auth/register" onClick={() => setIsMenuOpen(false)}>
+                      Registrarse
+                    </Link>
+                  </Button>
                 </div>
               </div>
-            </SheetContent>
-          </Sheet>
-        </div>
+            </div>
+          </div>
+        )}
       </div>
     </nav>
   )

@@ -61,7 +61,6 @@ export default function CoursesPage() {
       if (result.success && Array.isArray(result.data.courses)) {
         setCourses(result.data.courses)
       } else {
-        console.error("Invalid courses data:", result)
         setCourses([])
       }
     } catch (error) {
@@ -79,7 +78,6 @@ export default function CoursesPage() {
       if (result.success && Array.isArray(result.data)) {
         setTags(result.data)
       } else {
-        console.error("Invalid tags data:", result)
         setTags([])
       }
     } catch (error) {
