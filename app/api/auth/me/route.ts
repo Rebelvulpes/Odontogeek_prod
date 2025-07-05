@@ -1,48 +1,55 @@
-import { type NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
+import { createClient } from "@supabase/supabase-js"
+import { cookies } from "next/headers"
 
-export async function GET(req: NextRequest) {
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+
+export async function GET() {
   try {
-    const userSession = req.cookies.get("user-session")
+    const cookieStore = cookies()
+    const token = cookieStore.get("auth-token")
 
-    if (!userSession) {
+    if (!token) {
       return NextResponse.json({
         success: false,
-        message: "No hay sesión activa",
+        message: "No token found",
       })
     }
 
-    let sessionData
-    try {
-      sessionData = JSON.parse(userSession.value)
-    } catch (error) {
-      return NextResponse.json({
-        success: false,
-        message: "Sesión inválida",
-      })
-    }
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Verificar que la sesión tenga los datos necesarios
-    if (!sessionData.id || !sessionData.email || !sessionData.role) {
+    // Verificar el token y obtener el usuario
+    const { data: user, error } = await supabase
+      .from("users")
+      .select("id, email, name, role")
+      .eq("id", token.value)
+      .single()
+
+    if (error || !user) {
       return NextResponse.json({
         success: false,
-        message: "Datos de sesión incompletos",
+        message: "Invalid token",
       })
     }
 
     return NextResponse.json({
       success: true,
       user: {
-        id: sessionData.id,
-        email: sessionData.email,
-        name: sessionData.name || sessionData.email,
-        role: sessionData.role,
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
       },
     })
   } catch (error) {
-    console.error("Error verificando autenticación:", error)
-    return NextResponse.json({
-      success: false,
-      message: "Error interno del servidor",
-    })
+    console.error("Error verifying auth:", error)
+    return NextResponse.json(
+      {
+        success: false,
+        message: "Error interno del servidor",
+      },
+      { status: 500 },
+    )
   }
 }

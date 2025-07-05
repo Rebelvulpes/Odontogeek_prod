@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Eye, EyeOff, LogIn, ArrowLeft } from "lucide-react"
+import { Eye, EyeOff, Loader2 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 
 export default function LoginPage() {
@@ -19,9 +19,8 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
-
-  const { login } = useAuth()
   const router = useRouter()
+  const { login } = useAuth()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -32,43 +31,40 @@ export default function LoginPage() {
       const result = await login(email, password)
 
       if (result.success) {
-        // Redirigir según el resultado del login
-        if (result.redirectTo) {
-          router.push(result.redirectTo)
-        } else {
-          router.push("/dashboard")
-        }
+        // Redirigir según el redirectTo o a dashboard por defecto
+        router.push(result.redirectTo || "/dashboard")
       } else {
         setError(result.message)
       }
     } catch (error) {
-      setError("Error de conexión. Intenta nuevamente.")
+      setError("Error de conexión. Inténtalo de nuevo.")
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        {/* Back to Home */}
-        <div className="mb-6">
-          <Link
-            href="/"
-            className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Volver al inicio
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8">
+        <div className="text-center">
+          <Link href="/" className="flex items-center justify-center space-x-2 mb-8">
+            <img
+              src="/images/odontogeek-logo-new.png"
+              alt="OdontoGeek"
+              className="h-12 w-auto"
+              onError={(e) => {
+                const target = e.target as HTMLImageElement
+                target.src = "/placeholder-logo.svg"
+              }}
+            />
+            <span className="font-bold text-2xl text-gray-900">OdontoGeek</span>
           </Link>
         </div>
 
-        <Card className="shadow-xl border-0">
-          <CardHeader className="space-y-1 text-center">
-            <div className="flex justify-center mb-4">
-              <img src="/images/odontogeek-logo-new.png" alt="OdontoGeek" className="h-12 w-auto" />
-            </div>
-            <CardTitle className="text-2xl font-bold">Iniciar Sesión</CardTitle>
-            <CardDescription>Ingresa a tu cuenta para acceder a tus cursos</CardDescription>
+        <Card>
+          <CardHeader className="space-y-1">
+            <CardTitle className="text-2xl text-center">Iniciar Sesión</CardTitle>
+            <CardDescription className="text-center">Ingresa tus credenciales para acceder a tu cuenta</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -122,51 +118,24 @@ export default function LoginPage() {
 
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? (
-                  <div className="flex items-center">
-                    <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Iniciando sesión...
-                  </div>
+                  </>
                 ) : (
-                  <div className="flex items-center">
-                    <LogIn className="w-4 h-4 mr-2" />
-                    Iniciar Sesión
-                  </div>
+                  "Iniciar Sesión"
                 )}
               </Button>
             </form>
 
-            <div className="mt-6 text-center">
-              <p className="text-sm text-gray-600">
-                ¿No tienes una cuenta?{" "}
-                <Link href="/auth/register" className="font-medium text-blue-600 hover:text-blue-500 transition-colors">
-                  Regístrate aquí
-                </Link>
-              </p>
-            </div>
-
-            <div className="mt-4 text-center">
-              <Link
-                href="/auth/forgot-password"
-                className="text-sm text-gray-600 hover:text-gray-900 transition-colors"
-              >
-                ¿Olvidaste tu contraseña?
+            <div className="mt-6 text-center text-sm">
+              <span className="text-gray-600">¿No tienes una cuenta? </span>
+              <Link href="/auth/register" className="text-blue-600 hover:text-blue-500 font-medium">
+                Regístrate aquí
               </Link>
             </div>
           </CardContent>
         </Card>
-
-        {/* Demo Credentials */}
-        <div className="mt-6 p-4 bg-white/50 rounded-lg border border-gray-200">
-          <h3 className="text-sm font-medium text-gray-900 mb-2">Credenciales de prueba:</h3>
-          <div className="text-xs text-gray-600 space-y-1">
-            <p>
-              <strong>Admin:</strong> admin@odontogeek.com / admin123
-            </p>
-            <p>
-              <strong>Estudiante:</strong> student@odontogeek.com / student123
-            </p>
-          </div>
-        </div>
       </div>
     </div>
   )
