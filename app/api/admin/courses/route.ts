@@ -8,11 +8,12 @@ export async function GET() {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
+    // Obtener cursos con conteo de lecciones
     const { data: courses, error } = await supabase
       .from("courses")
       .select(`
         *,
-        lessons!inner(count)
+        lessons(count)
       `)
       .order("created_at", { ascending: false })
 
@@ -28,18 +29,18 @@ export async function GET() {
       )
     }
 
-    // Procesar los datos para incluir el conteo de lecciones
-    const processedCourses =
+    // Transformar los datos para incluir el conteo de lecciones
+    const coursesWithStats =
       courses?.map((course) => ({
         ...course,
-        lessonsCount: course.lessons?.length || 0,
-        students: 0, // Placeholder - implementar cuando tengamos enrollments
-        revenue: 0, // Placeholder - implementar cuando tengamos payments
+        lessonsCount: course.lessons?.[0]?.count || 0,
+        students: 0, // Por ahora, se puede implementar después
+        revenue: 0, // Por ahora, se puede implementar después
       })) || []
 
     return NextResponse.json({
       success: true,
-      data: processedCourses,
+      data: coursesWithStats,
     })
   } catch (error) {
     console.error("Error en GET cursos:", error)
@@ -66,7 +67,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          message: "Faltan campos requeridos: title, description, instructor",
+          message: "Los campos título, descripción e instructor son requeridos",
         },
         { status: 400 },
       )
@@ -79,10 +80,9 @@ export async function POST(request: NextRequest) {
         {
           title,
           description,
-          price: price ? Number.parseFloat(price) : 0,
+          price: Number.parseFloat(price) || 0,
           instructor_name: instructor,
           thumbnail_url: thumbnail_url || null,
-          status: "published",
           archived: false,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),

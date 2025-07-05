@@ -8,11 +8,12 @@ export async function GET() {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
+    // Obtener lecciones con información del curso
     const { data: lessons, error } = await supabase
       .from("lessons")
       .select(`
         *,
-        courses (
+        courses(
           id,
           title
         )
@@ -61,20 +62,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          message: "Faltan campos requeridos: title, course_id",
+          message: "Los campos título y curso son requeridos",
         },
         { status: 400 },
       )
     }
 
     // Verificar que el curso existe
-    const { data: course, error: courseError } = await supabase
+    const { data: courseExists, error: courseError } = await supabase
       .from("courses")
       .select("id")
       .eq("id", course_id)
       .single()
 
-    if (courseError || !course) {
+    if (courseError || !courseExists) {
       return NextResponse.json(
         {
           success: false,
@@ -92,11 +93,9 @@ export async function POST(request: NextRequest) {
           title,
           description: description || "",
           video_url: video_url || "",
-          duration_minutes: duration_minutes ? Number.parseInt(duration_minutes) : 0,
+          duration_minutes: Number.parseInt(duration_minutes) || 0,
           course_id,
-          order_index: order_index ? Number.parseInt(order_index) : 1,
-          is_free: false,
-          archived: false,
+          order_index: Number.parseInt(order_index) || 1,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         },

@@ -11,7 +11,6 @@ export async function GET() {
     const { data: slides, error } = await supabase
       .from("carousel_slides")
       .select("*")
-      .eq("is_active", true)
       .order("order_index", { ascending: true })
 
     if (error) {
@@ -19,37 +18,16 @@ export async function GET() {
       return NextResponse.json(
         {
           success: false,
-          message: "Error obteniendo slides",
+          message: "Error obteniendo slides del carousel",
           error: error,
         },
         { status: 500 },
       )
     }
 
-    // Transformar los datos para que coincidan con la interfaz del carousel
-    const transformedSlides =
-      slides?.map((slide) => ({
-        id: slide.id,
-        title: slide.title || "",
-        subtitle: slide.subtitle || "",
-        description: slide.description || "",
-        backgroundColor: slide.background_color || "from-blue-900 to-indigo-900",
-        promoImage: slide.image_url || "",
-        badge: slide.badge_text || "Nuevo",
-        badgeColor: slide.badge_color || "bg-green-500",
-        cta: slide.cta_text || "Ver más",
-        ctaLink: slide.cta_link || "/courses",
-        type: slide.slide_type || "course",
-        stats: [
-          { icon: "Users", label: "Estudiantes", value: "1,000+" },
-          { icon: "Play", label: "Lecciones", value: "20+" },
-          { icon: "Award", label: "Certificado", value: "Incluido" },
-        ],
-      })) || []
-
     return NextResponse.json({
       success: true,
-      data: transformedSlides,
+      data: slides || [],
     })
   } catch (error) {
     console.error("Error en GET carousel:", error)
@@ -72,11 +50,11 @@ export async function POST(request: NextRequest) {
     const { title, description, image_url, link_url, is_active, order_index } = body
 
     // Validar campos requeridos
-    if (!title) {
+    if (!title || !image_url) {
       return NextResponse.json(
         {
           success: false,
-          message: "El campo 'title' es requerido",
+          message: "Los campos título e imagen son requeridos",
         },
         { status: 400 },
       )
@@ -88,17 +66,11 @@ export async function POST(request: NextRequest) {
       .insert([
         {
           title,
-          subtitle: "",
           description: description || "",
-          image_url: image_url || "",
-          cta_text: "Ver más",
-          cta_link: link_url || "/courses",
-          background_color: "from-blue-900 to-indigo-900",
-          badge_text: "Nuevo",
-          badge_color: "bg-green-500",
-          order_index: order_index ? Number.parseInt(order_index) : 1,
-          slide_type: "course",
+          image_url,
+          link_url: link_url || null,
           is_active: is_active !== undefined ? is_active : true,
+          order_index: Number.parseInt(order_index) || 1,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         },

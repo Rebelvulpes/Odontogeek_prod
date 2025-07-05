@@ -13,7 +13,7 @@ export async function PUT(request: NextRequest, { params }: { params: { tagId: s
     const { name, color } = body
 
     const { data: tag, error } = await supabase
-      .from("tags")
+      .from("course_tags")
       .update({
         name: name,
         color: color,
@@ -42,7 +42,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { tagId
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
     const { tagId } = params
 
-    const { error } = await supabase.from("tags").delete().eq("id", tagId)
+    const { error } = await supabase.from("course_tags").delete().eq("id", tagId)
 
     if (error) {
       return NextResponse.json({ success: false, message: "Error eliminando tag", error }, { status: 500 })
