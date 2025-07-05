@@ -13,7 +13,8 @@ const slides = [
     title: "Nuevo Curso: Férulas Oclusales",
     subtitle: "Incrementa tus ingresos rápidamente imprimiendo tus propias férulas",
     description: "Olvídate de mandar a laboratorio y hazlas tú mismo",
-    image: "/placeholder.svg?height=400&width=600",
+    backgroundColor: "from-blue-900 to-indigo-900",
+    promoImage: "/placeholder.svg?height=500&width=400&text=Férulas+Oclusales",
     badge: "Nuevo Curso",
     badgeColor: "bg-green-500",
     cta: "Ver Curso",
@@ -30,7 +31,8 @@ const slides = [
     title: "Congreso Internacional de Odontología 2024",
     subtitle: "Participa en el Evento Dental del Año",
     description: "Únete a más de 5,000 profesionales dentales en el congreso más importante de Latinoamérica.",
-    image: "/placeholder.svg?height=400&width=600",
+    backgroundColor: "from-purple-900 to-blue-900",
+    promoImage: "/placeholder.svg?height=500&width=400&text=Congreso+2024",
     badge: "Evento Especial",
     badgeColor: "bg-blue-500",
     cta: "Más Información",
@@ -48,7 +50,8 @@ const slides = [
     subtitle: "Acceso Completo a Todos los Cursos",
     description:
       "Por tiempo limitado, obtén acceso a nuestra biblioteca completa de cursos dentales con un descuento exclusivo.",
-    image: "/placeholder.svg?height=400&width=600",
+    backgroundColor: "from-red-900 to-pink-900",
+    promoImage: "/placeholder.svg?height=500&width=400&text=40%+Descuento",
     badge: "Oferta Limitada",
     badgeColor: "bg-red-500",
     cta: "Aprovechar Oferta",
@@ -66,7 +69,8 @@ const slides = [
     subtitle: "Únete a la Comunidad OdontoGeek",
     description:
       "Miles de dentistas ya han mejorado sus habilidades con nuestros cursos. Forma parte de la comunidad más grande.",
-    image: "/placeholder.svg?height=400&width=600",
+    backgroundColor: "from-green-900 to-teal-900",
+    promoImage: "/placeholder.svg?height=500&width=400&text=10K+Profesionales",
     badge: "Comunidad",
     badgeColor: "bg-purple-500",
     cta: "Únete Ahora",
@@ -112,22 +116,26 @@ export function HeroCarousel() {
   const currentSlideData = slides[currentSlide]
 
   return (
-    <div className="relative min-h-[500px] sm:min-h-[600px] lg:min-h-[700px] overflow-hidden bg-gradient-to-br from-blue-50 to-indigo-100">
-      {/* Background Image */}
-      <div className="absolute inset-0">
+    <div className="relative min-h-[500px] sm:min-h-[600px] lg:min-h-[700px] overflow-hidden">
+      {/* Color Background */}
+      <div
+        className={`absolute inset-0 bg-gradient-to-br ${currentSlideData.backgroundColor} transition-all duration-1000`}
+      />
+
+      {/* Mobile Background Image with High Transparency */}
+      <div className="absolute inset-0 lg:hidden">
         <img
-          src={currentSlideData.image || "/placeholder.svg"}
+          src={currentSlideData.promoImage || "/placeholder.svg"}
           alt={currentSlideData.title}
-          className="w-full h-full object-cover opacity-20"
+          className="w-full h-full object-cover opacity-10"
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-blue-900/80 to-indigo-900/60" />
       </div>
 
       {/* Content */}
       <div className="relative z-10 container mx-auto px-4 h-full min-h-[500px] sm:min-h-[600px] lg:min-h-[700px] flex items-center">
-        <div className="w-full">
-          {/* Mobile-first layout */}
-          <div className="text-white space-y-4 sm:space-y-6 text-center lg:text-left lg:max-w-2xl">
+        <div className="w-full lg:grid lg:grid-cols-2 lg:gap-12 lg:items-center">
+          {/* Text Content */}
+          <div className="text-white space-y-4 sm:space-y-6 text-center lg:text-left">
             {/* Badge */}
             <div className="flex justify-center lg:justify-start">
               <Badge className={`${currentSlideData.badgeColor} text-white border-0 text-xs sm:text-sm px-3 py-1`}>
@@ -184,32 +192,28 @@ export function HeroCarousel() {
             </div>
           </div>
 
-          {/* Visual Element - Hidden on mobile, shown on larger screens */}
-          <div className="hidden lg:block absolute right-8 top-1/2 -translate-y-1/2">
+          {/* Promotional Image - Desktop Only */}
+          <div className="hidden lg:flex lg:justify-center lg:items-center">
             <div className="relative">
-              <div className="w-80 h-80 xl:w-96 xl:h-96 bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20">
-                <div className="h-full bg-gradient-to-br from-white/20 to-white/5 rounded-xl flex items-center justify-center">
-                  <div className="text-center text-white">
-                    <div className="w-20 h-20 xl:w-24 xl:h-24 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <img
-                        src="/images/odontogeek-logo-new.png"
-                        alt="OdontoGeek"
-                        className="h-8 w-auto brightness-0 invert"
-                      />
-                    </div>
-                    <h3 className="text-xl xl:text-2xl font-bold mb-2">OdontoGeek</h3>
-                    <p className="text-blue-100">Actualización continua</p>
-                  </div>
-                </div>
+              {/* Main promotional image */}
+              <div className="relative z-10">
+                <img
+                  src={currentSlideData.promoImage || "/placeholder.svg"}
+                  alt={currentSlideData.title}
+                  className="w-80 h-96 xl:w-96 xl:h-[480px] object-cover rounded-2xl shadow-2xl border-4 border-white/20"
+                />
               </div>
 
-              {/* Floating elements */}
-              <div className="absolute -top-4 -right-4 w-16 h-16 xl:w-20 xl:h-20 bg-yellow-400 rounded-full flex items-center justify-center animate-bounce">
+              {/* Decorative elements */}
+              <div className="absolute -top-4 -right-4 w-16 h-16 xl:w-20 xl:h-20 bg-yellow-400 rounded-full flex items-center justify-center animate-bounce z-20">
                 <Award className="w-6 h-6 xl:w-8 xl:h-8 text-yellow-800" />
               </div>
-              <div className="absolute -bottom-4 -left-4 w-12 h-12 xl:w-16 xl:h-16 bg-green-400 rounded-full flex items-center justify-center animate-pulse">
+              <div className="absolute -bottom-4 -left-4 w-12 h-12 xl:w-16 xl:h-16 bg-green-400 rounded-full flex items-center justify-center animate-pulse z-20">
                 <Users className="w-5 h-5 xl:w-6 xl:h-6 text-green-800" />
               </div>
+
+              {/* Background glow effect */}
+              <div className="absolute inset-0 bg-white/10 rounded-2xl blur-xl scale-110 -z-10"></div>
             </div>
           </div>
         </div>
