@@ -39,16 +39,17 @@ export async function GET() {
       )
     }
 
-    // Obtener el número de inscripciones por curso (sin filtro de payment_status por ahora)
+    // Obtener el número de inscripciones por curso
     const { data: enrollments, error: enrollmentsError } = await supabase.from("enrollments").select("course_id")
 
     if (enrollmentsError) {
       console.error("Error obteniendo inscripciones:", enrollmentsError)
+      // No retornamos error aquí, solo logueamos
     }
 
     // Crear un mapa de inscripciones por curso
     const enrollmentsByCourse = new Map()
-    if (enrollments) {
+    if (enrollments && Array.isArray(enrollments)) {
       enrollments.forEach((enrollment) => {
         const courseId = enrollment.course_id
         if (!enrollmentsByCourse.has(courseId)) {
@@ -100,16 +101,27 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { title, description, price, instructor, thumbnail_url, duration_hours, tags } = body
 
+    // Validar campos requeridos
+    if (!title || !description || !instructor) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Faltan campos requeridos: título, descripción e instructor",
+        },
+        { status: 400 },
+      )
+    }
+
     // Crear el curso
     const { data: course, error: courseError } = await supabase
       .from("courses")
       .insert({
         title,
         description,
-        price: Number.parseFloat(price),
+        price: price ? Number.parseFloat(price.toString()) : 0,
         instructor_name: instructor,
-        thumbnail_url,
-        duration_hours: duration_hours ? Number.parseInt(duration_hours) : null,
+        thumbnail_url: thumbnail_url || null,
+        duration_hours: duration_hours ? Number.parseInt(duration_hours.toString()) : null,
         status: "published",
         archived: false,
       })
