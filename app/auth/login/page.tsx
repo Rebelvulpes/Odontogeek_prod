@@ -9,8 +9,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Navigation } from "@/components/navigation"
 import Link from "next/link"
+import { Navigation } from "@/components/navigation"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -57,8 +57,8 @@ export default function LoginPage() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="tu@email.com"
                   required
+                  placeholder="tu@email.com"
                 />
               </div>
 
@@ -69,8 +69,8 @@ export default function LoginPage() {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
                   required
+                  placeholder="••••••••"
                 />
               </div>
 

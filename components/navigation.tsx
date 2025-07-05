@@ -12,14 +12,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Menu, User, LogOut, Settings } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 
 export function Navigation() {
+  const [isOpen, setIsOpen] = useState(false)
   const { user, logout } = useAuth()
   const router = useRouter()
-  const [isOpen, setIsOpen] = useState(false)
 
   const handleLogout = async () => {
     try {
@@ -38,31 +37,41 @@ export function Navigation() {
   ]
 
   return (
-    <nav className="border-b bg-white">
-      <div className="container mx-auto px-4">
-        <div className="flex h-16 items-center justify-between">
-          {/* Logo */}
-          <Link href="/" className="flex items-center space-x-2">
-            <img
-              src="/images/odontogeek-logo-new.png"
-              alt="OdontoGeek"
-              className="h-8 w-auto"
-              onError={(e) => {
-                const target = e.target as HTMLImageElement
-                target.src = "/placeholder-logo.png"
-              }}
-            />
-          </Link>
+    <nav className="bg-white border-b border-gray-200 sticky top-0 z-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between h-16">
+          <div className="flex items-center">
+            <Link href="/" className="flex-shrink-0 flex items-center">
+              <img
+                className="h-8 w-auto"
+                src="/images/odontogeek-logo-new.png"
+                alt="OdontoGeek"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement
+                  target.src = "/placeholder-logo.svg"
+                }}
+              />
+              <span className="ml-2 text-xl font-bold text-gray-900">OdontoGeek</span>
+            </Link>
+          </div>
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-8">
             {navLinks.map((link) => (
-              <Link key={link.href} href={link.href} className="text-gray-600 hover:text-gray-900 transition-colors">
+              <Link
+                key={link.href}
+                href={link.href}
+                className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-colors"
+              >
                 {link.label}
               </Link>
             ))}
+
             {user?.role === "admin" && (
-              <Link href="/admin" className="text-blue-600 hover:text-blue-800 font-medium transition-colors">
+              <Link
+                href="/admin"
+                className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-colors"
+              >
                 Admin
               </Link>
             )}
@@ -74,12 +83,7 @@ export function Navigation() {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src="/placeholder-user.jpg" alt={user.email} />
-                      <AvatarFallback>
-                        {user.first_name?.[0]?.toUpperCase() || user.email[0].toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
+                    <User className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-56" align="end" forceMount>
@@ -94,7 +98,7 @@ export function Navigation() {
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
                     <Link href="/dashboard" className="cursor-pointer">
-                      <User className="mr-2 h-4 w-4" />
+                      <Settings className="mr-2 h-4 w-4" />
                       Dashboard
                     </Link>
                   </DropdownMenuItem>
@@ -114,108 +118,100 @@ export function Navigation() {
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <div className="flex items-center space-x-2">
-                <Button variant="ghost" asChild>
-                  <Link href="/auth/login">Iniciar Sesión</Link>
-                </Button>
-                <Button asChild>
-                  <Link href="/auth/register">Registrarse</Link>
-                </Button>
+              <div className="flex items-center space-x-4">
+                <Link href="/auth/login">
+                  <Button variant="ghost">Iniciar Sesión</Button>
+                </Link>
+                <Link href="/auth/register">
+                  <Button>Registrarse</Button>
+                </Link>
               </div>
             )}
           </div>
 
-          {/* Mobile Navigation */}
-          <Sheet open={isOpen} onOpenChange={setIsOpen}>
-            <SheetTrigger asChild className="md:hidden">
-              <Button variant="ghost" size="icon">
-                <Menu className="h-5 w-5" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="right" className="w-[300px] sm:w-[400px]">
-              <div className="flex flex-col space-y-4 mt-4">
-                {navLinks.map((link) => (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    className="text-gray-600 hover:text-gray-900 transition-colors py-2"
-                    onClick={() => setIsOpen(false)}
-                  >
-                    {link.label}
-                  </Link>
-                ))}
-                {user?.role === "admin" && (
-                  <Link
-                    href="/admin"
-                    className="text-blue-600 hover:text-blue-800 font-medium transition-colors py-2"
-                    onClick={() => setIsOpen(false)}
-                  >
-                    Admin
-                  </Link>
-                )}
+          {/* Mobile menu button */}
+          <div className="md:hidden flex items-center">
+            <Sheet open={isOpen} onOpenChange={setIsOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="sm">
+                  <Menu className="h-6 w-6" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-[300px] sm:w-[400px]">
+                <div className="flex flex-col space-y-4 mt-4">
+                  {navLinks.map((link) => (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-colors"
+                      onClick={() => setIsOpen(false)}
+                    >
+                      {link.label}
+                    </Link>
+                  ))}
 
-                <div className="border-t pt-4">
-                  {user ? (
-                    <div className="space-y-2">
-                      <div className="flex items-center space-x-2 p-2">
-                        <Avatar className="h-8 w-8">
-                          <AvatarImage src="/placeholder-user.jpg" alt={user.email} />
-                          <AvatarFallback>
-                            {user.first_name?.[0]?.toUpperCase() || user.email[0].toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-medium text-sm">
+                  {user?.role === "admin" && (
+                    <Link
+                      href="/admin"
+                      className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-colors"
+                      onClick={() => setIsOpen(false)}
+                    >
+                      Admin
+                    </Link>
+                  )}
+
+                  <div className="border-t pt-4">
+                    {user ? (
+                      <div className="space-y-2">
+                        <div className="px-3 py-2">
+                          <p className="font-medium">
                             {user.first_name} {user.last_name}
                           </p>
-                          <p className="text-xs text-muted-foreground">{user.email}</p>
+                          <p className="text-sm text-gray-500">{user.email}</p>
                         </div>
-                      </div>
-                      <Button variant="ghost" className="w-full justify-start" asChild onClick={() => setIsOpen(false)}>
-                        <Link href="/dashboard">
-                          <User className="mr-2 h-4 w-4" />
-                          Dashboard
-                        </Link>
-                      </Button>
-                      {user.role === "admin" && (
-                        <Button
-                          variant="ghost"
-                          className="w-full justify-start"
-                          asChild
+                        <Link
+                          href="/dashboard"
+                          className="block px-3 py-2 text-sm text-gray-700 hover:text-blue-600"
                           onClick={() => setIsOpen(false)}
                         >
-                          <Link href="/admin">
-                            <Settings className="mr-2 h-4 w-4" />
+                          Dashboard
+                        </Link>
+                        {user.role === "admin" && (
+                          <Link
+                            href="/admin"
+                            className="block px-3 py-2 text-sm text-gray-700 hover:text-blue-600"
+                            onClick={() => setIsOpen(false)}
+                          >
                             Panel Admin
                           </Link>
-                        </Button>
-                      )}
-                      <Button
-                        variant="ghost"
-                        className="w-full justify-start"
-                        onClick={() => {
-                          handleLogout()
-                          setIsOpen(false)
-                        }}
-                      >
-                        <LogOut className="mr-2 h-4 w-4" />
-                        Cerrar Sesión
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <Button variant="ghost" className="w-full" asChild onClick={() => setIsOpen(false)}>
-                        <Link href="/auth/login">Iniciar Sesión</Link>
-                      </Button>
-                      <Button className="w-full" asChild onClick={() => setIsOpen(false)}>
-                        <Link href="/auth/register">Registrarse</Link>
-                      </Button>
-                    </div>
-                  )}
+                        )}
+                        <button
+                          onClick={() => {
+                            handleLogout()
+                            setIsOpen(false)
+                          }}
+                          className="block w-full text-left px-3 py-2 text-sm text-gray-700 hover:text-blue-600"
+                        >
+                          Cerrar Sesión
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <Link href="/auth/login" onClick={() => setIsOpen(false)}>
+                          <Button variant="ghost" className="w-full justify-start">
+                            Iniciar Sesión
+                          </Button>
+                        </Link>
+                        <Link href="/auth/register" onClick={() => setIsOpen(false)}>
+                          <Button className="w-full">Registrarse</Button>
+                        </Link>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </SheetContent>
-          </Sheet>
+              </SheetContent>
+            </Sheet>
+          </div>
         </div>
       </div>
     </nav>
