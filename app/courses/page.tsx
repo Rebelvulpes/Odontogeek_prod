@@ -183,7 +183,7 @@ export default function CoursesPage() {
           </div>
         </div>
 
-        {/* Grid de cursos */}
+        {/* Grid de cursos - Optimizado para imágenes 1080x1080 */}
         {filteredCourses.length > 0 ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8">
             {filteredCourses.map((course) => (
@@ -191,8 +191,8 @@ export default function CoursesPage() {
                 key={course.id}
                 className="group hover:shadow-xl transition-all duration-300 overflow-hidden bg-white"
               >
-                {/* Imagen del curso con manejo de errores mejorado */}
-                <div className="relative h-64 sm:h-72 lg:h-80 overflow-hidden bg-gray-100">
+                {/* Imagen del curso - Aspect ratio 1:1 para imágenes 1080x1080 */}
+                <div className="relative aspect-square overflow-hidden bg-gray-100">
                   {course.thumbnail_url ? (
                     <img
                       src={course.thumbnail_url || "/placeholder.svg"}
