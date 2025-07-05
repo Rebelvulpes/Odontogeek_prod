@@ -1,37 +1,23 @@
 "use client"
 
-import type React from "react"
 import { useState, useEffect } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Switch } from "@/components/ui/switch"
 import {
-  Video,
-  Users,
-  DollarSign,
-  BookOpen,
-  Plus,
-  Edit,
-  Trash2,
-  EyeOff,
-  Archive,
-  Tag,
-  ImageIcon,
-  Presentation,
-  Clock,
-  LinkIcon,
-  Eye,
-  ExternalLink,
-} from "lucide-react"
-import { Navigation } from "@/components/navigation"
-import { RouteGuard } from "@/components/route-guard"
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -41,25 +27,32 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { Checkbox } from "@/components/ui/checkbox"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
+import { toast } from "@/hooks/use-toast"
+import { Navigation } from "@/components/navigation"
+import { RouteGuard } from "@/components/route-guard"
+import { Users, BookOpen, DollarSign, TrendingUp, Plus, Edit, Trash2, EyeOff, Archive, Play, Pause } from "lucide-react"
+
+interface User {
+  id: string
+  name: string
+  email: string
+  role: string
+  created_at: string
+}
 
 interface Course {
   id: string
   title: string
   description: string
   price: number
-  instructor_name: string
-  thumbnail_url: string
-  duration_hours: number
-  archived: boolean
+  instructor: string
+  thumbnail_url?: string
   created_at: string
-  lessons: Lesson[]
-  tags: CourseTag[]
-  students: number
-  revenue: number
-  lessonsCount: number
-  status: string
+  archived: boolean
 }
 
 interface Lesson {
@@ -67,503 +60,188 @@ interface Lesson {
   title: string
   description: string
   video_url: string
-  duration_minutes: number
+  duration: number
+  course_id: string
   order_index: number
-  is_free: boolean
-  archived: boolean
   created_at: string
+}
+
+interface Stats {
+  totalUsers: number
+  totalCourses: number
+  totalRevenue: number
+  monthlyGrowth: number
 }
 
 interface CourseTag {
   id: string
   name: string
   color: string
-  slug: string
-  description: string
+  created_at: string
 }
 
 interface CarouselSlide {
   id: string
   title: string
-  subtitle: string
   description: string
   image_url: string
-  cta_text: string
-  cta_link: string
-  background_color: string
-  badge_text: string
-  badge_color: string
-  order_index: number
+  link_url?: string
   is_active: boolean
-  slide_type: string
-  stats: Array<{
-    icon_name: string
-    label: string
-    value: string
-    order_index: number
-  }>
+  order_index: number
+  created_at: string
 }
 
-interface Stats {
-  totalUsers: number
-  totalCourses: number
-  totalLessons: number
-  totalRevenue: number
-}
-
-const AdminPage = () => {
+export default function AdminPanel() {
+  const [stats, setStats] = useState<Stats>({ totalUsers: 0, totalCourses: 0, totalRevenue: 0, monthlyGrowth: 0 })
+  const [users, setUsers] = useState<User[]>([])
   const [courses, setCourses] = useState<Course[]>([])
-  const [users, setUsers] = useState<any[]>([])
-  const [tags, setTags] = useState<CourseTag[]>([])
+  const [lessons, setLessons] = useState<Lesson[]>([])
+  const [courseTags, setCourseTags] = useState<CourseTag[]>([])
   const [carouselSlides, setCarouselSlides] = useState<CarouselSlide[]>([])
-  const [stats, setStats] = useState<Stats>({
-    totalUsers: 0,
-    totalCourses: 0,
-    totalLessons: 0,
-    totalRevenue: 0,
-  })
   const [loading, setLoading] = useState(true)
-  const [newCourse, setNewCourse] = useState({
+
+  // Dialog states
+  const [courseDialogOpen, setCourseDialogOpen] = useState(false)
+  const [lessonDialogOpen, setLessonDialogOpen] = useState(false)
+  const [tagDialogOpen, setTagDialogOpen] = useState(false)
+  const [slideDialogOpen, setSlideDialogOpen] = useState(false)
+  const [editingCourse, setEditingCourse] = useState<Course | null>(null)
+  const [editingLesson, setEditingLesson] = useState<Lesson | null>(null)
+  const [editingTag, setEditingTag] = useState<CourseTag | null>(null)
+  const [editingSlide, setEditingSlide] = useState<CarouselSlide | null>(null)
+
+  // Form states
+  const [courseForm, setCourseForm] = useState({
     title: "",
     description: "",
     price: "",
     instructor: "",
-    thumbnailUrl: "",
-    durationHours: "",
-    tags: [] as string[],
+    thumbnail_url: "",
   })
-  const [selectedCourse, setSelectedCourse] = useState<string | null>(null)
-  const [isLessonDialogOpen, setIsLessonDialogOpen] = useState(false)
-  const [editingLesson, setEditingLesson] = useState<Lesson | null>(null)
-  const [newLesson, setNewLesson] = useState({
+
+  const [lessonForm, setLessonForm] = useState({
     title: "",
     description: "",
-    videoUrl: "",
+    video_url: "",
     duration: "",
-    order: "",
-    isFree: false,
+    course_id: "",
+    order_index: "",
   })
-  const [isCreateCourseDialogOpen, setIsCreateCourseDialogOpen] = useState(false)
-  const [isCreateTagDialogOpen, setIsCreateTagDialogOpen] = useState(false)
-  const [isEditTagDialogOpen, setIsEditTagDialogOpen] = useState(false)
-  const [isDeleteTagDialogOpen, setIsDeleteTagDialogOpen] = useState(false)
-  const [editingTag, setEditingTag] = useState<CourseTag | null>(null)
-  const [tagToDelete, setTagToDelete] = useState<CourseTag | null>(null)
-  const [newTag, setNewTag] = useState({
+
+  const [tagForm, setTagForm] = useState({
     name: "",
     color: "#3B82F6",
-    description: "",
   })
-  const [isEditCourseDialogOpen, setIsEditCourseDialogOpen] = useState(false)
-  const [editingCourse, setEditingCourse] = useState<Course | null>(null)
 
-  // Carousel management states
-  const [isCreateSlideDialogOpen, setIsCreateSlideDialogOpen] = useState(false)
-  const [isEditSlideDialogOpen, setIsEditSlideDialogOpen] = useState(false)
-  const [editingSlide, setEditingSlide] = useState<CarouselSlide | null>(null)
-  const [newSlide, setNewSlide] = useState({
+  const [slideForm, setSlideForm] = useState({
     title: "",
-    subtitle: "",
     description: "",
     image_url: "",
-    cta_text: "Ver Más",
-    cta_link: "/courses",
-    background_color: "from-blue-900 to-indigo-900",
-    badge_text: "",
-    badge_color: "bg-blue-500",
-    slide_type: "general",
+    link_url: "",
+    is_active: true,
+    order_index: "",
   })
 
-  const loadStats = async () => {
-    try {
-      const response = await fetch("/api/admin/stats")
-      const result = await response.json()
-      if (result.success) {
-        setStats(result.data)
-      } else {
-        console.error("Error cargando estadísticas:", result.message)
-        setStats({
-          totalUsers: 0,
-          totalCourses: 0,
-          totalLessons: 0,
-          totalRevenue: 0,
-        })
-      }
-    } catch (error) {
-      console.error("Error cargando estadísticas:", error)
-      setStats({
-        totalUsers: 0,
-        totalCourses: 0,
-        totalLessons: 0,
-        totalRevenue: 0,
-      })
-    }
-  }
+  useEffect(() => {
+    fetchData()
+  }, [])
 
-  const loadCourses = async () => {
+  const fetchData = async () => {
     try {
       setLoading(true)
-      const response = await fetch("/api/admin/courses")
-      const result = await response.json()
-
-      if (result.success) {
-        setCourses(Array.isArray(result.data) ? result.data : [])
-      } else {
-        console.error("Error loading courses:", result.message)
-        alert(`Error cargando cursos: ${result.message}`)
-      }
+      await Promise.all([
+        fetchStats(),
+        fetchUsers(),
+        fetchCourses(),
+        fetchLessons(),
+        fetchCourseTags(),
+        fetchCarouselSlides(),
+      ])
     } catch (error) {
-      console.error("Error cargando cursos:", error)
-      alert("Error de conexión al cargar cursos")
+      console.error("Error fetching data:", error)
+      toast({
+        title: "Error",
+        description: "Error al cargar los datos",
+        variant: "destructive",
+      })
     } finally {
       setLoading(false)
     }
   }
 
-  const loadTags = async () => {
-    try {
-      const response = await fetch("/api/course-tags")
-      const result = await response.json()
-      if (result.success) {
-        setTags(Array.isArray(result.data) ? result.data : [])
-      }
-    } catch (error) {
-      console.error("Error cargando etiquetas:", error)
+  const fetchStats = async () => {
+    const response = await fetch("/api/admin/stats")
+    if (response.ok) {
+      const data = await response.json()
+      setStats(data)
     }
   }
 
-  const loadCarouselSlides = async () => {
-    try {
-      const response = await fetch("/api/carousel")
-      const result = await response.json()
-      if (result.success) {
-        setCarouselSlides(Array.isArray(result.data) ? result.data : [])
-      }
-    } catch (error) {
-      console.error("Error cargando slides del carrusel:", error)
+  const fetchUsers = async () => {
+    const response = await fetch("/api/admin/users")
+    if (response.ok) {
+      const data = await response.json()
+      setUsers(data)
     }
   }
 
-  useEffect(() => {
-    loadStats()
-    loadCourses()
-    loadTags()
-    loadCarouselSlides()
-  }, [])
+  const fetchCourses = async () => {
+    const response = await fetch("/api/admin/courses")
+    if (response.ok) {
+      const data = await response.json()
+      setCourses(data)
+    }
+  }
 
-  const handleCreateCourse = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const fetchLessons = async () => {
+    const response = await fetch("/api/admin/lessons")
+    if (response.ok) {
+      const data = await response.json()
+      setLessons(data)
+    }
+  }
+
+  const fetchCourseTags = async () => {
+    const response = await fetch("/api/course-tags")
+    if (response.ok) {
+      const data = await response.json()
+      setCourseTags(data)
+    }
+  }
+
+  const fetchCarouselSlides = async () => {
+    const response = await fetch("/api/carousel")
+    if (response.ok) {
+      const data = await response.json()
+      setCarouselSlides(data)
+    }
+  }
+
+  const handleCreateCourse = async () => {
     try {
       const response = await fetch("/api/admin/courses", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...newCourse,
-          duration_hours: newCourse.durationHours ? Number.parseInt(newCourse.durationHours) : null,
+          ...courseForm,
+          price: Number.parseFloat(courseForm.price),
         }),
       })
-      const result = await response.json()
-      if (result.success) {
-        setNewCourse({
-          title: "",
-          description: "",
-          price: "",
-          instructor: "",
-          thumbnailUrl: "",
-          durationHours: "",
-          tags: [],
-        })
-        setIsCreateCourseDialogOpen(false)
-        loadCourses()
-        loadStats()
-        alert("Curso creado exitosamente!")
+
+      if (response.ok) {
+        toast({ title: "Éxito", description: "Curso creado correctamente" })
+        setCourseDialogOpen(false)
+        setCourseForm({ title: "", description: "", price: "", instructor: "", thumbnail_url: "" })
+        fetchCourses()
       } else {
-        alert(result.message)
+        throw new Error("Error al crear curso")
       }
     } catch (error) {
-      alert("Error creando curso")
+      toast({ title: "Error", description: "Error al crear curso", variant: "destructive" })
     }
   }
 
-  const handleCreateTag = async (e: React.FormEvent) => {
-    e.preventDefault()
-    try {
-      const response = await fetch("/api/course-tags", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newTag),
-      })
-      const result = await response.json()
-      if (result.success) {
-        setNewTag({ name: "", color: "#3B82F6", description: "" })
-        setIsCreateTagDialogOpen(false)
-        loadTags()
-        alert("Etiqueta creada exitosamente!")
-      } else {
-        alert(result.message)
-      }
-    } catch (error) {
-      alert("Error creando etiqueta")
-    }
-  }
-
-  const handleEditTag = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!editingTag) return
-
-    try {
-      const response = await fetch(`/api/course-tags/${editingTag.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: editingTag.name,
-          color: editingTag.color,
-          description: editingTag.description,
-        }),
-      })
-      const result = await response.json()
-      if (result.success) {
-        setIsEditTagDialogOpen(false)
-        setEditingTag(null)
-        loadTags()
-        alert("Etiqueta actualizada exitosamente!")
-      } else {
-        alert(result.message)
-      }
-    } catch (error) {
-      alert("Error actualizando etiqueta")
-    }
-  }
-
-  const handleDeleteTag = async () => {
-    if (!tagToDelete) return
-
-    try {
-      const response = await fetch(`/api/course-tags/${tagToDelete.id}`, {
-        method: "DELETE",
-      })
-      const result = await response.json()
-      if (result.success) {
-        setIsDeleteTagDialogOpen(false)
-        setTagToDelete(null)
-        loadTags()
-        alert("Etiqueta eliminada exitosamente!")
-      } else {
-        alert(result.message)
-      }
-    } catch (error) {
-      alert("Error eliminando etiqueta")
-    }
-  }
-
-  const openEditTagDialog = (tag: CourseTag) => {
-    setEditingTag({ ...tag })
-    setIsEditTagDialogOpen(true)
-  }
-
-  const openDeleteTagDialog = (tag: CourseTag) => {
-    setTagToDelete(tag)
-    setIsDeleteTagDialogOpen(true)
-  }
-
-  const handleCreateLesson = async (e: React.FormEvent) => {
-    e.preventDefault()
-    try {
-      const response = await fetch("/api/admin/lessons", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          course_id: selectedCourse,
-          title: newLesson.title,
-          description: newLesson.description,
-          video_url: newLesson.videoUrl,
-          duration_minutes: Number.parseInt(newLesson.duration),
-          order_index: Number.parseInt(newLesson.order),
-          is_free: newLesson.isFree,
-        }),
-      })
-      const result = await response.json()
-      if (result.success) {
-        setIsLessonDialogOpen(false)
-        setNewLesson({ title: "", description: "", videoUrl: "", duration: "", order: "", isFree: false })
-        loadCourses()
-        loadStats()
-        alert("Lección creada exitosamente!")
-      } else {
-        alert(result.message)
-      }
-    } catch (error) {
-      alert("Error creando lección")
-    }
-  }
-
-  const openLessonDialog = (courseId: string, lesson?: Lesson) => {
-    setSelectedCourse(courseId)
-    if (lesson) {
-      setEditingLesson(lesson)
-      setNewLesson({
-        title: lesson.title || "",
-        description: lesson.description || "",
-        videoUrl: lesson.video_url || "",
-        duration: lesson.duration_minutes?.toString() || "",
-        order: lesson.order_index?.toString() || "",
-        isFree: lesson.is_free || false,
-      })
-    } else {
-      setEditingLesson(null)
-      setNewLesson({
-        title: "",
-        description: "",
-        videoUrl: "",
-        duration: "",
-        order: "",
-        isFree: false,
-      })
-    }
-    setIsLessonDialogOpen(true)
-  }
-
-  const handleArchiveLesson = async (lessonId: string) => {
-    if (!lessonId || lessonId === "undefined" || lessonId === "null") {
-      alert("Error: ID de lección no válido")
-      return
-    }
-
-    if (confirm("¿Estás seguro de que quieres archivar esta lección? Se ocultará pero no se eliminará.")) {
-      try {
-        const response = await fetch(`/api/admin/lessons/${lessonId}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ archived: true }),
-        })
-        const result = await response.json()
-        if (result.success) {
-          loadCourses()
-          loadStats()
-          alert("Lección archivada exitosamente")
-        } else {
-          alert(result.message)
-        }
-      } catch (error) {
-        console.error("Error archivando lección:", error)
-        alert("Error archivando lección")
-      }
-    }
-  }
-
-  const handleDeleteLesson = async (lessonId: string) => {
-    if (!lessonId || lessonId === "undefined" || lessonId === "null") {
-      alert("Error: ID de lección no válido")
-      return
-    }
-
-    if (
-      confirm("¿Estás seguro de que quieres ELIMINAR DEFINITIVAMENTE esta lección? Esta acción no se puede deshacer.")
-    ) {
-      try {
-        const response = await fetch(`/api/admin/lessons/${lessonId}`, {
-          method: "DELETE",
-        })
-        const result = await response.json()
-        if (result.success) {
-          loadCourses()
-          loadStats()
-          alert("Lección eliminada definitivamente")
-        } else {
-          alert(result.message)
-        }
-      } catch (error) {
-        console.error("Error eliminando lección:", error)
-        alert("Error eliminando lección")
-      }
-    }
-  }
-
-  const handleArchiveCourse = async (courseId: string) => {
-    if (!courseId || courseId === "undefined" || courseId === "null") {
-      alert("Error: ID de curso no válido")
-      return
-    }
-
-    if (
-      confirm("¿Estás seguro de que quieres archivar este curso? Se ocultará de la vista pública pero no se eliminará.")
-    ) {
-      try {
-        const response = await fetch(`/api/admin/courses/${courseId}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ archived: true }),
-        })
-        const result = await response.json()
-        if (result.success) {
-          loadCourses()
-          loadStats()
-          alert("Curso archivado exitosamente")
-        } else {
-          alert(result.message)
-        }
-      } catch (error) {
-        console.error("Error archivando curso:", error)
-        alert("Error archivando curso")
-      }
-    }
-  }
-
-  const handleDeleteCourse = async (courseId: string) => {
-    if (!courseId || courseId === "undefined" || courseId === "null") {
-      alert("Error: ID de curso no válido")
-      return
-    }
-
-    if (
-      confirm(
-        "¿Estás seguro de que quieres ELIMINAR DEFINITIVAMENTE este curso? Esta acción eliminará también todas sus lecciones y no se puede deshacer.",
-      )
-    ) {
-      try {
-        const response = await fetch(`/api/admin/courses/${courseId}`, {
-          method: "DELETE",
-        })
-        const result = await response.json()
-        if (result.success) {
-          loadCourses()
-          loadStats()
-          alert(result.message)
-        } else {
-          alert(result.message)
-        }
-      } catch (error) {
-        console.error("Error eliminando curso:", error)
-        alert("Error eliminando curso")
-      }
-    }
-  }
-
-  const handleTagToggle = (tagId: string) => {
-    setNewCourse((prev) => ({
-      ...prev,
-      tags: prev.tags.includes(tagId) ? prev.tags.filter((id) => id !== tagId) : [...prev.tags, tagId],
-    }))
-  }
-
-  const selectedCourseData = courses.find((c) => c.id === selectedCourse)
-
-  const openEditCourseDialog = (course: Course) => {
-    setEditingCourse(course)
-    setNewCourse({
-      title: course.title || "",
-      description: course.description || "",
-      price: course.price?.toString() || "",
-      instructor: course.instructor_name || "",
-      thumbnailUrl: course.thumbnail_url || "",
-      durationHours: course.duration_hours?.toString() || "",
-      tags: course.tags?.map((tag) => tag.id) || [],
-    })
-    setIsEditCourseDialogOpen(true)
-  }
-
-  const handleUpdateCourse = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleUpdateCourse = async () => {
     if (!editingCourse) return
 
     try {
@@ -571,79 +249,252 @@ const AdminPage = () => {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: newCourse.title,
-          description: newCourse.description,
-          price: Number.parseFloat(newCourse.price),
-          instructor: newCourse.instructor,
-          thumbnail_url: newCourse.thumbnailUrl,
-          duration_hours: newCourse.durationHours ? Number.parseInt(newCourse.durationHours) : null,
-          tags: newCourse.tags,
+          ...courseForm,
+          price: Number.parseFloat(courseForm.price),
         }),
       })
-      const result = await response.json()
-      if (result.success) {
-        setNewCourse({
-          title: "",
-          description: "",
-          price: "",
-          instructor: "",
-          thumbnailUrl: "",
-          durationHours: "",
-          tags: [],
-        })
-        setIsEditCourseDialogOpen(false)
+
+      if (response.ok) {
+        toast({ title: "Éxito", description: "Curso actualizado correctamente" })
+        setCourseDialogOpen(false)
         setEditingCourse(null)
-        loadCourses()
-        loadStats()
-        alert("Curso actualizado exitosamente!")
+        setCourseForm({ title: "", description: "", price: "", instructor: "", thumbnail_url: "" })
+        fetchCourses()
       } else {
-        alert(result.message)
+        throw new Error("Error al actualizar curso")
       }
     } catch (error) {
-      console.error("Error actualizando curso:", error)
-      alert("Error actualizando curso")
+      toast({ title: "Error", description: "Error al actualizar curso", variant: "destructive" })
     }
   }
 
-  // Carousel management functions
-  const handleCreateSlide = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleArchiveCourse = async (courseId: string) => {
+    try {
+      const response = await fetch(`/api/admin/courses/${courseId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ archived: true }),
+      })
+
+      if (response.ok) {
+        toast({ title: "Éxito", description: "Curso archivado correctamente" })
+        fetchCourses()
+      } else {
+        throw new Error("Error al archivar curso")
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Error al archivar curso", variant: "destructive" })
+    }
+  }
+
+  const handleDeleteCourse = async (courseId: string) => {
+    try {
+      const response = await fetch(`/api/admin/courses/${courseId}`, {
+        method: "DELETE",
+      })
+
+      if (response.ok) {
+        toast({ title: "Éxito", description: "Curso eliminado correctamente" })
+        fetchCourses()
+      } else {
+        throw new Error("Error al eliminar curso")
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Error al eliminar curso", variant: "destructive" })
+    }
+  }
+
+  const openEditCourseDialog = (course: Course) => {
+    setEditingCourse(course)
+    setCourseForm({
+      title: course.title || "",
+      description: course.description || "",
+      price: course.price?.toString() || "",
+      instructor: course.instructor || "",
+      thumbnail_url: course.thumbnail_url || "",
+    })
+    setCourseDialogOpen(true)
+  }
+
+  const handleCreateLesson = async () => {
+    try {
+      const response = await fetch("/api/admin/lessons", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...lessonForm,
+          duration: Number.parseInt(lessonForm.duration),
+          order_index: Number.parseInt(lessonForm.order_index),
+        }),
+      })
+
+      if (response.ok) {
+        toast({ title: "Éxito", description: "Lección creada correctamente" })
+        setLessonDialogOpen(false)
+        setLessonForm({ title: "", description: "", video_url: "", duration: "", course_id: "", order_index: "" })
+        fetchLessons()
+      } else {
+        throw new Error("Error al crear lección")
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Error al crear lección", variant: "destructive" })
+    }
+  }
+
+  const handleUpdateLesson = async () => {
+    if (!editingLesson) return
+
+    try {
+      const response = await fetch(`/api/admin/lessons/${editingLesson.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...lessonForm,
+          duration: Number.parseInt(lessonForm.duration),
+          order_index: Number.parseInt(lessonForm.order_index),
+        }),
+      })
+
+      if (response.ok) {
+        toast({ title: "Éxito", description: "Lección actualizada correctamente" })
+        setLessonDialogOpen(false)
+        setEditingLesson(null)
+        setLessonForm({ title: "", description: "", video_url: "", duration: "", course_id: "", order_index: "" })
+        fetchLessons()
+      } else {
+        throw new Error("Error al actualizar lección")
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Error al actualizar lección", variant: "destructive" })
+    }
+  }
+
+  const handleDeleteLesson = async (lessonId: string) => {
+    try {
+      const response = await fetch(`/api/admin/lessons/${lessonId}`, {
+        method: "DELETE",
+      })
+
+      if (response.ok) {
+        toast({ title: "Éxito", description: "Lección eliminada correctamente" })
+        fetchLessons()
+      } else {
+        throw new Error("Error al eliminar lección")
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Error al eliminar lección", variant: "destructive" })
+    }
+  }
+
+  const openEditLessonDialog = (lesson: Lesson) => {
+    setEditingLesson(lesson)
+    setLessonForm({
+      title: lesson.title || "",
+      description: lesson.description || "",
+      video_url: lesson.video_url || "",
+      duration: lesson.duration?.toString() || "",
+      course_id: lesson.course_id || "",
+      order_index: lesson.order_index?.toString() || "",
+    })
+    setLessonDialogOpen(true)
+  }
+
+  const handleCreateTag = async () => {
+    try {
+      const response = await fetch("/api/course-tags", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(tagForm),
+      })
+
+      if (response.ok) {
+        toast({ title: "Éxito", description: "Tag creado correctamente" })
+        setTagDialogOpen(false)
+        setTagForm({ name: "", color: "#3B82F6" })
+        fetchCourseTags()
+      } else {
+        throw new Error("Error al crear tag")
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Error al crear tag", variant: "destructive" })
+    }
+  }
+
+  const handleUpdateTag = async () => {
+    if (!editingTag) return
+
+    try {
+      const response = await fetch(`/api/course-tags/${editingTag.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(tagForm),
+      })
+
+      if (response.ok) {
+        toast({ title: "Éxito", description: "Tag actualizado correctamente" })
+        setTagDialogOpen(false)
+        setEditingTag(null)
+        setTagForm({ name: "", color: "#3B82F6" })
+        fetchCourseTags()
+      } else {
+        throw new Error("Error al actualizar tag")
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Error al actualizar tag", variant: "destructive" })
+    }
+  }
+
+  const handleDeleteTag = async (tagId: string) => {
+    try {
+      const response = await fetch(`/api/course-tags/${tagId}`, {
+        method: "DELETE",
+      })
+
+      if (response.ok) {
+        toast({ title: "Éxito", description: "Tag eliminado correctamente" })
+        fetchCourseTags()
+      } else {
+        throw new Error("Error al eliminar tag")
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Error al eliminar tag", variant: "destructive" })
+    }
+  }
+
+  const openEditTagDialog = (tag: CourseTag) => {
+    setEditingTag(tag)
+    setTagForm({
+      name: tag.name || "",
+      color: tag.color || "#3B82F6",
+    })
+    setTagDialogOpen(true)
+  }
+
+  const handleCreateSlide = async () => {
     try {
       const response = await fetch("/api/carousel", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...newSlide,
-          order_index: carouselSlides.length + 1,
+          ...slideForm,
+          order_index: Number.parseInt(slideForm.order_index),
         }),
       })
-      const result = await response.json()
-      if (result.success) {
-        setNewSlide({
-          title: "",
-          subtitle: "",
-          description: "",
-          image_url: "",
-          cta_text: "Ver Más",
-          cta_link: "/courses",
-          background_color: "from-blue-900 to-indigo-900",
-          badge_text: "",
-          badge_color: "bg-blue-500",
-          slide_type: "general",
-        })
-        setIsCreateSlideDialogOpen(false)
-        loadCarouselSlides()
-        alert("Slide creado exitosamente!")
+
+      if (response.ok) {
+        toast({ title: "Éxito", description: "Slide creado correctamente" })
+        setSlideDialogOpen(false)
+        setSlideForm({ title: "", description: "", image_url: "", link_url: "", is_active: true, order_index: "" })
+        fetchCarouselSlides()
       } else {
-        alert(result.message)
+        throw new Error("Error al crear slide")
       }
     } catch (error) {
-      alert("Error creando slide")
+      toast({ title: "Error", description: "Error al crear slide", variant: "destructive" })
     }
   }
 
-  const handleUpdateSlide = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleUpdateSlide = async () => {
     if (!editingSlide) return
 
     try {
@@ -651,1690 +502,826 @@ const AdminPage = () => {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: newSlide.title,
-          subtitle: newSlide.subtitle,
-          description: newSlide.description,
-          image_url: newSlide.image_url,
-          cta_text: newSlide.cta_text,
-          cta_link: newSlide.cta_link,
-          background_color: newSlide.background_color,
-          badge_text: newSlide.badge_text,
-          badge_color: newSlide.badge_color,
-          slide_type: newSlide.slide_type,
-          is_active: editingSlide.is_active,
-          order_index: editingSlide.order_index,
+          ...slideForm,
+          order_index: Number.parseInt(slideForm.order_index),
         }),
       })
-      const result = await response.json()
-      if (result.success) {
-        setIsEditSlideDialogOpen(false)
+
+      if (response.ok) {
+        toast({ title: "Éxito", description: "Slide actualizado correctamente" })
+        setSlideDialogOpen(false)
         setEditingSlide(null)
-        loadCarouselSlides()
-        alert("Slide actualizado exitosamente!")
+        setSlideForm({ title: "", description: "", image_url: "", link_url: "", is_active: true, order_index: "" })
+        fetchCarouselSlides()
       } else {
-        alert(result.message)
+        throw new Error("Error al actualizar slide")
       }
     } catch (error) {
-      alert("Error actualizando slide")
-    }
-  }
-
-  const handleDeleteSlide = async (slideId: string) => {
-    if (confirm("¿Estás seguro de que quieres eliminar este slide del carrusel?")) {
-      try {
-        const response = await fetch(`/api/carousel/${slideId}`, {
-          method: "DELETE",
-        })
-        const result = await response.json()
-        if (result.success) {
-          loadCarouselSlides()
-          alert("Slide eliminado exitosamente!")
-        } else {
-          alert(result.message)
-        }
-      } catch (error) {
-        alert("Error eliminando slide")
-      }
+      toast({ title: "Error", description: "Error al actualizar slide", variant: "destructive" })
     }
   }
 
   const handleToggleSlideActive = async (slideId: string, isActive: boolean) => {
     try {
-      const slide = carouselSlides.find((s) => s.id === slideId)
-      if (!slide) return
-
       const response = await fetch(`/api/carousel/${slideId}`, {
-        method: "PUT",
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...slide,
-          is_active: !isActive,
-        }),
+        body: JSON.stringify({ is_active: !isActive }),
       })
-      const result = await response.json()
-      if (result.success) {
-        loadCarouselSlides()
+
+      if (response.ok) {
+        toast({ title: "Éxito", description: `Slide ${!isActive ? "activado" : "desactivado"} correctamente` })
+        fetchCarouselSlides()
       } else {
-        alert(result.message)
+        throw new Error("Error al cambiar estado del slide")
       }
     } catch (error) {
-      alert("Error actualizando slide")
+      toast({ title: "Error", description: "Error al cambiar estado del slide", variant: "destructive" })
+    }
+  }
+
+  const handleDeleteSlide = async (slideId: string) => {
+    try {
+      const response = await fetch(`/api/carousel/${slideId}`, {
+        method: "DELETE",
+      })
+
+      if (response.ok) {
+        toast({ title: "Éxito", description: "Slide eliminado correctamente" })
+        fetchCarouselSlides()
+      } else {
+        throw new Error("Error al eliminar slide")
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Error al eliminar slide", variant: "destructive" })
     }
   }
 
   const openEditSlideDialog = (slide: CarouselSlide) => {
     setEditingSlide(slide)
-    setNewSlide({
+    setSlideForm({
       title: slide.title || "",
-      subtitle: slide.subtitle || "",
       description: slide.description || "",
       image_url: slide.image_url || "",
-      cta_text: slide.cta_text || "Ver Más",
-      cta_link: slide.cta_link || "/courses",
-      background_color: slide.background_color || "from-blue-900 to-indigo-900",
-      badge_text: slide.badge_text || "",
-      badge_color: slide.badge_color || "bg-blue-500",
-      slide_type: slide.slide_type || "general",
+      link_url: slide.link_url || "",
+      is_active: slide.is_active,
+      order_index: slide.order_index?.toString() || "",
     })
-    setIsEditSlideDialogOpen(true)
+    setSlideDialogOpen(true)
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navigation />
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Cargando panel de administración...</p>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <RouteGuard requireAuth={true} requireRole="admin">
+    <RouteGuard requiredRole="admin">
       <div className="min-h-screen bg-gray-50">
         <Navigation />
 
-        <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
-          {/* Page Title */}
+        <div className="container mx-auto px-4 py-8">
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-gray-900">Panel de Administración</h1>
-            <p className="text-gray-600 mt-2">Gestiona cursos, lecciones, etiquetas, carrusel y usuarios</p>
+            <p className="text-gray-600 mt-2">Gestiona usuarios, cursos y contenido de la plataforma</p>
           </div>
 
           {/* Stats Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 mb-6 sm:mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <Card>
-              <CardContent className="p-3 sm:p-4 lg:p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs sm:text-sm font-medium text-gray-600">Total Usuarios</p>
-                    <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">
-                      {stats.totalUsers.toLocaleString()}
-                    </p>
-                  </div>
-                  <Users className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-blue-500" />
-                </div>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Usuarios</CardTitle>
+                <Users className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.totalUsers}</div>
               </CardContent>
             </Card>
 
             <Card>
-              <CardContent className="p-3 sm:p-4 lg:p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs sm:text-sm font-medium text-gray-600">Ingresos</p>
-                    <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">
-                      ${stats.totalRevenue.toLocaleString()}
-                    </p>
-                  </div>
-                  <DollarSign className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-green-500" />
-                </div>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Cursos</CardTitle>
+                <BookOpen className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.totalCourses}</div>
               </CardContent>
             </Card>
 
             <Card>
-              <CardContent className="p-3 sm:p-4 lg:p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs sm:text-sm font-medium text-gray-600">Cursos</p>
-                    <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">{stats.totalCourses}</p>
-                  </div>
-                  <BookOpen className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-purple-500" />
-                </div>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Ingresos Totales</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">${stats.totalRevenue}</div>
               </CardContent>
             </Card>
 
             <Card>
-              <CardContent className="p-3 sm:p-4 lg:p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs sm:text-sm font-medium text-gray-600">Videos</p>
-                    <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">{stats.totalLessons}</p>
-                  </div>
-                  <Video className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-orange-500" />
-                </div>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Crecimiento Mensual</CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">+{stats.monthlyGrowth}%</div>
               </CardContent>
             </Card>
           </div>
 
-          {/* Tabs */}
-          <Tabs defaultValue="courses" className="space-y-4 sm:space-y-6">
-            <div className="overflow-x-auto">
-              <TabsList className="grid w-full grid-cols-5 min-w-[500px] sm:min-w-0">
-                <TabsTrigger value="courses" className="text-xs sm:text-sm">
-                  <BookOpen className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                  <span className="hidden sm:inline">Gestión de </span>Cursos
-                </TabsTrigger>
-                <TabsTrigger value="lessons" className="text-xs sm:text-sm">
-                  <Video className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                  <span className="hidden sm:inline">Gestión de </span>Lecciones
-                </TabsTrigger>
-                <TabsTrigger value="carousel" className="text-xs sm:text-sm">
-                  <Presentation className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                  Carrusel
-                </TabsTrigger>
-                <TabsTrigger value="tags" className="text-xs sm:text-sm">
-                  <Tag className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                  Etiquetas
-                </TabsTrigger>
-                <TabsTrigger value="users" className="text-xs sm:text-sm">
-                  <Users className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                  Usuarios
-                </TabsTrigger>
-              </TabsList>
-            </div>
+          {/* Main Content Tabs */}
+          <Tabs defaultValue="courses" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-6">
+              <TabsTrigger value="courses">Cursos</TabsTrigger>
+              <TabsTrigger value="lessons">Lecciones</TabsTrigger>
+              <TabsTrigger value="users">Usuarios</TabsTrigger>
+              <TabsTrigger value="tags">Tags</TabsTrigger>
+              <TabsTrigger value="carousel">Carousel</TabsTrigger>
+            </TabsList>
 
-            <TabsContent value="courses" className="space-y-4 sm:space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Cursos</h2>
-                <Button size="sm" className="w-full sm:w-auto" onClick={() => setIsCreateCourseDialogOpen(true)}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Crear Curso
-                </Button>
-              </div>
-
+            {/* Courses Tab */}
+            <TabsContent value="courses">
               <Card>
-                <CardContent className="p-0">
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="min-w-[250px]">Curso</TableHead>
-                          <TableHead className="min-w-[100px]">Estudiantes</TableHead>
-                          <TableHead className="min-w-[100px]">Ingresos</TableHead>
-                          <TableHead className="min-w-[100px]">Lecciones</TableHead>
-                          <TableHead className="min-w-[80px]">Estado</TableHead>
-                          <TableHead className="min-w-[150px]">Acciones</TableHead>
+                <CardHeader>
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <CardTitle>Gestión de Cursos</CardTitle>
+                      <CardDescription>Administra los cursos de la plataforma</CardDescription>
+                    </div>
+                    <Dialog open={courseDialogOpen} onOpenChange={setCourseDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button
+                          onClick={() => {
+                            setEditingCourse(null)
+                            setCourseForm({ title: "", description: "", price: "", instructor: "", thumbnail_url: "" })
+                          }}
+                        >
+                          <Plus className="w-4 h-4 mr-2" />
+                          Nuevo Curso
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-2xl">
+                        <DialogHeader>
+                          <DialogTitle>{editingCourse ? "Editar Curso" : "Crear Nuevo Curso"}</DialogTitle>
+                          <DialogDescription>
+                            {editingCourse ? "Modifica los datos del curso" : "Completa la información del nuevo curso"}
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-4 py-4">
+                          <div className="grid gap-2">
+                            <Label htmlFor="title">Título</Label>
+                            <Input
+                              id="title"
+                              value={courseForm.title}
+                              onChange={(e) => setCourseForm({ ...courseForm, title: e.target.value })}
+                              placeholder="Título del curso"
+                            />
+                          </div>
+                          <div className="grid gap-2">
+                            <Label htmlFor="description">Descripción</Label>
+                            <Textarea
+                              id="description"
+                              value={courseForm.description}
+                              onChange={(e) => setCourseForm({ ...courseForm, description: e.target.value })}
+                              placeholder="Descripción del curso"
+                              rows={3}
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="grid gap-2">
+                              <Label htmlFor="price">Precio</Label>
+                              <Input
+                                id="price"
+                                type="number"
+                                value={courseForm.price}
+                                onChange={(e) => setCourseForm({ ...courseForm, price: e.target.value })}
+                                placeholder="0.00"
+                              />
+                            </div>
+                            <div className="grid gap-2">
+                              <Label htmlFor="instructor">Instructor</Label>
+                              <Input
+                                id="instructor"
+                                value={courseForm.instructor}
+                                onChange={(e) => setCourseForm({ ...courseForm, instructor: e.target.value })}
+                                placeholder="Nombre del instructor"
+                              />
+                            </div>
+                          </div>
+                          <div className="grid gap-2">
+                            <Label htmlFor="thumbnail_url">URL de Imagen</Label>
+                            <Input
+                              id="thumbnail_url"
+                              value={courseForm.thumbnail_url}
+                              onChange={(e) => setCourseForm({ ...courseForm, thumbnail_url: e.target.value })}
+                              placeholder="https://ejemplo.com/imagen.jpg"
+                            />
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => setCourseDialogOpen(false)}>
+                            Cancelar
+                          </Button>
+                          <Button onClick={editingCourse ? handleUpdateCourse : handleCreateCourse}>
+                            {editingCourse ? "Actualizar" : "Crear"}
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Título</TableHead>
+                        <TableHead>Instructor</TableHead>
+                        <TableHead>Precio</TableHead>
+                        <TableHead>Estado</TableHead>
+                        <TableHead>Fecha</TableHead>
+                        <TableHead>Acciones</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {courses.map((course) => (
+                        <TableRow key={course.id}>
+                          <TableCell className="font-medium">{course.title}</TableCell>
+                          <TableCell>{course.instructor}</TableCell>
+                          <TableCell>${course.price}</TableCell>
+                          <TableCell>
+                            <Badge variant={course.archived ? "secondary" : "default"}>
+                              {course.archived ? "Archivado" : "Activo"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{new Date(course.created_at).toLocaleDateString()}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center space-x-2">
+                              <Button variant="ghost" size="sm" onClick={() => openEditCourseDialog(course)}>
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleArchiveCourse(course.id)}
+                                disabled={course.archived}
+                              >
+                                {course.archived ? <EyeOff className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
+                              </Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button variant="ghost" size="sm">
+                                    <Trash2 className="w-4 h-4 text-red-500" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Esta acción no se puede deshacer. Se eliminará permanentemente el curso y todas
+                                      sus lecciones.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => handleDeleteCourse(course.id)}>
+                                      Eliminar
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
+                          </TableCell>
                         </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {courses.map((course) => (
-                          <TableRow key={course.id}>
-                            <TableCell>
-                              <div className="flex items-start space-x-3">
-                                <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
-                                  {course.thumbnail_url ? (
-                                    <img
-                                      src={course.thumbnail_url || "/placeholder.svg"}
-                                      alt={course.title}
-                                      className="w-full h-full object-cover"
-                                      onError={(e) => {
-                                        const target = e.target as HTMLImageElement
-                                        target.src = "/placeholder.svg?height=80&width=80&text=No+Image"
-                                      }}
-                                    />
-                                  ) : (
-                                    <div className="w-full h-full flex items-center justify-center bg-gray-200">
-                                      <ImageIcon className="w-6 h-6 text-gray-400" />
-                                    </div>
-                                  )}
-                                </div>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </TabsContent>
 
-                                <div className="min-w-0 flex-1">
-                                  <div className="flex items-center space-x-2">
-                                    <p className="font-medium text-sm sm:text-base truncate">{course.title}</p>
-                                    {course.archived && (
-                                      <Badge variant="secondary" className="text-xs bg-gray-100 text-gray-600">
-                                        Archivado
-                                      </Badge>
-                                    )}
-                                  </div>
-                                  <div className="flex flex-wrap gap-1 mt-1">
-                                    {course.tags?.slice(0, 2).map((tag) => (
-                                      <Badge
-                                        key={tag.id}
-                                        variant="secondary"
-                                        className="text-xs"
-                                        style={{ backgroundColor: tag.color + "20", color: tag.color }}
-                                      >
-                                        {tag.name}
-                                      </Badge>
-                                    ))}
-                                    {course.tags && course.tags.length > 2 && (
-                                      <Badge variant="secondary" className="text-xs">
-                                        +{course.tags.length - 2}
-                                      </Badge>
-                                    )}
-                                  </div>
-                                  <p className="text-xs sm:text-sm text-gray-500 mt-1">
-                                    ${course.price} • {course.duration_hours || 0}h
-                                  </p>
-                                  <p className="text-xs text-gray-400">
-                                    Instructor: {course.instructor_name || "No asignado"}
-                                  </p>
-                                  <p className="text-xs text-gray-400">
-                                    Creado:{" "}
-                                    {course.created_at ? new Date(course.created_at).toLocaleDateString() : "N/A"}
-                                  </p>
-                                </div>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-sm sm:text-base">{course.students.toLocaleString()}</TableCell>
-                            <TableCell className="text-sm sm:text-base">${course.revenue.toLocaleString()}</TableCell>
+            {/* Lessons Tab */}
+            <TabsContent value="lessons">
+              <Card>
+                <CardHeader>
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <CardTitle>Gestión de Lecciones</CardTitle>
+                      <CardDescription>Administra las lecciones de los cursos</CardDescription>
+                    </div>
+                    <Dialog open={lessonDialogOpen} onOpenChange={setLessonDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button
+                          onClick={() => {
+                            setEditingLesson(null)
+                            setLessonForm({
+                              title: "",
+                              description: "",
+                              video_url: "",
+                              duration: "",
+                              course_id: "",
+                              order_index: "",
+                            })
+                          }}
+                        >
+                          <Plus className="w-4 h-4 mr-2" />
+                          Nueva Lección
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-2xl">
+                        <DialogHeader>
+                          <DialogTitle>{editingLesson ? "Editar Lección" : "Crear Nueva Lección"}</DialogTitle>
+                          <DialogDescription>
+                            {editingLesson
+                              ? "Modifica los datos de la lección"
+                              : "Completa la información de la nueva lección"}
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-4 py-4">
+                          <div className="grid gap-2">
+                            <Label htmlFor="lesson-title">Título</Label>
+                            <Input
+                              id="lesson-title"
+                              value={lessonForm.title}
+                              onChange={(e) => setLessonForm({ ...lessonForm, title: e.target.value })}
+                              placeholder="Título de la lección"
+                            />
+                          </div>
+                          <div className="grid gap-2">
+                            <Label htmlFor="lesson-description">Descripción</Label>
+                            <Textarea
+                              id="lesson-description"
+                              value={lessonForm.description}
+                              onChange={(e) => setLessonForm({ ...lessonForm, description: e.target.value })}
+                              placeholder="Descripción de la lección"
+                              rows={3}
+                            />
+                          </div>
+                          <div className="grid gap-2">
+                            <Label htmlFor="video-url">URL del Video</Label>
+                            <Input
+                              id="video-url"
+                              value={lessonForm.video_url}
+                              onChange={(e) => setLessonForm({ ...lessonForm, video_url: e.target.value })}
+                              placeholder="https://ejemplo.com/video.mp4"
+                            />
+                          </div>
+                          <div className="grid grid-cols-3 gap-4">
+                            <div className="grid gap-2">
+                              <Label htmlFor="duration">Duración (min)</Label>
+                              <Input
+                                id="duration"
+                                type="number"
+                                value={lessonForm.duration}
+                                onChange={(e) => setLessonForm({ ...lessonForm, duration: e.target.value })}
+                                placeholder="30"
+                              />
+                            </div>
+                            <div className="grid gap-2">
+                              <Label htmlFor="course-select">Curso</Label>
+                              <Select
+                                value={lessonForm.course_id}
+                                onValueChange={(value) => setLessonForm({ ...lessonForm, course_id: value })}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Seleccionar curso" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {courses.map((course) => (
+                                    <SelectItem key={course.id} value={course.id}>
+                                      {course.title}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="grid gap-2">
+                              <Label htmlFor="order">Orden</Label>
+                              <Input
+                                id="order"
+                                type="number"
+                                value={lessonForm.order_index}
+                                onChange={(e) => setLessonForm({ ...lessonForm, order_index: e.target.value })}
+                                placeholder="1"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => setLessonDialogOpen(false)}>
+                            Cancelar
+                          </Button>
+                          <Button onClick={editingLesson ? handleUpdateLesson : handleCreateLesson}>
+                            {editingLesson ? "Actualizar" : "Crear"}
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Título</TableHead>
+                        <TableHead>Curso</TableHead>
+                        <TableHead>Duración</TableHead>
+                        <TableHead>Orden</TableHead>
+                        <TableHead>Fecha</TableHead>
+                        <TableHead>Acciones</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {lessons.map((lesson) => {
+                        const course = courses.find((c) => c.id === lesson.course_id)
+                        return (
+                          <TableRow key={lesson.id}>
+                            <TableCell className="font-medium">{lesson.title}</TableCell>
+                            <TableCell>{course?.title || "Curso no encontrado"}</TableCell>
+                            <TableCell>{lesson.duration} min</TableCell>
+                            <TableCell>{lesson.order_index}</TableCell>
+                            <TableCell>{new Date(lesson.created_at).toLocaleDateString()}</TableCell>
                             <TableCell>
                               <div className="flex items-center space-x-2">
-                                <Video className="w-3 h-3 sm:w-4 sm:h-4 text-gray-500" />
-                                <span className="text-sm sm:text-base">{course.lessonsCount || 0}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge
-                                variant={course.status === "published" ? "default" : "secondary"}
-                                className="text-xs"
-                              >
-                                {course.status === "published" ? "Publicado" : "Borrador"}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center space-x-1">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => openLessonDialog(course.id)}
-                                  title="Agregar lección"
-                                >
-                                  <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
+                                <Button variant="ghost" size="sm" onClick={() => openEditLessonDialog(lesson)}>
+                                  <Edit className="w-4 h-4" />
                                 </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  title="Editar curso"
-                                  onClick={() => openEditCourseDialog(course)}
-                                >
-                                  <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleArchiveCourse(course.id)}
-                                  className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
-                                  title={course.archived ? "Curso archivado" : "Archivar curso"}
-                                >
-                                  {course.archived ? (
-                                    <EyeOff className="w-3 h-3 sm:w-4 sm:h-4" />
-                                  ) : (
-                                    <Archive className="w-3 h-3 sm:w-4 sm:h-4" />
-                                  )}
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleDeleteCourse(course.id)}
-                                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                  title="Eliminar definitivamente"
-                                >
-                                  <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
-                                </Button>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button variant="ghost" size="sm">
+                                      <Trash2 className="w-4 h-4 text-red-500" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Esta acción no se puede deshacer. Se eliminará permanentemente la lección.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                      <AlertDialogAction onClick={() => handleDeleteLesson(lesson.id)}>
+                                        Eliminar
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
                               </div>
                             </TableCell>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
+                        )
+                      })}
+                    </TableBody>
+                  </Table>
                 </CardContent>
               </Card>
             </TabsContent>
 
-            <TabsContent value="lessons" className="space-y-4 sm:space-y-6">
-              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Gestión de Lecciones</h2>
+            {/* Users Tab */}
+            <TabsContent value="users">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Gestión de Usuarios</CardTitle>
+                  <CardDescription>Administra los usuarios registrados en la plataforma</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nombre</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Rol</TableHead>
+                        <TableHead>Fecha de Registro</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {users.map((user) => (
+                        <TableRow key={user.id}>
+                          <TableCell className="font-medium">{user.name}</TableCell>
+                          <TableCell>{user.email}</TableCell>
+                          <TableCell>
+                            <Badge variant={user.role === "admin" ? "default" : "secondary"}>{user.role}</Badge>
+                          </TableCell>
+                          <TableCell>{new Date(user.created_at).toLocaleDateString()}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </TabsContent>
 
-              <div className="grid gap-4 sm:gap-6">
-                {courses.map((course) => (
-                  <Card key={course.id}>
-                    <CardHeader className="p-4 sm:p-6">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <div>
-                          <div className="flex items-center space-x-2">
-                            <CardTitle className="text-base sm:text-lg">{course.title}</CardTitle>
-                            {course.archived && (
-                              <Badge variant="secondary" className="text-xs bg-gray-100 text-gray-600">
-                                Archivado
-                              </Badge>
-                            )}
-                          </div>
-                          <CardDescription className="text-sm">
-                            {course.lessons?.length || 0} lecciones configuradas
-                          </CardDescription>
-                        </div>
-                        <Button onClick={() => openLessonDialog(course.id)} size="sm" className="w-full sm:w-auto">
+            {/* Tags Tab */}
+            <TabsContent value="tags">
+              <Card>
+                <CardHeader>
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <CardTitle>Gestión de Tags</CardTitle>
+                      <CardDescription>Administra las etiquetas para categorizar cursos</CardDescription>
+                    </div>
+                    <Dialog open={tagDialogOpen} onOpenChange={setTagDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button
+                          onClick={() => {
+                            setEditingTag(null)
+                            setTagForm({ name: "", color: "#3B82F6" })
+                          }}
+                        >
                           <Plus className="w-4 h-4 mr-2" />
-                          Agregar Lección
+                          Nuevo Tag
                         </Button>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="p-4 sm:p-6 pt-0">
-                      {course.lessons && course.lessons.length > 0 ? (
-                        <div className="space-y-3">
-                          {course.lessons.map((lesson) => (
-                            <div
-                              key={lesson.id}
-                              className="flex flex-col sm:flex-row sm:items-center justify-between p-3 border rounded-lg gap-3"
-                            >
-                              <div className="flex items-center space-x-3">
-                                <div className="w-6 h-6 sm:w-8 sm:h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                                  <span className="text-xs sm:text-sm font-medium text-blue-600">
-                                    {lesson.order_index}
-                                  </span>
-                                </div>
-                                <div className="min-w-0">
-                                  <p className="font-medium text-sm sm:text-base truncate">{lesson.title}</p>
-                                  <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-500">
-                                    <div className="flex items-center space-x-1">
-                                      <Clock className="w-3 h-3" />
-                                      <span>{lesson.duration_minutes} min</span>
-                                    </div>
-                                    <div className="flex items-center space-x-1">
-                                      <LinkIcon className="w-3 h-3" />
-                                      <span>Bunny.net</span>
-                                    </div>
-                                    {lesson.is_free && (
-                                      <Badge variant="secondary" className="text-xs">
-                                        Gratis
-                                      </Badge>
-                                    )}
-                                    <div className="text-xs text-gray-400">ID: {lesson.id}</div>
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="flex items-center space-x-2 self-end sm:self-center">
-                                <Button variant="ghost" size="sm" onClick={() => openLessonDialog(course.id, lesson)}>
-                                  <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleArchiveLesson(lesson.id)}
-                                  className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
-                                  title="Archivar lección"
-                                >
-                                  <Eye className="w-3 h-3 sm:w-4 sm:h-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleDeleteLesson(lesson.id)}
-                                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                  title="Eliminar definitivamente"
-                                >
-                                  <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
-                                </Button>
-                              </div>
-                            </div>
-                          ))}
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>{editingTag ? "Editar Tag" : "Crear Nuevo Tag"}</DialogTitle>
+                          <DialogDescription>
+                            {editingTag ? "Modifica los datos del tag" : "Completa la información del nuevo tag"}
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-4 py-4">
+                          <div className="grid gap-2">
+                            <Label htmlFor="tag-name">Nombre</Label>
+                            <Input
+                              id="tag-name"
+                              value={tagForm.name}
+                              onChange={(e) => setTagForm({ ...tagForm, name: e.target.value })}
+                              placeholder="Nombre del tag"
+                            />
+                          </div>
+                          <div className="grid gap-2">
+                            <Label htmlFor="tag-color">Color</Label>
+                            <Input
+                              id="tag-color"
+                              type="color"
+                              value={tagForm.color}
+                              onChange={(e) => setTagForm({ ...tagForm, color: e.target.value })}
+                            />
+                          </div>
                         </div>
-                      ) : (
-                        <div className="text-center py-6 sm:py-8 text-gray-500">
-                          <Video className="w-8 h-8 sm:w-12 sm:h-12 mx-auto mb-4 opacity-50" />
-                          <p className="text-sm sm:text-base">No hay lecciones configuradas</p>
-                          <p className="text-xs sm:text-sm">Agrega la primera lección para este curso</p>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </TabsContent>
-
-            <TabsContent value="carousel" className="space-y-4 sm:space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Gestión del Carrusel</h2>
-                <Button size="sm" className="w-full sm:w-auto" onClick={() => setIsCreateSlideDialogOpen(true)}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Crear Slide
-                </Button>
-              </div>
-
-              <Card>
-                <CardContent className="p-0">
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="min-w-[300px]">Slide</TableHead>
-                          <TableHead className="min-w-[100px]">Tipo</TableHead>
-                          <TableHead className="min-w-[80px]">Orden</TableHead>
-                          <TableHead className="min-w-[80px]">Estado</TableHead>
-                          <TableHead className="min-w-[150px]">Acciones</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {carouselSlides.map((slide) => (
-                          <TableRow key={slide.id}>
-                            <TableCell>
-                              <div className="flex items-start space-x-3">
-                                <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
-                                  {slide.image_url ? (
-                                    <img
-                                      src={slide.image_url || "/placeholder.svg"}
-                                      alt={slide.title}
-                                      className="w-full h-full object-cover"
-                                      onError={(e) => {
-                                        const target = e.target as HTMLImageElement
-                                        target.src = "/placeholder.svg?height=80&width=80&text=No+Image"
-                                      }}
-                                    />
-                                  ) : (
-                                    <div className="w-full h-full flex items-center justify-center bg-gray-200">
-                                      <Presentation className="w-6 h-6 text-gray-400" />
-                                    </div>
-                                  )}
-                                </div>
-
-                                <div className="min-w-0 flex-1">
-                                  <div className="flex items-center space-x-2">
-                                    <p className="font-medium text-sm sm:text-base truncate">{slide.title}</p>
-                                    {slide.badge_text && (
-                                      <Badge variant="secondary" className="text-xs">
-                                        {slide.badge_text}
-                                      </Badge>
-                                    )}
-                                  </div>
-                                  <p className="text-xs sm:text-sm text-gray-500 mt-1 truncate">{slide.subtitle}</p>
-                                  <p className="text-xs text-gray-400 mt-1">CTA: {slide.cta_text}</p>
-                                  <p className="text-xs text-gray-400">Link: {slide.cta_link}</p>
-                                </div>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="outline" className="text-xs capitalize">
-                                {slide.slide_type}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-sm sm:text-base">{slide.order_index}</TableCell>
-                            <TableCell>
-                              <Badge variant={slide.is_active ? "default" : "secondary"} className="text-xs">
-                                {slide.is_active ? "Activo" : "Inactivo"}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center space-x-1">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => openEditSlideDialog(slide)}
-                                  title="Editar slide"
-                                >
-                                  <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleToggleSlideActive(slide.id, slide.is_active)}
-                                  className={
-                                    slide.is_active
-                                      ? "text-orange-600 hover:text-orange-700 hover:bg-orange-50"
-                                      : "text-green-600 hover:text-green-700 hover:bg-green-50"
-                                  }
-                                  title={slide.is_active ? "Desactivar slide" : "Activar slide"}
-                                >
-                                  {slide.is_active ? (
-                                    <EyeOff className="w-3 h-3 sm:w-4 sm:h-4" />
-                                  ) : (
-                                    <Eye className="w-3 h-3 sm:w-4 sm:h-4" />
-                                  )}
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleDeleteSlide(slide.id)}
-                                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                  title="Eliminar slide"
-                                >
-                                  <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => setTagDialogOpen(false)}>
+                            Cancelar
+                          </Button>
+                          <Button onClick={editingTag ? handleUpdateTag : handleCreateTag}>
+                            {editingTag ? "Actualizar" : "Crear"}
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
                   </div>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nombre</TableHead>
+                        <TableHead>Color</TableHead>
+                        <TableHead>Fecha</TableHead>
+                        <TableHead>Acciones</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {courseTags.map((tag) => (
+                        <TableRow key={tag.id}>
+                          <TableCell className="font-medium">{tag.name}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center space-x-2">
+                              <div className="w-4 h-4 rounded-full" style={{ backgroundColor: tag.color }} />
+                              <span>{tag.color}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>{new Date(tag.created_at).toLocaleDateString()}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center space-x-2">
+                              <Button variant="ghost" size="sm" onClick={() => openEditTagDialog(tag)}>
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button variant="ghost" size="sm">
+                                    <Trash2 className="w-4 h-4 text-red-500" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Esta acción no se puede deshacer. Se eliminará permanentemente el tag.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => handleDeleteTag(tag.id)}>
+                                      Eliminar
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </CardContent>
               </Card>
             </TabsContent>
 
-            <TabsContent value="tags" className="space-y-4 sm:space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Etiquetas de Cursos</h2>
-                <Button size="sm" className="w-full sm:w-auto" onClick={() => setIsCreateTagDialogOpen(true)}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Crear Etiqueta
-                </Button>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {tags.map((tag) => (
-                  <Card key={tag.id} className="hover:shadow-md transition-shadow">
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <Badge
-                          variant="secondary"
-                          className="text-sm font-medium"
-                          style={{ backgroundColor: tag.color + "20", color: tag.color }}
-                        >
-                          {tag.name}
-                        </Badge>
-                        <div className="w-4 h-4 rounded-full border" style={{ backgroundColor: tag.color }} />
-                      </div>
-                      <p className="text-sm text-gray-600 mb-2">{tag.description}</p>
-                      <p className="text-xs text-gray-400 mb-3">Slug: {tag.slug}</p>
-
-                      <div className="flex items-center justify-end space-x-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => openEditTagDialog(tag)}
-                          className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                          title="Editar etiqueta"
-                        >
-                          <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => openDeleteTagDialog(tag)}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          title="Eliminar etiqueta"
-                        >
-                          <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </TabsContent>
-
-            <TabsContent value="users" className="space-y-4 sm:space-y-6">
-              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Usuarios Registrados</h2>
-
+            {/* Carousel Tab */}
+            <TabsContent value="carousel">
               <Card>
-                <CardContent className="p-0">
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="min-w-[150px]">Usuario</TableHead>
-                          <TableHead className="min-w-[200px]">Email</TableHead>
-                          <TableHead className="min-w-[80px]">Cursos</TableHead>
-                          <TableHead className="min-w-[100px]">Total Gastado</TableHead>
-                          <TableHead className="min-w-[120px]">Fecha de Registro</TableHead>
-                          <TableHead className="min-w-[100px]">Acciones</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {users.length === 0 ? (
-                          <TableRow>
-                            <TableCell colSpan={6} className="text-center py-8 text-gray-500">
-                              <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                              <p className="text-sm sm:text-base">No hay usuarios registrados</p>
-                              <p className="text-xs sm:text-sm">Los usuarios aparecerán aquí cuando se registren</p>
-                            </TableCell>
-                          </TableRow>
-                        ) : (
-                          users.map((user) => (
-                            <TableRow key={user.id}>
-                              <TableCell className="font-medium text-sm sm:text-base">{user.name}</TableCell>
-                              <TableCell className="text-sm sm:text-base">{user.email}</TableCell>
-                              <TableCell className="text-sm sm:text-base">{user.courses}</TableCell>
-                              <TableCell className="text-sm sm:text-base">${user.spent}</TableCell>
-                              <TableCell className="text-sm sm:text-base">{user.joinDate}</TableCell>
-                              <TableCell>
-                                <div className="flex items-center space-x-2">
-                                  <Button variant="ghost" size="sm">
-                                    <Eye className="w-3 h-3 sm:w-4 sm:h-4" />
-                                  </Button>
-                                  <Button variant="ghost" size="sm">
-                                    <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
-                                  </Button>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          ))
-                        )}
-                      </TableBody>
-                    </Table>
+                <CardHeader>
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <CardTitle>Gestión de Carousel</CardTitle>
+                      <CardDescription>Administra las imágenes del carousel principal</CardDescription>
+                    </div>
+                    <Dialog open={slideDialogOpen} onOpenChange={setSlideDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button
+                          onClick={() => {
+                            setEditingSlide(null)
+                            setSlideForm({
+                              title: "",
+                              description: "",
+                              image_url: "",
+                              link_url: "",
+                              is_active: true,
+                              order_index: "",
+                            })
+                          }}
+                        >
+                          <Plus className="w-4 h-4 mr-2" />
+                          Nuevo Slide
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-2xl">
+                        <DialogHeader>
+                          <DialogTitle>{editingSlide ? "Editar Slide" : "Crear Nuevo Slide"}</DialogTitle>
+                          <DialogDescription>
+                            {editingSlide ? "Modifica los datos del slide" : "Completa la información del nuevo slide"}
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-4 py-4">
+                          <div className="grid gap-2">
+                            <Label htmlFor="slide-title">Título</Label>
+                            <Input
+                              id="slide-title"
+                              value={slideForm.title}
+                              onChange={(e) => setSlideForm({ ...slideForm, title: e.target.value })}
+                              placeholder="Título del slide"
+                            />
+                          </div>
+                          <div className="grid gap-2">
+                            <Label htmlFor="slide-description">Descripción</Label>
+                            <Textarea
+                              id="slide-description"
+                              value={slideForm.description}
+                              onChange={(e) => setSlideForm({ ...slideForm, description: e.target.value })}
+                              placeholder="Descripción del slide"
+                              rows={3}
+                            />
+                          </div>
+                          <div className="grid gap-2">
+                            <Label htmlFor="slide-image">URL de Imagen</Label>
+                            <Input
+                              id="slide-image"
+                              value={slideForm.image_url}
+                              onChange={(e) => setSlideForm({ ...slideForm, image_url: e.target.value })}
+                              placeholder="https://ejemplo.com/imagen.jpg"
+                            />
+                          </div>
+                          <div className="grid gap-2">
+                            <Label htmlFor="slide-link">URL de Enlace (opcional)</Label>
+                            <Input
+                              id="slide-link"
+                              value={slideForm.link_url}
+                              onChange={(e) => setSlideForm({ ...slideForm, link_url: e.target.value })}
+                              placeholder="https://ejemplo.com/enlace"
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="grid gap-2">
+                              <Label htmlFor="slide-order">Orden</Label>
+                              <Input
+                                id="slide-order"
+                                type="number"
+                                value={slideForm.order_index}
+                                onChange={(e) => setSlideForm({ ...slideForm, order_index: e.target.value })}
+                                placeholder="1"
+                              />
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Switch
+                                id="slide-active"
+                                checked={slideForm.is_active}
+                                onCheckedChange={(checked) => setSlideForm({ ...slideForm, is_active: checked })}
+                              />
+                              <Label htmlFor="slide-active">Activo</Label>
+                            </div>
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => setSlideDialogOpen(false)}>
+                            Cancelar
+                          </Button>
+                          <Button onClick={editingSlide ? handleUpdateSlide : handleCreateSlide}>
+                            {editingSlide ? "Actualizar" : "Crear"}
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
                   </div>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Imagen</TableHead>
+                        <TableHead>Título</TableHead>
+                        <TableHead>Estado</TableHead>
+                        <TableHead>Orden</TableHead>
+                        <TableHead>Fecha</TableHead>
+                        <TableHead>Acciones</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {carouselSlides.map((slide) => (
+                        <TableRow key={slide.id}>
+                          <TableCell>
+                            <img
+                              src={slide.image_url || "/placeholder.svg"}
+                              alt={slide.title}
+                              className="w-16 h-10 object-cover rounded"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement
+                                target.src = "/placeholder.jpg"
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell className="font-medium">{slide.title}</TableCell>
+                          <TableCell>
+                            <Badge variant={slide.is_active ? "default" : "secondary"}>
+                              {slide.is_active ? "Activo" : "Inactivo"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{slide.order_index}</TableCell>
+                          <TableCell>{new Date(slide.created_at).toLocaleDateString()}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center space-x-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleToggleSlideActive(slide.id, slide.is_active)}
+                              >
+                                {slide.is_active ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={() => openEditSlideDialog(slide)}>
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button variant="ghost" size="sm">
+                                    <Trash2 className="w-4 h-4 text-red-500" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Esta acción no se puede deshacer. Se eliminará permanentemente el slide.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => handleDeleteSlide(slide.id)}>
+                                      Eliminar
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </CardContent>
               </Card>
             </TabsContent>
           </Tabs>
         </div>
-
-        {/* Dialog para crear/editar lecciones */}
-        <Dialog open={isLessonDialogOpen} onOpenChange={setIsLessonDialogOpen}>
-          <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="text-base sm:text-lg">
-                {editingLesson ? "Editar Lección" : "Agregar Nueva Lección"}
-              </DialogTitle>
-              <DialogDescription className="text-sm">
-                Configura los detalles de la lección con el enlace directo de Bunny.net
-                {selectedCourseData && ` para el curso "${selectedCourseData.title}"`}
-              </DialogDescription>
-            </DialogHeader>
-
-            <form onSubmit={handleCreateLesson} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="lessonTitle" className="text-sm">
-                    Título de la Lección
-                  </Label>
-                  <Input
-                    id="lessonTitle"
-                    placeholder="Ej: Introducción a la Implantología"
-                    value={newLesson.title}
-                    onChange={(e) => setNewLesson({ ...newLesson, title: e.target.value })}
-                    required
-                    className="text-sm"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="lessonOrder" className="text-sm">
-                    Orden
-                  </Label>
-                  <Input
-                    id="lessonOrder"
-                    type="number"
-                    placeholder="1"
-                    value={newLesson.order}
-                    onChange={(e) => setNewLesson({ ...newLesson, order: e.target.value })}
-                    required
-                    className="text-sm"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="lessonDescription" className="text-sm">
-                  Descripción
-                </Label>
-                <Textarea
-                  id="lessonDescription"
-                  placeholder="Describe el contenido de esta lección..."
-                  value={newLesson.description}
-                  onChange={(e) => setNewLesson({ ...newLesson, description: e.target.value })}
-                  className="text-sm"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="videoUrl" className="text-sm">
-                  URL del Video (Bunny.net)
-                </Label>
-                <Input
-                  id="videoUrl"
-                  placeholder="https://vz-12345.b-cdn.net/mi-video.mp4"
-                  value={newLesson.videoUrl}
-                  onChange={(e) => setNewLesson({ ...newLesson, videoUrl: e.target.value })}
-                  required
-                  className="text-sm"
-                />
-                <p className="text-xs text-gray-500">Copia el enlace directo desde tu panel de Bunny.net</p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="duration" className="text-sm">
-                    Duración (minutos)
-                  </Label>
-                  <Input
-                    id="duration"
-                    type="number"
-                    placeholder="45"
-                    value={newLesson.duration}
-                    onChange={(e) => setNewLesson({ ...newLesson, duration: e.target.value })}
-                    required
-                    className="text-sm"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="isFree" className="text-sm">
-                    Acceso
-                  </Label>
-                  <div className="flex items-center space-x-2 pt-2">
-                    <Switch
-                      id="isFree"
-                      checked={newLesson.isFree}
-                      onCheckedChange={(checked) => setNewLesson({ ...newLesson, isFree: checked })}
-                    />
-                    <Label htmlFor="isFree" className="text-sm">
-                      Lección gratuita
-                    </Label>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-2 pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsLessonDialogOpen(false)}
-                  className="w-full sm:w-auto"
-                >
-                  Cancelar
-                </Button>
-                <Button type="submit" className="w-full sm:w-auto">
-                  {editingLesson ? "Actualizar Lección" : "Crear Lección"}
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
-
-        {/* Dialog para crear curso */}
-        <Dialog open={isCreateCourseDialogOpen} onOpenChange={setIsCreateCourseDialogOpen}>
-          <DialogContent className="max-w-[95vw] sm:max-w-3xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="text-base sm:text-lg">Crear Nuevo Curso</DialogTitle>
-              <DialogDescription className="text-sm">
-                Completa los detalles básicos del curso. Las lecciones se configuran después.
-              </DialogDescription>
-            </DialogHeader>
-
-            <form onSubmit={handleCreateCourse} className="space-y-4">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="title" className="text-sm sm:text-base">
-                      Título del Curso
-                    </Label>
-                    <Input
-                      id="title"
-                      placeholder="Ej: Implantología Avanzada"
-                      value={newCourse.title}
-                      onChange={(e) => setNewCourse({ ...newCourse, title: e.target.value })}
-                      className="text-sm sm:text-base"
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="description" className="text-sm sm:text-base">
-                      Descripción
-                    </Label>
-                    <Textarea
-                      id="description"
-                      placeholder="Describe el contenido del curso..."
-                      value={newCourse.description}
-                      onChange={(e) => setNewCourse({ ...newCourse, description: e.target.value })}
-                      className="text-sm sm:text-base"
-                      rows={4}
-                      required
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="price" className="text-sm sm:text-base">
-                        Precio ($)
-                      </Label>
-                      <Input
-                        id="price"
-                        type="number"
-                        placeholder="299"
-                        value={newCourse.price}
-                        onChange={(e) => setNewCourse({ ...newCourse, price: e.target.value })}
-                        className="text-sm sm:text-base"
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="durationHours" className="text-sm sm:text-base">
-                        Duración (horas)
-                      </Label>
-                      <Input
-                        id="durationHours"
-                        type="number"
-                        placeholder="12"
-                        value={newCourse.durationHours}
-                        onChange={(e) => setNewCourse({ ...newCourse, durationHours: e.target.value })}
-                        className="text-sm sm:text-base"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="instructor" className="text-sm sm:text-base">
-                      Instructor
-                    </Label>
-                    <Input
-                      id="instructor"
-                      placeholder="Dr. Juan Pérez"
-                      value={newCourse.instructor}
-                      onChange={(e) => setNewCourse({ ...newCourse, instructor: e.target.value })}
-                      className="text-sm sm:text-base"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="thumbnailUrl" className="text-sm sm:text-base flex items-center">
-                      <ImageIcon className="w-4 h-4 mr-2" />
-                      Imagen del Curso
-                    </Label>
-                    <Input
-                      id="thumbnailUrl"
-                      type="url"
-                      placeholder="https://res.cloudinary.com/tu-cuenta/image/upload/v123/curso.jpg"
-                      value={newCourse.thumbnailUrl}
-                      onChange={(e) => setNewCourse({ ...newCourse, thumbnailUrl: e.target.value })}
-                      className="text-sm sm:text-base"
-                    />
-                    <div className="flex items-start space-x-2 text-xs text-gray-500">
-                      <ExternalLink className="w-3 h-3 mt-0.5 flex-shrink-0" />
-                      <div>
-                        <p>Sube tu imagen a Cloudinary, Imgur, o cualquier servicio de hosting de imágenes.</p>
-                        <p className="mt-1">Tamaño recomendado: 1080x1080px (1:1)</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {newCourse.thumbnailUrl && (
-                    <div className="space-y-2">
-                      <Label className="text-sm">Vista Previa</Label>
-                      <div className="w-full max-w-sm">
-                        <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden border">
-                          <img
-                            src={newCourse.thumbnailUrl || "/placeholder.svg"}
-                            alt="Vista previa del curso"
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement
-                              target.src = "/placeholder.svg?height=300&width=300&text=Error+cargando+imagen"
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="space-y-2">
-                    <Label className="text-sm sm:text-base">Etiquetas del Curso</Label>
-                    <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-3 border rounded-md bg-gray-50">
-                      {tags.map((tag) => (
-                        <div key={tag.id} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`tag-${tag.id}`}
-                            checked={newCourse.tags.includes(tag.id)}
-                            onCheckedChange={() => handleTagToggle(tag.id)}
-                          />
-                          <Label
-                            htmlFor={`tag-${tag.id}`}
-                            className="text-xs cursor-pointer flex items-center space-x-1"
-                          >
-                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: tag.color }} />
-                            <span style={{ color: tag.color }}>{tag.name}</span>
-                          </Label>
-                        </div>
-                      ))}
-                    </div>
-                    <p className="text-xs text-gray-500">Selecciona las etiquetas que mejor describan este curso</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-2 pt-6 border-t">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsCreateCourseDialogOpen(false)}
-                  className="w-full sm:w-auto"
-                >
-                  Cancelar
-                </Button>
-                <Button type="submit" className="w-full sm:w-auto">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Crear Curso
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
-
-        {/* Dialog para editar curso */}
-        <Dialog open={isEditCourseDialogOpen} onOpenChange={setIsEditCourseDialogOpen}>
-          <DialogContent className="max-w-[95vw] sm:max-w-3xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="text-base sm:text-lg">Editar Curso</DialogTitle>
-              <DialogDescription className="text-sm">
-                Modifica los detalles del curso "{editingCourse?.title}"
-              </DialogDescription>
-            </DialogHeader>
-
-            <form onSubmit={handleUpdateCourse} className="space-y-4">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="editTitle" className="text-sm sm:text-base">
-                      Título del Curso
-                    </Label>
-                    <Input
-                      id="editTitle"
-                      placeholder="Ej: Implantología Avanzada"
-                      value={newCourse.title}
-                      onChange={(e) => setNewCourse({ ...newCourse, title: e.target.value })}
-                      className="text-sm sm:text-base"
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="editDescription" className="text-sm sm:text-base">
-                      Descripción
-                    </Label>
-                    <Textarea
-                      id="editDescription"
-                      placeholder="Describe el contenido del curso..."
-                      value={newCourse.description}
-                      onChange={(e) => setNewCourse({ ...newCourse, description: e.target.value })}
-                      className="text-sm sm:text-base"
-                      rows={4}
-                      required
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="editPrice" className="text-sm sm:text-base">
-                        Precio ($)
-                      </Label>
-                      <Input
-                        id="editPrice"
-                        type="number"
-                        placeholder="299"
-                        value={newCourse.price}
-                        onChange={(e) => setNewCourse({ ...newCourse, price: e.target.value })}
-                        className="text-sm sm:text-base"
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="editDurationHours" className="text-sm sm:text-base">
-                        Duración (horas)
-                      </Label>
-                      <Input
-                        id="editDurationHours"
-                        type="number"
-                        placeholder="12"
-                        value={newCourse.durationHours}
-                        onChange={(e) => setNewCourse({ ...newCourse, durationHours: e.target.value })}
-                        className="text-sm sm:text-base"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="editInstructor" className="text-sm sm:text-base">
-                      Instructor
-                    </Label>
-                    <Input
-                      id="editInstructor"
-                      placeholder="Dr. Juan Pérez"
-                      value={newCourse.instructor}
-                      onChange={(e) => setNewCourse({ ...newCourse, instructor: e.target.value })}
-                      className="text-sm sm:text-base"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="editThumbnailUrl" className="text-sm sm:text-base flex items-center">
-                      <ImageIcon className="w-4 h-4 mr-2" />
-                      Imagen del Curso
-                    </Label>
-                    <Input
-                      id="editThumbnailUrl"
-                      type="url"
-                      placeholder="https://res.cloudinary.com/tu-cuenta/image/upload/v123/curso.jpg"
-                      value={newCourse.thumbnailUrl}
-                      onChange={(e) => setNewCourse({ ...newCourse, thumbnailUrl: e.target.value })}
-                      className="text-sm sm:text-base"
-                    />
-                    <div className="flex items-start space-x-2 text-xs text-gray-500">
-                      <ExternalLink className="w-3 h-3 mt-0.5 flex-shrink-0" />
-                      <div>
-                        <p>Sube tu imagen a Cloudinary, Imgur, o cualquier servicio de hosting de imágenes.</p>
-                        <p className="mt-1">Tamaño recomendado: 1080x1080px (1:1)</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {newCourse.thumbnailUrl && (
-                    <div className="space-y-2">
-                      <Label className="text-sm">Vista Previa</Label>
-                      <div className="w-full max-w-sm">
-                        <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden border">
-                          <img
-                            src={newCourse.thumbnailUrl || "/placeholder.svg"}
-                            alt="Vista previa del curso"
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement
-                              target.src = "/placeholder.svg?height=300&width=300&text=Error+cargando+imagen"
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="space-y-2">
-                    <Label className="text-sm sm:text-base">Etiquetas del Curso</Label>
-                    <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-3 border rounded-md bg-gray-50">
-                      {tags.map((tag) => (
-                        <div key={tag.id} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`edit-tag-${tag.id}`}
-                            checked={newCourse.tags.includes(tag.id)}
-                            onCheckedChange={() => handleTagToggle(tag.id)}
-                          />
-                          <Label
-                            htmlFor={`edit-tag-${tag.id}`}
-                            className="text-xs cursor-pointer flex items-center space-x-1"
-                          >
-                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: tag.color }} />
-                            <span style={{ color: tag.color }}>{tag.name}</span>
-                          </Label>
-                        </div>
-                      ))}
-                    </div>
-                    <p className="text-xs text-gray-500">Selecciona las etiquetas que mejor describan este curso</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-2 pt-6 border-t">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setIsEditCourseDialogOpen(false)
-                    setEditingCourse(null)
-                    setNewCourse({
-                      title: "",
-                      description: "",
-                      price: "",
-                      instructor: "",
-                      thumbnailUrl: "",
-                      durationHours: "",
-                      tags: [],
-                    })
-                  }}
-                  className="w-full sm:w-auto"
-                >
-                  Cancelar
-                </Button>
-                <Button type="submit" className="w-full sm:w-auto">
-                  <Edit className="w-4 h-4 mr-2" />
-                  Actualizar Curso
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
-
-        {/* Dialog para crear slide del carrusel */}
-        <Dialog open={isCreateSlideDialogOpen} onOpenChange={setIsCreateSlideDialogOpen}>
-          <DialogContent className="max-w-[95vw] sm:max-w-3xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="text-base sm:text-lg">Crear Nuevo Slide</DialogTitle>
-              <DialogDescription className="text-sm">
-                Crea un nuevo slide para el carrusel de la página principal
-              </DialogDescription>
-            </DialogHeader>
-
-            <form onSubmit={handleCreateSlide} className="space-y-4">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="slideTitle" className="text-sm sm:text-base">
-                      Título del Slide
-                    </Label>
-                    <Input
-                      id="slideTitle"
-                      placeholder="Ej: Nuevo Curso Disponible"
-                      value={newSlide.title}
-                      onChange={(e) => setNewSlide({ ...newSlide, title: e.target.value })}
-                      className="text-sm sm:text-base"
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="slideSubtitle" className="text-sm sm:text-base">
-                      Subtítulo
-                    </Label>
-                    <Input
-                      id="slideSubtitle"
-                      placeholder="Ej: Aprende las técnicas más avanzadas"
-                      value={newSlide.subtitle}
-                      onChange={(e) => setNewSlide({ ...newSlide, subtitle: e.target.value })}
-                      className="text-sm sm:text-base"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="slideDescription" className="text-sm sm:text-base">
-                      Descripción
-                    </Label>
-                    <Textarea
-                      id="slideDescription"
-                      placeholder="Describe el contenido del slide..."
-                      value={newSlide.description}
-                      onChange={(e) => setNewSlide({ ...newSlide, description: e.target.value })}
-                      className="text-sm sm:text-base"
-                      rows={3}
-                      required
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="slideCtaText" className="text-sm sm:text-base">
-                        Texto del Botón
-                      </Label>
-                      <Input
-                        id="slideCtaText"
-                        placeholder="Ver Más"
-                        value={newSlide.cta_text}
-                        onChange={(e) => setNewSlide({ ...newSlide, cta_text: e.target.value })}
-                        className="text-sm sm:text-base"
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="slideCtaLink" className="text-sm sm:text-base">
-                        Enlace del Botón
-                      </Label>
-                      <Input
-                        id="slideCtaLink"
-                        placeholder="/courses"
-                        value={newSlide.cta_link}
-                        onChange={(e) => setNewSlide({ ...newSlide, cta_link: e.target.value })}
-                        className="text-sm sm:text-base"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="slideBadgeText" className="text-sm sm:text-base">
-                        Texto del Badge
-                      </Label>
-                      <Input
-                        id="slideBadgeText"
-                        placeholder="Nuevo"
-                        value={newSlide.badge_text}
-                        onChange={(e) => setNewSlide({ ...newSlide, badge_text: e.target.value })}
-                        className="text-sm sm:text-base"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="slideType" className="text-sm sm:text-base">
-                        Tipo de Slide
-                      </Label>
-                      <select
-                        id="slideType"
-                        value={newSlide.slide_type}
-                        onChange={(e) => setNewSlide({ ...newSlide, slide_type: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm sm:text-base"
-                      >
-                        <option value="general">General</option>
-                        <option value="course">Curso</option>
-                        <option value="promotion">Promoción</option>
-                        <option value="news">Noticia</option>
-                        <option value="success">Éxito</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="slideImageUrl" className="text-sm sm:text-base flex items-center">
-                      <ImageIcon className="w-4 h-4 mr-2" />
-                      Imagen del Slide
-                    </Label>
-                    <Input
-                      id="slideImageUrl"
-                      type="url"
-                      placeholder="https://res.cloudinary.com/tu-cuenta/image/upload/v123/slide.jpg"
-                      value={newSlide.image_url}
-                      onChange={(e) => setNewSlide({ ...newSlide, image_url: e.target.value })}
-                      className="text-sm sm:text-base"
-                    />
-                    <div className="flex items-start space-x-2 text-xs text-gray-500">
-                      <ExternalLink className="w-3 h-3 mt-0.5 flex-shrink-0" />
-                      <div>
-                        <p>Sube tu imagen a Cloudinary, Imgur, o cualquier servicio de hosting de imágenes.</p>
-                        <p className="mt-1">Tamaño recomendado: 1080x1080px (1:1)</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {newSlide.image_url && (
-                    <div className="space-y-2">
-                      <Label className="text-sm">Vista Previa</Label>
-                      <div className="w-full max-w-sm">
-                        <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden border">
-                          <img
-                            src={newSlide.image_url || "/placeholder.svg"}
-                            alt="Vista previa del slide"
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement
-                              target.src = "/placeholder.svg?height=300&width=300&text=Error+cargando+imagen"
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="space-y-2">
-                    <Label htmlFor="slideBackgroundColor" className="text-sm sm:text-base">
-                      Color de Fondo (Gradiente)
-                    </Label>
-                    <select
-                      id="slideBackgroundColor"
-                      value={newSlide.background_color}
-                      onChange={(e) => setNewSlide({ ...newSlide, background_color: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm sm:text-base"
-                    >
-                      <option value="from-blue-900 to-indigo-900">Azul a Índigo</option>
-                      <option value="from-purple-900 to-blue-900">Púrpura a Azul</option>
-                      <option value="from-red-900 to-pink-900">Rojo a Rosa</option>
-                      <option value="from-green-900 to-teal-900">Verde a Teal</option>
-                      <option value="from-orange-900 to-red-900">Naranja a Rojo</option>
-                      <option value="from-gray-900 to-gray-800">Gris Oscuro</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="slideBadgeColor" className="text-sm sm:text-base">
-                      Color del Badge
-                    </Label>
-                    <select
-                      id="slideBadgeColor"
-                      value={newSlide.badge_color}
-                      onChange={(e) => setNewSlide({ ...newSlide, badge_color: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm sm:text-base"
-                    >
-                      <option value="bg-blue-500">Azul</option>
-                      <option value="bg-green-500">Verde</option>
-                      <option value="bg-red-500">Rojo</option>
-                      <option value="bg-purple-500">Púrpura</option>
-                      <option value="bg-orange-500">Naranja</option>
-                      <option value="bg-gray-500">Gris</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-2 pt-6 border-t">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsCreateSlideDialogOpen(false)}
-                  className="w-full sm:w-auto"
-                >
-                  Cancelar
-                </Button>
-                <Button type="submit" className="w-full sm:w-auto">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Crear Slide
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
-
-        {/* Dialog para editar slide del carrusel */}
-        <Dialog open={isEditSlideDialogOpen} onOpenChange={setIsEditSlideDialogOpen}>
-          <DialogContent className="max-w-[95vw] sm:max-w-3xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="text-base sm:text-lg">Editar Slide</DialogTitle>
-              <DialogDescription className="text-sm">
-                Modifica los detalles del slide "{editingSlide?.title}"
-              </DialogDescription>
-            </DialogHeader>
-
-            <form onSubmit={handleUpdateSlide} className="space-y-4">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="editSlideTitle" className="text-sm sm:text-base">
-                      Título del Slide
-                    </Label>
-                    <Input
-                      id="editSlideTitle"
-                      placeholder="Ej: Nuevo Curso Disponible"
-                      value={newSlide.title}
-                      onChange={(e) => setNewSlide({ ...newSlide, title: e.target.value })}
-                      className="text-sm sm:text-base"
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="editSlideSubtitle" className="text-sm sm:text-base">
-                      Subtítulo
-                    </Label>
-                    <Input
-                      id="editSlideSubtitle"
-                      placeholder="Ej: Aprende las técnicas más avanzadas"
-                      value={newSlide.subtitle}
-                      onChange={(e) => setNewSlide({ ...newSlide, subtitle: e.target.value })}
-                      className="text-sm sm:text-base"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="editSlideDescription" className="text-sm sm:text-base">
-                      Descripción
-                    </Label>
-                    <Textarea
-                      id="editSlideDescription"
-                      placeholder="Describe el contenido del slide..."
-                      value={newSlide.description}
-                      onChange={(e) => setNewSlide({ ...newSlide, description: e.target.value })}
-                      className="text-sm sm:text-base"
-                      rows={3}
-                      required
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="editSlideCtaText" className="text-sm sm:text-base">
-                        Texto del Botón
-                      </Label>
-                      <Input
-                        id="editSlideCtaText"
-                        placeholder="Ver Más"
-                        value={newSlide.cta_text}
-                        onChange={(e) => setNewSlide({ ...newSlide, cta_text: e.target.value })}
-                        className="text-sm sm:text-base"
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="editSlideCtaLink" className="text-sm sm:text-base">
-                        Enlace del Botón
-                      </Label>
-                      <Input
-                        id="editSlideCtaLink"
-                        placeholder="/courses"
-                        value={newSlide.cta_link}
-                        onChange={(e) => setNewSlide({ ...newSlide, cta_link: e.target.value })}
-                        className="text-sm sm:text-base"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="editSlideBadgeText" className="text-sm sm:text-base">
-                        Texto del Badge
-                      </Label>
-                      <Input
-                        id="editSlideBadgeText"
-                        placeholder="Nuevo"
-                        value={newSlide.badge_text}
-                        onChange={(e) => setNewSlide({ ...newSlide, badge_text: e.target.value })}
-                        className="text-sm sm:text-base"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="editSlideType" className="text-sm sm:text-base">
-                        Tipo de Slide
-                      </Label>
-                      <select
-                        id="editSlideType"
-                        value={newSlide.slide_type}
-                        onChange={(e) => setNewSlide({ ...newSlide, slide_type: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm sm:text-base"
-                      >
-                        <option value="general">General</option>
-                        <option value="course">Curso</option>
-                        <option value="promotion">Promoción</option>
-                        <option value="news">Noticia</option>
-                        <option value="success">Éxito</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="editSlideImageUrl" className="text-sm sm:text-base flex items-center">
-                      <ImageIcon className="w-4 h-4 mr-2" />
-                      Imagen del Slide
-                    </Label>
-                    <Input
-                      id="editSlideImageUrl"
-                      type="url"
-                      placeholder="https://res.cloudinary.com/tu-cuenta/image/upload/v123/slide.jpg"
-                      value={newSlide.image_url}
-                      onChange={(e) => setNewSlide({ ...newSlide, image_url: e.target.value })}
-                      className="text-sm sm:text-base"
-                    />
-                    <div className="flex items-start space-x-2 text-xs text-gray-500">
-                      <ExternalLink className="w-3 h-3 mt-0.5 flex-shrink-0" />
-                      <div>
-                        <p>Sube tu imagen a Cloudinary, Imgur, o cualquier servicio de hosting de imágenes.</p>
-                        <p className="mt-1">Tamaño recomendado: 1080x1080px (1:1)</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {newSlide.image_url && (
-                    <div className="space-y-2">
-                      <Label className="text-sm">Vista Previa</Label>
-                      <div className="w-full max-w-sm">
-                        <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden border">
-                          <img
-                            src={newSlide.image_url || "/placeholder.svg"}
-                            alt="Vista previa del slide"
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement
-                              target.src = "/placeholder.svg?height=300&width=300&text=Error+cargando+imagen"
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="space-y-2">
-                    <Label htmlFor="editSlideBackgroundColor" className="text-sm sm:text-base">
-                      Color de Fondo (Gradiente)
-                    </Label>
-                    <select
-                      id="editSlideBackgroundColor"
-                      value={newSlide.background_color}
-                      onChange={(e) => setNewSlide({ ...newSlide, background_color: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm sm:text-base"
-                    >
-                      <option value="from-blue-900 to-indigo-900">Azul a Índigo</option>
-                      <option value="from-purple-900 to-blue-900">Púrpura a Azul</option>
-                      <option value="from-red-900 to-pink-900">Rojo a Rosa</option>
-                      <option value="from-green-900 to-teal-900">Verde a Teal</option>
-                      <option value="from-orange-900 to-red-900">Naranja a Rojo</option>
-                      <option value="from-gray-900 to-gray-800">Gris Oscuro</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="editSlideBadgeColor" className="text-sm sm:text-base">
-                      Color del Badge
-                    </Label>
-                    <select
-                      id="editSlideBadgeColor"
-                      value={newSlide.badge_color}
-                      onChange={(e) => setNewSlide({ ...newSlide, badge_color: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm sm:text-base"
-                    >
-                      <option value="bg-blue-500">Azul</option>
-                      <option value="bg-green-500">Verde</option>
-                      <option value="bg-red-500">Rojo</option>
-                      <option value="bg-purple-500">Púrpura</option>
-                      <option value="bg-orange-500">Naranja</option>
-                      <option value="bg-gray-500">Gris</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-2 pt-6 border-t">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsEditSlideDialogOpen(false)}
-                  className="w-full sm:w-auto"
-                >
-                  Cancelar
-                </Button>
-                <Button type="submit" className="w-full sm:w-auto">
-                  <Edit className="w-4 h-4 mr-2" />
-                  Actualizar Slide
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
-
-        {/* Dialog para crear etiqueta */}
-        <Dialog open={isCreateTagDialogOpen} onOpenChange={setIsCreateTagDialogOpen}>
-          <DialogContent className="max-w-[95vw] sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>Crear Nueva Etiqueta</DialogTitle>
-              <DialogDescription>Crea una nueva etiqueta para clasificar tus cursos.</DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleCreateTag} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="tagName">Nombre de la Etiqueta</Label>
-                <Input
-                  id="tagName"
-                  placeholder="Ej: Implantología"
-                  value={newTag.name}
-                  onChange={(e) => setNewTag({ ...newTag, name: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="tagColor">Color de la Etiqueta</Label>
-                <Input
-                  type="color"
-                  id="tagColor"
-                  value={newTag.color}
-                  onChange={(e) => setNewTag({ ...newTag, color: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="tagDescription">Descripción</Label>
-                <Textarea
-                  id="tagDescription"
-                  placeholder="Describe esta etiqueta..."
-                  value={newTag.description}
-                  onChange={(e) => setNewTag({ ...newTag, description: e.target.value })}
-                />
-              </div>
-              <div className="flex justify-end space-x-2">
-                <Button type="button" variant="outline" onClick={() => setIsCreateTagDialogOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button type="submit">Crear Etiqueta</Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
-
-        {/* Dialog para editar etiqueta */}
-        <Dialog open={isEditTagDialogOpen} onOpenChange={setIsEditTagDialogOpen}>
-          <DialogContent className="max-w-[95vw] sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>Editar Etiqueta</DialogTitle>
-              <DialogDescription>Edita los detalles de la etiqueta "{editingTag?.name}".</DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleEditTag} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="editTagName">Nombre de la Etiqueta</Label>
-                <Input
-                  id="editTagName"
-                  placeholder="Ej: Implantología"
-                  value={editingTag?.name || ""}
-                  onChange={(e) => setEditingTag({ ...editingTag!, name: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="editTagColor">Color de la Etiqueta</Label>
-                <Input
-                  type="color"
-                  id="editTagColor"
-                  value={editingTag?.color || "#3B82F6"}
-                  onChange={(e) => setEditingTag({ ...editingTag!, color: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="editTagDescription">Descripción</Label>
-                <Textarea
-                  id="editTagDescription"
-                  placeholder="Describe esta etiqueta..."
-                  value={editingTag?.description || ""}
-                  onChange={(e) => setEditingTag({ ...editingTag!, description: e.target.value })}
-                />
-              </div>
-              <div className="flex justify-end space-x-2">
-                <Button type="button" variant="outline" onClick={() => setIsEditTagDialogOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button type="submit">Guardar Cambios</Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
-
-        {/* Alert Dialog para eliminar etiqueta */}
-        <AlertDialog open={isDeleteTagDialogOpen} onOpenChange={setIsDeleteTagDialogOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>¿Eliminar Etiqueta?</AlertDialogTitle>
-              <AlertDialogDescription>
-                ¿Estás seguro de que quieres eliminar la etiqueta "{tagToDelete?.name}"? Esta acción no se puede
-                deshacer.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setIsDeleteTagDialogOpen(false)}>Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDeleteTag}>Eliminar</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
       </div>
     </RouteGuard>
   )
 }
-
-export default AdminPage
