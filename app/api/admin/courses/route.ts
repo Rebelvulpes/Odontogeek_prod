@@ -1,13 +1,13 @@
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
-import { NextResponse } from "next/server"
-import { cookies } from "next/headers"
+import { type NextRequest, NextResponse } from "next/server"
+import { createClient } from "@supabase/supabase-js"
 
-export const dynamic = "force-dynamic"
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
-export async function GET(request: Request) {
-  const supabase = createRouteHandlerClient({ cookies })
-
+export async function GET() {
   try {
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
     // Obtener todos los cursos con lecciones
     const { data: courses, error: coursesError } = await supabase
       .from("courses")
@@ -39,26 +39,31 @@ export async function GET(request: Request) {
       )
     }
 
-    // Obtener el número de inscripciones por curso usando la tabla correcta "enrollments"
+    // Obtener el número de inscripciones por curso
     const { data: enrollments, error: enrollmentsError } = await supabase
       .from("enrollments")
-      .select("course_id")
+      .select("course_id, amount")
       .eq("payment_status", "completed")
 
     if (enrollmentsError) {
       console.error("Error obteniendo inscripciones:", enrollmentsError)
-      // No fallar si no hay inscripciones, solo usar 0
     }
 
     // Crear un mapa de inscripciones por curso
     const enrollmentsByCourse = new Map()
     if (enrollments) {
       enrollments.forEach((enrollment) => {
-        enrollmentsByCourse.set(enrollment.course_id, (enrollmentsByCourse.get(enrollment.course_id) || 0) + 1)
+        const courseId = enrollment.course_id
+        if (!enrollmentsByCourse.has(courseId)) {
+          enrollmentsByCourse.set(courseId, { count: 0, revenue: 0 })
+        }
+        const current = enrollmentsByCourse.get(courseId)
+        current.count += 1
+        current.revenue += enrollment.amount || 0
       })
     }
 
-    // Obtener etiquetas de cursos usando consultas separadas para evitar problemas de relación
+    // Obtener etiquetas de cursos
     const { data: courseTags, error: courseTagsError } = await supabase.from("course_tags").select("course_id, tag_id")
 
     if (courseTagsError) {
@@ -95,20 +100,20 @@ export async function GET(request: Request) {
     }
 
     // Procesar cursos y agregar datos calculados
-    const processedCourses = courses.map((course) => {
-      const studentCount = enrollmentsByCourse.get(course.id) || 0
-      const revenue = studentCount * (course.price || 0)
-      const lessonsCount = course.lessons ? course.lessons.filter((lesson) => !lesson.archived).length : 0
+    const processedCourses =
+      courses?.map((course) => {
+        const enrollmentData = enrollmentsByCourse.get(course.id) || { count: 0, revenue: 0 }
+        const lessonsCount = course.lessons ? course.lessons.filter((lesson) => !lesson.archived).length : 0
 
-      return {
-        ...course,
-        tags: tagsByCourse.get(course.id) || [],
-        students: studentCount,
-        revenue: revenue,
-        lessonsCount: lessonsCount,
-        status: course.archived ? "archived" : "published",
-      }
-    })
+        return {
+          ...course,
+          tags: tagsByCourse.get(course.id) || [],
+          students: enrollmentData.count,
+          revenue: enrollmentData.revenue,
+          lessonsCount: lessonsCount,
+          status: course.archived ? "archived" : "published",
+        }
+      }) || []
 
     return NextResponse.json({
       success: true,
@@ -120,17 +125,16 @@ export async function GET(request: Request) {
       {
         success: false,
         message: "Error interno del servidor",
-        error: error.message,
+        error: error instanceof Error ? error.message : "Error desconocido",
       },
       { status: 500 },
     )
   }
 }
 
-export async function POST(request: Request) {
-  const supabase = createRouteHandlerClient({ cookies })
-
+export async function POST(request: NextRequest) {
   try {
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
     const body = await request.json()
     const { title, description, price, instructor, thumbnail_url, duration_hours, tags } = body
 
@@ -164,7 +168,7 @@ export async function POST(request: Request) {
 
     // Asociar etiquetas si se proporcionaron
     if (tags && tags.length > 0) {
-      const courseTagsData = tags.map((tagId) => ({
+      const courseTagsData = tags.map((tagId: string) => ({
         course_id: course.id,
         tag_id: tagId,
       }))
@@ -173,7 +177,6 @@ export async function POST(request: Request) {
 
       if (tagsError) {
         console.error("Error asociando etiquetas:", tagsError)
-        // No fallar por las etiquetas, el curso ya se creó
       }
     }
 
@@ -188,7 +191,7 @@ export async function POST(request: Request) {
       {
         success: false,
         message: "Error interno del servidor",
-        error: error.message,
+        error: error instanceof Error ? error.message : "Error desconocido",
       },
       { status: 500 },
     )

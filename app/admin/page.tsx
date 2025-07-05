@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -43,11 +42,56 @@ import {
 } from "lucide-react"
 import { Navigation } from "@/components/navigation"
 
+interface Course {
+  id: string
+  title: string
+  description: string
+  price: number
+  instructor_name: string
+  thumbnail_url: string
+  duration_hours: number
+  archived: boolean
+  created_at: string
+  lessons: Lesson[]
+  tags: CourseTag[]
+  students: number
+  revenue: number
+  lessonsCount: number
+  status: string
+}
+
+interface Lesson {
+  id: string
+  title: string
+  description: string
+  video_url: string
+  duration_minutes: number
+  order_index: number
+  is_free: boolean
+  archived: boolean
+  created_at: string
+}
+
+interface CourseTag {
+  id: string
+  name: string
+  color: string
+  slug: string
+  description: string
+}
+
+interface Stats {
+  totalUsers: number
+  totalCourses: number
+  totalLessons: number
+  totalRevenue: number
+}
+
 const AdminPage = () => {
-  const [courses, setCourses] = useState([])
-  const [users, setUsers] = useState([])
-  const [tags, setTags] = useState([])
-  const [stats, setStats] = useState({
+  const [courses, setCourses] = useState<Course[]>([])
+  const [users, setUsers] = useState<any[]>([])
+  const [tags, setTags] = useState<CourseTag[]>([])
+  const [stats, setStats] = useState<Stats>({
     totalUsers: 0,
     totalCourses: 0,
     totalLessons: 0,
@@ -61,12 +105,11 @@ const AdminPage = () => {
     instructor: "",
     thumbnailUrl: "",
     durationHours: "",
-    tags: [],
+    tags: [] as string[],
   })
-  const [selectedCourse, setSelectedCourse] = useState<number | null>(null)
+  const [selectedCourse, setSelectedCourse] = useState<string | null>(null)
   const [isLessonDialogOpen, setIsLessonDialogOpen] = useState(false)
-  const [editingLesson, setEditingLesson] = useState<any>(null)
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [editingLesson, setEditingLesson] = useState<Lesson | null>(null)
   const [newLesson, setNewLesson] = useState({
     title: "",
     description: "",
@@ -79,15 +122,15 @@ const AdminPage = () => {
   const [isCreateTagDialogOpen, setIsCreateTagDialogOpen] = useState(false)
   const [isEditTagDialogOpen, setIsEditTagDialogOpen] = useState(false)
   const [isDeleteTagDialogOpen, setIsDeleteTagDialogOpen] = useState(false)
-  const [editingTag, setEditingTag] = useState<any>(null)
-  const [tagToDelete, setTagToDelete] = useState<any>(null)
+  const [editingTag, setEditingTag] = useState<CourseTag | null>(null)
+  const [tagToDelete, setTagToDelete] = useState<CourseTag | null>(null)
   const [newTag, setNewTag] = useState({
     name: "",
     color: "#3B82F6",
     description: "",
   })
   const [isEditCourseDialogOpen, setIsEditCourseDialogOpen] = useState(false)
-  const [editingCourse, setEditingCourse] = useState<any>(null)
+  const [editingCourse, setEditingCourse] = useState<Course | null>(null)
 
   const loadStats = async () => {
     try {
@@ -121,17 +164,8 @@ const AdminPage = () => {
       const response = await fetch("/api/admin/courses")
       const result = await response.json()
 
-      console.log("Respuesta de la API:", result)
-
       if (result.success) {
-        const coursesWithLessons = result.data.map((course) => {
-          console.log(`Curso ${course.title}:`, course.lessons)
-          return {
-            ...course,
-            lessons: course.lessons || [],
-          }
-        })
-        setCourses(coursesWithLessons)
+        setCourses(result.data)
       } else {
         console.error("Error loading courses:", result.message)
         alert(`Error cargando cursos: ${result.message}`)
@@ -267,12 +301,12 @@ const AdminPage = () => {
     }
   }
 
-  const openEditTagDialog = (tag: any) => {
+  const openEditTagDialog = (tag: CourseTag) => {
     setEditingTag({ ...tag })
     setIsEditTagDialogOpen(true)
   }
 
-  const openDeleteTagDialog = (tag: any) => {
+  const openDeleteTagDialog = (tag: CourseTag) => {
     setTagToDelete(tag)
     setIsDeleteTagDialogOpen(true)
   }
@@ -308,9 +342,7 @@ const AdminPage = () => {
     }
   }
 
-  const openLessonDialog = (courseId: number, lesson?: any) => {
-    console.log("Abriendo diálogo para curso:", courseId, "lección:", lesson)
-
+  const openLessonDialog = (courseId: string, lesson?: Lesson) => {
     setSelectedCourse(courseId)
     if (lesson) {
       setEditingLesson(lesson)
@@ -337,11 +369,8 @@ const AdminPage = () => {
   }
 
   const handleArchiveLesson = async (lessonId: string) => {
-    console.log("Intentando archivar lección con ID:", lessonId)
-
     if (!lessonId || lessonId === "undefined" || lessonId === "null") {
       alert("Error: ID de lección no válido")
-      console.error("ID de lección inválido:", lessonId)
       return
     }
 
@@ -368,11 +397,8 @@ const AdminPage = () => {
   }
 
   const handleDeleteLesson = async (lessonId: string) => {
-    console.log("Intentando eliminar lección con ID:", lessonId)
-
     if (!lessonId || lessonId === "undefined" || lessonId === "null") {
       alert("Error: ID de lección no válido")
-      console.error("ID de lección inválido:", lessonId)
       return
     }
 
@@ -399,8 +425,6 @@ const AdminPage = () => {
   }
 
   const handleArchiveCourse = async (courseId: string) => {
-    console.log("Intentando archivar curso con ID:", courseId)
-
     if (!courseId || courseId === "undefined" || courseId === "null") {
       alert("Error: ID de curso no válido")
       return
@@ -431,8 +455,6 @@ const AdminPage = () => {
   }
 
   const handleDeleteCourse = async (courseId: string) => {
-    console.log("Intentando eliminar curso con ID:", courseId)
-
     if (!courseId || courseId === "undefined" || courseId === "null") {
       alert("Error: ID de curso no válido")
       return
@@ -471,7 +493,7 @@ const AdminPage = () => {
 
   const selectedCourseData = courses.find((c) => c.id === selectedCourse)
 
-  const openEditCourseDialog = (course: any) => {
+  const openEditCourseDialog = (course: Course) => {
     setEditingCourse(course)
     setNewCourse({
       title: course.title || "",
@@ -480,7 +502,7 @@ const AdminPage = () => {
       instructor: course.instructor_name || "",
       thumbnailUrl: course.thumbnail_url || "",
       durationHours: course.duration_hours?.toString() || "",
-      tags: course.tags?.map((tag: any) => tag.id) || [],
+      tags: course.tags?.map((tag) => tag.id) || [],
     })
     setIsEditCourseDialogOpen(true)
   }
@@ -553,7 +575,7 @@ const AdminPage = () => {
           <p className="text-gray-600 mt-2">Gestiona cursos, lecciones, etiquetas y usuarios</p>
         </div>
 
-        {/* Stats Cards - Mobile optimized con datos reales */}
+        {/* Stats Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 mb-6 sm:mb-8">
           <Card>
             <CardContent className="p-3 sm:p-4 lg:p-6">
@@ -608,7 +630,7 @@ const AdminPage = () => {
           </Card>
         </div>
 
-        {/* Tabs - Mobile optimized */}
+        {/* Tabs */}
         <Tabs defaultValue="courses" className="space-y-4 sm:space-y-6">
           <div className="overflow-x-auto">
             <TabsList className="grid w-full grid-cols-4 min-w-[400px] sm:min-w-0">
@@ -666,8 +688,8 @@ const AdminPage = () => {
                                     alt={course.title}
                                     className="w-full h-full object-cover"
                                     onError={(e) => {
-                                      console.error("Error cargando imagen en admin:", course.thumbnail_url)
-                                      e.currentTarget.src = "/placeholder.svg?height=80&width=80&text=No+Image"
+                                      const target = e.target as HTMLImageElement
+                                      target.src = "/placeholder.svg?height=80&width=80&text=No+Image"
                                     }}
                                   />
                                 ) : (
@@ -697,7 +719,7 @@ const AdminPage = () => {
                                       {tag.name}
                                     </Badge>
                                   ))}
-                                  {course.tags?.length > 2 && (
+                                  {course.tags && course.tags.length > 2 && (
                                     <Badge variant="secondary" className="text-xs">
                                       +{course.tags.length - 2}
                                     </Badge>
@@ -752,13 +774,7 @@ const AdminPage = () => {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => {
-                                  if (course.id) {
-                                    handleArchiveCourse(course.id)
-                                  } else {
-                                    alert("Error: ID de curso no disponible")
-                                  }
-                                }}
+                                onClick={() => handleArchiveCourse(course.id)}
                                 className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
                                 title={course.archived ? "Curso archivado" : "Archivar curso"}
                               >
@@ -771,13 +787,7 @@ const AdminPage = () => {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => {
-                                  if (course.id) {
-                                    handleDeleteCourse(course.id)
-                                  } else {
-                                    alert("Error: ID de curso no disponible")
-                                  }
-                                }}
+                                onClick={() => handleDeleteCourse(course.id)}
                                 className="text-red-600 hover:text-red-700 hover:bg-red-50"
                                 title="Eliminar definitivamente"
                               >
@@ -824,79 +834,62 @@ const AdminPage = () => {
                   <CardContent className="p-4 sm:p-6 pt-0">
                     {course.lessons && course.lessons.length > 0 ? (
                       <div className="space-y-3">
-                        {course.lessons.map((lesson) => {
-                          console.log("Renderizando lección:", lesson)
-                          return (
-                            <div
-                              key={lesson.id}
-                              className="flex flex-col sm:flex-row sm:items-center justify-between p-3 border rounded-lg gap-3"
-                            >
-                              <div className="flex items-center space-x-3">
-                                <div className="w-6 h-6 sm:w-8 sm:h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                                  <span className="text-xs sm:text-sm font-medium text-blue-600">
-                                    {lesson.order_index}
-                                  </span>
-                                </div>
-                                <div className="min-w-0">
-                                  <p className="font-medium text-sm sm:text-base truncate">{lesson.title}</p>
-                                  <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-500">
-                                    <div className="flex items-center space-x-1">
-                                      <Clock className="w-3 h-3" />
-                                      <span>{lesson.duration_minutes} min</span>
-                                    </div>
-                                    <div className="flex items-center space-x-1">
-                                      <LinkIcon className="w-3 h-3" />
-                                      <span>Bunny.net</span>
-                                    </div>
-                                    {lesson.is_free && (
-                                      <Badge variant="secondary" className="text-xs">
-                                        Gratis
-                                      </Badge>
-                                    )}
-                                    <div className="text-xs text-gray-400">ID: {lesson.id}</div>
-                                  </div>
-                                </div>
+                        {course.lessons.map((lesson) => (
+                          <div
+                            key={lesson.id}
+                            className="flex flex-col sm:flex-row sm:items-center justify-between p-3 border rounded-lg gap-3"
+                          >
+                            <div className="flex items-center space-x-3">
+                              <div className="w-6 h-6 sm:w-8 sm:h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                <span className="text-xs sm:text-sm font-medium text-blue-600">
+                                  {lesson.order_index}
+                                </span>
                               </div>
-                              <div className="flex items-center space-x-2 self-end sm:self-center">
-                                <Button variant="ghost" size="sm" onClick={() => openLessonDialog(course.id, lesson)}>
-                                  <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => {
-                                    if (lesson.id) {
-                                      handleArchiveLesson(lesson.id)
-                                    } else {
-                                      alert("Error: ID de lección no disponible")
-                                      console.error("Lección sin ID:", lesson)
-                                    }
-                                  }}
-                                  className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
-                                  title="Archivar lección"
-                                >
-                                  <Eye className="w-3 h-3 sm:w-4 sm:h-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => {
-                                    if (lesson.id) {
-                                      handleDeleteLesson(lesson.id)
-                                    } else {
-                                      alert("Error: ID de lección no disponible")
-                                      console.error("Lección sin ID:", lesson)
-                                    }
-                                  }}
-                                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                  title="Eliminar definitivamente"
-                                >
-                                  <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
-                                </Button>
+                              <div className="min-w-0">
+                                <p className="font-medium text-sm sm:text-base truncate">{lesson.title}</p>
+                                <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-500">
+                                  <div className="flex items-center space-x-1">
+                                    <Clock className="w-3 h-3" />
+                                    <span>{lesson.duration_minutes} min</span>
+                                  </div>
+                                  <div className="flex items-center space-x-1">
+                                    <LinkIcon className="w-3 h-3" />
+                                    <span>Bunny.net</span>
+                                  </div>
+                                  {lesson.is_free && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      Gratis
+                                    </Badge>
+                                  )}
+                                  <div className="text-xs text-gray-400">ID: {lesson.id}</div>
+                                </div>
                               </div>
                             </div>
-                          )
-                        })}
+                            <div className="flex items-center space-x-2 self-end sm:self-center">
+                              <Button variant="ghost" size="sm" onClick={() => openLessonDialog(course.id, lesson)}>
+                                <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleArchiveLesson(lesson.id)}
+                                className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                                title="Archivar lección"
+                              >
+                                <Eye className="w-3 h-3 sm:w-4 sm:h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteLesson(lesson.id)}
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                title="Eliminar definitivamente"
+                              >
+                                <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     ) : (
                       <div className="text-center py-6 sm:py-8 text-gray-500">
@@ -937,7 +930,6 @@ const AdminPage = () => {
                     <p className="text-sm text-gray-600 mb-2">{tag.description}</p>
                     <p className="text-xs text-gray-400 mb-3">Slug: {tag.slug}</p>
 
-                    {/* Botones de acción */}
                     <div className="flex items-center justify-end space-x-2">
                       <Button
                         variant="ghost"
@@ -1020,7 +1012,7 @@ const AdminPage = () => {
         </Tabs>
       </div>
 
-      {/* Dialog para crear/editar lecciones - Mobile optimized */}
+      {/* Dialog para crear/editar lecciones */}
       <Dialog open={isLessonDialogOpen} onOpenChange={setIsLessonDialogOpen}>
         <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -1153,7 +1145,6 @@ const AdminPage = () => {
 
           <form onSubmit={handleCreateCourse} className="space-y-4">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Columna izquierda - Información básica */}
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="title" className="text-sm sm:text-base">
@@ -1229,9 +1220,7 @@ const AdminPage = () => {
                 </div>
               </div>
 
-              {/* Columna derecha - Imagen y etiquetas */}
               <div className="space-y-4">
-                {/* Imagen del curso */}
                 <div className="space-y-2">
                   <Label htmlFor="thumbnailUrl" className="text-sm sm:text-base flex items-center">
                     <ImageIcon className="w-4 h-4 mr-2" />
@@ -1254,7 +1243,6 @@ const AdminPage = () => {
                   </div>
                 </div>
 
-                {/* Vista previa de la imagen */}
                 {newCourse.thumbnailUrl && (
                   <div className="space-y-2">
                     <Label className="text-sm">Vista Previa</Label>
@@ -1265,7 +1253,8 @@ const AdminPage = () => {
                           alt="Vista previa del curso"
                           className="w-full h-full object-cover"
                           onError={(e) => {
-                            e.currentTarget.src = "/placeholder.svg?height=300&width=300&text=Error+cargando+imagen"
+                            const target = e.target as HTMLImageElement
+                            target.src = "/placeholder.svg?height=300&width=300&text=Error+cargando+imagen"
                           }}
                         />
                       </div>
@@ -1273,7 +1262,6 @@ const AdminPage = () => {
                   </div>
                 )}
 
-                {/* Selección de Etiquetas */}
                 <div className="space-y-2">
                   <Label className="text-sm sm:text-base">Etiquetas del Curso</Label>
                   <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-3 border rounded-md bg-gray-50">
@@ -1326,7 +1314,6 @@ const AdminPage = () => {
 
           <form onSubmit={handleUpdateCourse} className="space-y-4">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Columna izquierda - Información básica */}
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="editTitle" className="text-sm sm:text-base">
@@ -1402,9 +1389,7 @@ const AdminPage = () => {
                 </div>
               </div>
 
-              {/* Columna derecha - Imagen y etiquetas */}
               <div className="space-y-4">
-                {/* Imagen del curso */}
                 <div className="space-y-2">
                   <Label htmlFor="editThumbnailUrl" className="text-sm sm:text-base flex items-center">
                     <ImageIcon className="w-4 h-4 mr-2" />
@@ -1427,7 +1412,6 @@ const AdminPage = () => {
                   </div>
                 </div>
 
-                {/* Vista previa de la imagen */}
                 {newCourse.thumbnailUrl && (
                   <div className="space-y-2">
                     <Label className="text-sm">Vista Previa</Label>
@@ -1438,7 +1422,8 @@ const AdminPage = () => {
                           alt="Vista previa del curso"
                           className="w-full h-full object-cover"
                           onError={(e) => {
-                            e.currentTarget.src = "/placeholder.svg?height=300&width=300&text=Error+cargando+imagen"
+                            const target = e.target as HTMLImageElement
+                            target.src = "/placeholder.svg?height=300&width=300&text=Error+cargando+imagen"
                           }}
                         />
                       </div>
@@ -1446,7 +1431,6 @@ const AdminPage = () => {
                   </div>
                 )}
 
-                {/* Selección de Etiquetas */}
                 <div className="space-y-2">
                   <Label className="text-sm sm:text-base">Etiquetas del Curso</Label>
                   <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-3 border rounded-md bg-gray-50">
@@ -1595,7 +1579,7 @@ const AdminPage = () => {
                 id="editTagName"
                 placeholder="Ej: Cirugía Oral"
                 value={editingTag?.name || ""}
-                onChange={(e) => setEditingTag({ ...editingTag, name: e.target.value })}
+                onChange={(e) => setEditingTag({ ...editingTag!, name: e.target.value })}
                 required
               />
             </div>
@@ -1609,13 +1593,13 @@ const AdminPage = () => {
                   id="editTagColor"
                   type="color"
                   value={editingTag?.color || "#3B82F6"}
-                  onChange={(e) => setEditingTag({ ...editingTag, color: e.target.value })}
+                  onChange={(e) => setEditingTag({ ...editingTag!, color: e.target.value })}
                   className="w-16 h-10 p-1"
                 />
                 <Input
                   type="text"
                   value={editingTag?.color || "#3B82F6"}
-                  onChange={(e) => setEditingTag({ ...editingTag, color: e.target.value })}
+                  onChange={(e) => setEditingTag({ ...editingTag!, color: e.target.value })}
                   placeholder="#3B82F6"
                   className="flex-1"
                 />
@@ -1630,7 +1614,7 @@ const AdminPage = () => {
                 id="editTagDescription"
                 placeholder="Describe el tipo de cursos que incluye esta etiqueta..."
                 value={editingTag?.description || ""}
-                onChange={(e) => setEditingTag({ ...editingTag, description: e.target.value })}
+                onChange={(e) => setEditingTag({ ...editingTag!, description: e.target.value })}
                 rows={3}
               />
             </div>

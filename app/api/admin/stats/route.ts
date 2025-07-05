@@ -1,13 +1,13 @@
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
 import { NextResponse } from "next/server"
-import { cookies } from "next/headers"
+import { createClient } from "@supabase/supabase-js"
 
-export const dynamic = "force-dynamic"
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 export async function GET() {
-  const supabase = createRouteHandlerClient({ cookies })
-
   try {
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
     // Obtener total de usuarios
     const { count: totalUsers, error: usersError } = await supabase
       .from("users")
@@ -65,7 +65,7 @@ export async function GET() {
       {
         success: false,
         message: "Error interno del servidor",
-        error: error.message,
+        error: error instanceof Error ? error.message : "Error desconocido",
       },
       { status: 500 },
     )

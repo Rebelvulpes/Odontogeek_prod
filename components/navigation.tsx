@@ -4,7 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
-import { Menu, X, User, LogOut, Settings } from "lucide-react"
+import { Menu, X, User, LogOut, Shield } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,6 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Badge } from "@/components/ui/badge"
 
 interface NavigationProps {
   user?: {
@@ -30,14 +31,19 @@ export function Navigation({ user }: NavigationProps) {
   }
 
   return (
-    <nav className="bg-white shadow-sm border-b">
+    <nav className="bg-white shadow-sm border-b sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <div className="flex items-center">
             <Link href="/" className="flex items-center space-x-3">
-              <Image src="/images/odontogeek-logo-new.png" alt="Logo" width={40} height={40} className="h-10 w-auto" />
-              <span className="text-xl font-bold text-gray-900">Cursos Dentales</span>
+              <Image
+                src="/images/odontogeek-logo-new.png"
+                alt="OdontoGeek"
+                width={40}
+                height={40}
+                className="h-10 w-auto"
+              />
             </Link>
           </div>
 
@@ -65,6 +71,12 @@ export function Navigation({ user }: NavigationProps) {
                   <Button variant="ghost" className="flex items-center space-x-2">
                     <User className="w-4 h-4" />
                     <span>{user.name}</span>
+                    {user.role === "admin" && (
+                      <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-700">
+                        <Shield className="w-3 h-3 mr-1" />
+                        Admin
+                      </Badge>
+                    )}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
@@ -76,8 +88,8 @@ export function Navigation({ user }: NavigationProps) {
                   </DropdownMenuItem>
                   {user.role === "admin" && (
                     <DropdownMenuItem asChild>
-                      <Link href="/admin" className="flex items-center">
-                        <Settings className="w-4 h-4 mr-2" />
+                      <Link href="/admin" className="flex items-center text-orange-600">
+                        <Shield className="w-4 h-4 mr-2" />
                         Panel Admin
                       </Link>
                     </DropdownMenuItem>
@@ -146,7 +158,15 @@ export function Navigation({ user }: NavigationProps) {
               <div className="border-t pt-4 mt-4">
                 {user ? (
                   <div className="space-y-1">
-                    <div className="px-3 py-2 text-sm text-gray-500">Conectado como {user.name}</div>
+                    <div className="px-3 py-2 text-sm text-gray-500 flex items-center space-x-2">
+                      <span>Conectado como {user.name}</span>
+                      {user.role === "admin" && (
+                        <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-700">
+                          <Shield className="w-3 h-3 mr-1" />
+                          Admin
+                        </Badge>
+                      )}
+                    </div>
                     <Link
                       href="/dashboard"
                       className="block px-3 py-2 text-gray-700 hover:text-blue-600 transition-colors"
@@ -157,7 +177,7 @@ export function Navigation({ user }: NavigationProps) {
                     {user.role === "admin" && (
                       <Link
                         href="/admin"
-                        className="block px-3 py-2 text-gray-700 hover:text-blue-600 transition-colors"
+                        className="block px-3 py-2 text-orange-600 hover:text-orange-700 transition-colors"
                         onClick={() => setIsMobileMenuOpen(false)}
                       >
                         Panel Admin

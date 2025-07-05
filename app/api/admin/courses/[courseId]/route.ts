@@ -1,13 +1,12 @@
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
-import { NextResponse } from "next/server"
-import { cookies } from "next/headers"
+import { type NextRequest, NextResponse } from "next/server"
+import { createClient } from "@supabase/supabase-js"
 
-export const dynamic = "force-dynamic"
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
-export async function PUT(request: Request, { params }: { params: { courseId: string } }) {
-  const supabase = createRouteHandlerClient({ cookies })
-
+export async function PUT(request: NextRequest, { params }: { params: { courseId: string } }) {
   try {
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
     const body = await request.json()
     const { title, description, price, instructor, thumbnail_url, duration_hours, tags, archived } = body
 
@@ -50,7 +49,7 @@ export async function PUT(request: Request, { params }: { params: { courseId: st
 
       // Agregar nuevas etiquetas
       if (tags.length > 0) {
-        const courseTagsData = tags.map((tagId) => ({
+        const courseTagsData = tags.map((tagId: string) => ({
           course_id: params.courseId,
           tag_id: tagId,
         }))
@@ -74,17 +73,17 @@ export async function PUT(request: Request, { params }: { params: { courseId: st
       {
         success: false,
         message: "Error interno del servidor",
-        error: error.message,
+        error: error instanceof Error ? error.message : "Error desconocido",
       },
       { status: 500 },
     )
   }
 }
 
-export async function DELETE(request: Request, { params }: { params: { courseId: string } }) {
-  const supabase = createRouteHandlerClient({ cookies })
-
+export async function DELETE(request: NextRequest, { params }: { params: { courseId: string } }) {
   try {
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
     // Primero eliminar las lecciones del curso
     const { error: lessonsError } = await supabase.from("lessons").delete().eq("course_id", params.courseId)
 
@@ -132,7 +131,7 @@ export async function DELETE(request: Request, { params }: { params: { courseId:
       {
         success: false,
         message: "Error interno del servidor",
-        error: error.message,
+        error: error instanceof Error ? error.message : "Error desconocido",
       },
       { status: 500 },
     )
