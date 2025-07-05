@@ -58,8 +58,8 @@ export default function CoursesPage() {
     try {
       const response = await fetch("/api/courses")
       const result = await response.json()
-      if (result.success && Array.isArray(result.data.courses)) {
-        setCourses(result.data.courses)
+      if (result.success) {
+        setCourses(result.data.courses || [])
       } else {
         setCourses([])
       }
@@ -75,8 +75,8 @@ export default function CoursesPage() {
     try {
       const response = await fetch("/api/course-tags")
       const result = await response.json()
-      if (result.success && Array.isArray(result.data)) {
-        setTags(result.data)
+      if (result.success) {
+        setTags(result.data || [])
       } else {
         setTags([])
       }
@@ -86,25 +86,22 @@ export default function CoursesPage() {
     }
   }
 
-  // Filtrar cursos - Asegurándonos de que courses sea un array
-  const filteredCourses = Array.isArray(courses)
-    ? courses.filter((course) => {
-        const matchesSearch =
-          course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          course.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          course.instructor_name?.toLowerCase().includes(searchTerm.toLowerCase())
+  // Filtrar cursos
+  const filteredCourses = courses.filter((course) => {
+    const matchesSearch =
+      course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      course.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      course.instructor_name?.toLowerCase().includes(searchTerm.toLowerCase())
 
-        const matchesTag =
-          selectedTag === "all" || (Array.isArray(course.tags) && course.tags.some((tag) => tag.id === selectedTag))
+    const matchesTag = selectedTag === "all" || (course.tags && course.tags.some((tag) => tag.id === selectedTag))
 
-        const matchesPrice =
-          priceFilter === "all" ||
-          (priceFilter === "free" && course.price === 0) ||
-          (priceFilter === "paid" && course.price > 0)
+    const matchesPrice =
+      priceFilter === "all" ||
+      (priceFilter === "free" && course.price === 0) ||
+      (priceFilter === "paid" && course.price > 0)
 
-        return matchesSearch && matchesTag && matchesPrice
-      })
-    : []
+    return matchesSearch && matchesTag && matchesPrice
+  })
 
   if (loading) {
     return (
@@ -263,7 +260,7 @@ export default function CoursesPage() {
 
                 <CardHeader className="pb-4 px-6 pt-6">
                   <div className="flex flex-wrap gap-2 mb-3">
-                    {Array.isArray(course.tags) &&
+                    {course.tags &&
                       course.tags.slice(0, 2).map((tag) => (
                         <Badge
                           key={tag.id}
@@ -278,7 +275,7 @@ export default function CoursesPage() {
                           {tag.name}
                         </Badge>
                       ))}
-                    {Array.isArray(course.tags) && course.tags.length > 2 && (
+                    {course.tags && course.tags.length > 2 && (
                       <Badge variant="secondary" className="text-xs font-medium px-2 py-1">
                         +{course.tags.length - 2}
                       </Badge>
@@ -310,9 +307,7 @@ export default function CoursesPage() {
                   <div className="flex items-center justify-between text-sm text-gray-600 mb-5">
                     <div className="flex items-center space-x-1">
                       <Play className="w-4 h-4" />
-                      <span className="font-medium">
-                        {Array.isArray(course.lessons) ? course.lessons.length : 0} lecciones
-                      </span>
+                      <span className="font-medium">{course.lessons ? course.lessons.length : 0} lecciones</span>
                     </div>
                     <div className="flex items-center space-x-1">
                       <Clock className="w-4 h-4" />
@@ -331,7 +326,7 @@ export default function CoursesPage() {
                   </div>
 
                   {/* Lecciones gratuitas */}
-                  {Array.isArray(course.lessons) && course.lessons.some((lesson) => lesson.is_free) && (
+                  {course.lessons && course.lessons.some((lesson) => lesson.is_free) && (
                     <div className="flex items-center space-x-2 text-green-600 text-sm mb-5 bg-green-50 rounded-lg px-3 py-2">
                       <CheckCircle className="w-4 h-4" />
                       <span className="font-medium">Incluye lecciones gratuitas</span>

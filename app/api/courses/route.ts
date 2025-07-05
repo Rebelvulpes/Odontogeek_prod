@@ -116,7 +116,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       success: true,
       data: {
-        courses: filteredCourses,
+        courses: coursesWithDetails,
         pagination: {
           currentPage: page,
           totalPages,
