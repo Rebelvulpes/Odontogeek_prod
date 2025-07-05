@@ -199,3 +199,52 @@ export async function DELETE(request: NextRequest, { params }: { params: { cours
     )
   }
 }
+
+export async function PATCH(request: NextRequest, { params }: { params: { courseId: string } }) {
+  try {
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    const { courseId } = params
+    const body = await request.json()
+
+    const { archived } = body
+
+    // Actualizar solo el campo archived
+    const { data: course, error: courseError } = await supabase
+      .from("courses")
+      .update({
+        archived: archived,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", courseId)
+      .select()
+      .single()
+
+    if (courseError) {
+      console.error("Error archivando curso:", courseError)
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Error archivando curso",
+          error: courseError,
+        },
+        { status: 500 },
+      )
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: archived ? "Curso archivado exitosamente" : "Curso restaurado exitosamente",
+      data: course,
+    })
+  } catch (error) {
+    console.error("Error en PATCH curso:", error)
+    return NextResponse.json(
+      {
+        success: false,
+        message: "Error interno del servidor",
+        error: error instanceof Error ? error.message : "Error desconocido",
+      },
+      { status: 500 },
+    )
+  }
+}

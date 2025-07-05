@@ -64,3 +64,35 @@ export async function DELETE(request: NextRequest, { params }: { params: { slide
     return NextResponse.json({ success: false, message: "Error interno del servidor" }, { status: 500 })
   }
 }
+
+export async function PATCH(request: NextRequest, { params }: { params: { slideId: string } }) {
+  try {
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    const body = await request.json()
+    const { slideId } = params
+
+    const { is_active } = body
+
+    const { data: slide, error } = await supabase
+      .from("carousel_slides")
+      .update({
+        is_active: is_active,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", slideId)
+      .select()
+      .single()
+
+    if (error) {
+      return NextResponse.json({ success: false, message: "Error actualizando slide", error }, { status: 500 })
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: `Slide ${is_active ? "activado" : "desactivado"} exitosamente`,
+      data: slide,
+    })
+  } catch (error) {
+    return NextResponse.json({ success: false, message: "Error interno del servidor" }, { status: 500 })
+  }
+}

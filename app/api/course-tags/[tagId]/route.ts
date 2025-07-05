@@ -1,23 +1,58 @@
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
-import { NextResponse } from "next/server"
-import { cookies } from "next/headers"
+import { type NextRequest, NextResponse } from "next/server"
+import { createClient } from "@supabase/supabase-js"
 
-interface Params {
-  params: {
-    tagId: string
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+
+export async function PUT(request: NextRequest, { params }: { params: { tagId: string } }) {
+  try {
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    const body = await request.json()
+    const { tagId } = params
+
+    const { name, color } = body
+
+    const { data: tag, error } = await supabase
+      .from("course_tags")
+      .update({
+        name: name,
+        color: color,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", tagId)
+      .select()
+      .single()
+
+    if (error) {
+      return NextResponse.json({ success: false, message: "Error actualizando tag", error }, { status: 500 })
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: "Tag actualizado exitosamente",
+      data: tag,
+    })
+  } catch (error) {
+    return NextResponse.json({ success: false, message: "Error interno del servidor" }, { status: 500 })
   }
 }
 
-export async function DELETE(request: Request, { params: { tagId } }: Params) {
-  const supabase = createRouteHandlerClient({ cookies })
+export async function DELETE(request: NextRequest, { params }: { params: { tagId: string } }) {
+  try {
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    const { tagId } = params
 
-  // Skip deleting relations since the table structure is different
-  // Just delete the tag directly
-  const { error } = await supabase.from("course_tags").delete().eq("id", tagId)
+    const { error } = await supabase.from("course_tags").delete().eq("id", tagId)
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) {
+      return NextResponse.json({ success: false, message: "Error eliminando tag", error }, { status: 500 })
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: "Tag eliminado exitosamente",
+    })
+  } catch (error) {
+    return NextResponse.json({ success: false, message: "Error interno del servidor" }, { status: 500 })
   }
-
-  return NextResponse.json({ message: "Tag deleted successfully" })
 }

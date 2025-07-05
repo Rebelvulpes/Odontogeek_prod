@@ -8,22 +8,12 @@ export async function GET() {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Obtener todos los cursos con lecciones
+    // Obtener cursos con el conteo de lecciones
     const { data: courses, error: coursesError } = await supabase
       .from("courses")
       .select(`
         *,
-        lessons (
-          id,
-          title,
-          description,
-          video_url,
-          duration_minutes,
-          order_index,
-          is_free,
-          archived,
-          created_at
-        )
+        lessons!inner(count)
       `)
       .order("created_at", { ascending: false })
 
@@ -39,51 +29,35 @@ export async function GET() {
       )
     }
 
-    // Obtener el número de inscripciones por curso
-    const { data: enrollments, error: enrollmentsError } = await supabase.from("enrollments").select("course_id")
+    // Obtener estadísticas de inscripciones por curso
+    const { data: enrollments, error: enrollmentsError } = await supabase
+      .from("enrollments")
+      .select("course_id, user_id")
 
-    if (enrollmentsError) {
-      console.error("Error obteniendo inscripciones:", enrollmentsError)
-      // No retornamos error aquí, solo logueamos
+    let enrollmentStats: Record<string, number> = {}
+    if (!enrollmentsError && Array.isArray(enrollments)) {
+      enrollmentStats = enrollments.reduce((acc: Record<string, number>, enrollment) => {
+        acc[enrollment.course_id] = (acc[enrollment.course_id] || 0) + 1
+        return acc
+      }, {})
     }
 
-    // Crear un mapa de inscripciones por curso
-    const enrollmentsByCourse = new Map()
-    if (enrollments && Array.isArray(enrollments)) {
-      enrollments.forEach((enrollment) => {
-        const courseId = enrollment.course_id
-        if (!enrollmentsByCourse.has(courseId)) {
-          enrollmentsByCourse.set(courseId, { count: 0, revenue: 0 })
-        }
-        const current = enrollmentsByCourse.get(courseId)
-        current.count += 1
-      })
-    }
-
-    // Procesar cursos y agregar datos calculados
-    const processedCourses =
-      courses?.map((course) => {
-        const enrollmentData = enrollmentsByCourse.get(course.id) || { count: 0, revenue: 0 }
-        // Calcular revenue basado en el precio del curso y número de estudiantes
-        const revenue = enrollmentData.count * (course.price || 0)
-        const lessonsCount = course.lessons ? course.lessons.filter((lesson) => !lesson.archived).length : 0
-
-        return {
+    // Procesar los datos de cursos
+    const processedCourses = Array.isArray(courses)
+      ? courses.map((course) => ({
           ...course,
-          tags: [],
-          students: enrollmentData.count,
-          revenue: revenue,
-          lessonsCount: lessonsCount,
-          status: course.archived ? "archived" : "published",
-        }
-      }) || []
+          lessonsCount: course.lessons?.[0]?.count || 0,
+          students: enrollmentStats[course.id] || 0,
+          revenue: (enrollmentStats[course.id] || 0) * (course.price || 0),
+        }))
+      : []
 
     return NextResponse.json({
       success: true,
       data: processedCourses,
     })
   } catch (error) {
-    console.error("Error en la ruta de cursos admin:", error)
+    console.error("Error en GET cursos:", error)
     return NextResponse.json(
       {
         success: false,
@@ -99,42 +73,43 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
     const body = await request.json()
-    const { title, description, price, instructor, thumbnail_url, duration_hours, tags } = body
 
     // Validar campos requeridos
-    if (!title || !description || !instructor) {
+    if (!body.title || !body.description) {
       return NextResponse.json(
         {
           success: false,
-          message: "Faltan campos requeridos: título, descripción e instructor",
+          message: "Título y descripción son requeridos",
         },
         { status: 400 },
       )
     }
 
-    // Crear el curso
-    const { data: course, error: courseError } = await supabase
+    const { title, description, price, instructor, thumbnail_url } = body
+
+    const { data: course, error } = await supabase
       .from("courses")
-      .insert({
-        title,
-        description,
-        price: price ? Number.parseFloat(price.toString()) : 0,
-        instructor_name: instructor,
-        thumbnail_url: thumbnail_url || null,
-        duration_hours: duration_hours ? Number.parseInt(duration_hours.toString()) : null,
-        status: "published",
-        archived: false,
-      })
+      .insert([
+        {
+          title,
+          description,
+          price: price ? Number.parseFloat(price) : 0,
+          instructor_name: instructor || "",
+          thumbnail_url: thumbnail_url || null,
+          archived: false,
+          created_at: new Date().toISOString(),
+        },
+      ])
       .select()
       .single()
 
-    if (courseError) {
-      console.error("Error creando curso:", courseError)
+    if (error) {
+      console.error("Error creando curso:", error)
       return NextResponse.json(
         {
           success: false,
           message: "Error creando curso",
-          error: courseError,
+          error: error,
         },
         { status: 500 },
       )
@@ -146,7 +121,7 @@ export async function POST(request: NextRequest) {
       data: course,
     })
   } catch (error) {
-    console.error("Error en POST de cursos admin:", error)
+    console.error("Error en POST curso:", error)
     return NextResponse.json(
       {
         success: false,
