@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server"
+import { type NextRequest, NextResponse } from "next/server"
 
-export async function POST() {
+export async function POST(req: NextRequest) {
   try {
     const response = NextResponse.json({
       success: true,
@@ -17,13 +17,10 @@ export async function POST() {
 
     return response
   } catch (error) {
-    console.error("Error cerrando sesión:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Error cerrando sesión",
-      },
-      { status: 500 },
-    )
+    console.error("Error en logout:", error)
+    return NextResponse.json({
+      success: false,
+      message: "Error cerrando sesión",
+    })
   }
 }

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Menu, LogOut, Settings, BookOpen, Home, Shield } from "lucide-react"
+import { Menu, LogOut, Settings, BookOpen, Home, Shield, Users, Award, Phone, LogIn, UserPlus } from "lucide-react"
 import { useAuth } from "@/components/auth-provider"
 
 interface NavigationProps {
@@ -19,15 +19,13 @@ export function Navigation({ user }: NavigationProps) {
   const pathname = usePathname()
   const { logout } = useAuth()
 
-  const navigationItems = [
+  const publicNavigationItems = [
     { name: "Inicio", href: "/", icon: Home },
     { name: "Cursos", href: "/courses", icon: BookOpen },
+    { name: "Nosotros", href: "/about", icon: Users },
+    { name: "Certificaciones", href: "/certifications", icon: Award },
+    { name: "Contacto", href: "/contact", icon: Phone },
   ]
-
-  // Agregar item de admin si el usuario es admin
-  if (user?.role === "admin") {
-    navigationItems.push({ name: "Admin", href: "/admin", icon: Shield })
-  }
 
   const handleLogout = () => {
     logout()
@@ -43,7 +41,7 @@ export function Navigation({ user }: NavigationProps) {
   }
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 shadow-sm">
+    <nav className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
@@ -55,7 +53,7 @@ export function Navigation({ user }: NavigationProps) {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-8">
-            {navigationItems.map((item) => {
+            {publicNavigationItems.map((item) => {
               const Icon = item.icon
               const isActive = pathname === item.href
               return (
@@ -99,6 +97,14 @@ export function Navigation({ user }: NavigationProps) {
                       <span>Mi Dashboard</span>
                     </Link>
                   </DropdownMenuItem>
+                  {user.role === "admin" && (
+                    <DropdownMenuItem asChild>
+                      <Link href="/admin" className="flex items-center">
+                        <Shield className="mr-2 h-4 w-4" />
+                        <span>Panel Admin</span>
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem asChild>
                     <Link href="/settings" className="flex items-center">
                       <Settings className="mr-2 h-4 w-4" />
@@ -113,11 +119,17 @@ export function Navigation({ user }: NavigationProps) {
               </DropdownMenu>
             ) : (
               <div className="flex items-center space-x-2">
-                <Button variant="ghost" asChild>
-                  <Link href="/auth/login">Iniciar Sesión</Link>
+                <Button variant="ghost" asChild className="flex items-center space-x-1">
+                  <Link href="/auth/login">
+                    <LogIn className="w-4 h-4" />
+                    <span>Iniciar Sesión</span>
+                  </Link>
                 </Button>
-                <Button asChild>
-                  <Link href="/auth/register">Registrarse</Link>
+                <Button asChild className="flex items-center space-x-1">
+                  <Link href="/auth/register">
+                    <UserPlus className="w-4 h-4" />
+                    <span>Registrarse</span>
+                  </Link>
                 </Button>
               </div>
             )}
@@ -131,7 +143,15 @@ export function Navigation({ user }: NavigationProps) {
               </SheetTrigger>
               <SheetContent side="right" className="w-[300px] sm:w-[400px]">
                 <div className="flex flex-col space-y-4 mt-4">
-                  {navigationItems.map((item) => {
+                  {/* Mobile Logo */}
+                  <div className="flex items-center justify-between pb-6 border-b">
+                    <Link href="/" className="flex items-center space-x-2" onClick={() => setIsOpen(false)}>
+                      <img src="/images/odontogeek-logo-new.png" alt="OdontoGeek" className="h-8 w-auto" />
+                    </Link>
+                  </div>
+
+                  {/* Mobile Navigation */}
+                  {publicNavigationItems.map((item) => {
                     const Icon = item.icon
                     const isActive = pathname === item.href
                     return (
@@ -149,9 +169,14 @@ export function Navigation({ user }: NavigationProps) {
                     )
                   })}
 
-                  {user && (
+                  {/* Mobile User Menu */}
+                  <hr className="my-4" />
+                  {user ? (
                     <>
-                      <hr className="my-4" />
+                      <div className="px-3 py-2">
+                        <p className="font-medium text-gray-900">{user.name}</p>
+                        <p className="text-sm text-gray-500">{user.email}</p>
+                      </div>
                       <Link
                         href="/dashboard"
                         onClick={() => setIsOpen(false)}
@@ -160,6 +185,16 @@ export function Navigation({ user }: NavigationProps) {
                         <Home className="w-4 h-4" />
                         <span>Mi Dashboard</span>
                       </Link>
+                      {user.role === "admin" && (
+                        <Link
+                          href="/admin"
+                          onClick={() => setIsOpen(false)}
+                          className="flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50"
+                        >
+                          <Shield className="w-4 h-4" />
+                          <span>Panel Admin</span>
+                        </Link>
+                      )}
                       <Link
                         href="/settings"
                         onClick={() => setIsOpen(false)}
@@ -178,6 +213,25 @@ export function Navigation({ user }: NavigationProps) {
                         <LogOut className="w-4 h-4" />
                         <span>Cerrar Sesión</span>
                       </button>
+                    </>
+                  ) : (
+                    <>
+                      <Link
+                        href="/auth/login"
+                        onClick={() => setIsOpen(false)}
+                        className="flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50"
+                      >
+                        <LogIn className="w-4 h-4" />
+                        <span>Iniciar Sesión</span>
+                      </Link>
+                      <Link
+                        href="/auth/register"
+                        onClick={() => setIsOpen(false)}
+                        className="flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700"
+                      >
+                        <UserPlus className="w-4 h-4" />
+                        <span>Registrarse</span>
+                      </Link>
                     </>
                   )}
                 </div>
