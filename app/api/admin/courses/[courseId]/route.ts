@@ -108,22 +108,26 @@ export async function PUT(request: NextRequest, { params }: { params: { courseId
       return NextResponse.json({ success: false, message: "Error actualizando curso" }, { status: 500 })
     }
 
-    // Actualizar etiquetas - CORREGIDO
+    // Actualizar etiquetas - CORREGIDO para usar la estructura correcta
     // Primero eliminar etiquetas existentes
-    await supabase.from("course_tags").delete().eq("course_id", courseId)
+    const { error: deleteError } = await supabase.from("course_tags").delete().eq("course_id", courseId)
 
-    // Luego insertar nuevas etiquetas
-    if (tags.length > 0) {
+    if (deleteError) {
+      console.error("Error eliminando etiquetas existentes:", deleteError)
+    }
+
+    // Luego insertar nuevas etiquetas si existen
+    if (tags && tags.length > 0) {
       const courseTagsData = tags.map((tagId: string) => ({
         course_id: courseId,
         tag_id: tagId,
       }))
 
-      const { error: tagsError } = await supabase.from("course_tags").insert(courseTagsData)
+      const { error: insertError } = await supabase.from("course_tags").insert(courseTagsData)
 
-      if (tagsError) {
-        console.error("Error actualizando etiquetas:", tagsError)
-        // No fallar completamente si las etiquetas fallan
+      if (insertError) {
+        console.error("Error insertando nuevas etiquetas:", insertError)
+        // No fallar completamente si las etiquetas fallan, solo registrar el error
       }
     }
 
