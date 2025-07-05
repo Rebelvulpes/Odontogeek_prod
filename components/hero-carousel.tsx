@@ -45,7 +45,7 @@ export function HeroCarousel() {
   }, [])
 
   useEffect(() => {
-    if (!isAutoPlaying || slides.length === 0) return
+    if (!isAutoPlaying || !slides || slides.length === 0) return
 
     const interval = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % slides.length)
@@ -59,10 +59,10 @@ export function HeroCarousel() {
       const response = await fetch("/api/carousel")
       const result = await response.json()
 
-      if (result.success && result.data && Array.isArray(result.data)) {
+      if (result.success && result.data && Array.isArray(result.data) && result.data.length > 0) {
         setSlides(result.data)
       } else {
-        console.error("Error cargando slides:", result.message || "Datos inválidos")
+        console.log("No hay slides en la base de datos, usando slides por defecto")
         setSlides(getDefaultSlides())
       }
     } catch (error) {
@@ -96,11 +96,13 @@ export function HeroCarousel() {
   ]
 
   const nextSlide = () => {
+    if (!slides || slides.length === 0) return
     setCurrentSlide((prev) => (prev + 1) % slides.length)
     setIsAutoPlaying(false)
   }
 
   const prevSlide = () => {
+    if (!slides || slides.length === 0) return
     setCurrentSlide((prev) => (prev - 1 + slides.length) % slides.length)
     setIsAutoPlaying(false)
   }
@@ -135,7 +137,7 @@ export function HeroCarousel() {
     )
   }
 
-  const currentSlideData = slides && slides[currentSlide] ? slides[currentSlide] : getDefaultSlides()[0]
+  const currentSlideData = slides[currentSlide] || getDefaultSlides()[0]
 
   return (
     <div className="relative min-h-[500px] sm:min-h-[600px] lg:min-h-[700px] overflow-hidden">
@@ -183,23 +185,25 @@ export function HeroCarousel() {
             </p>
 
             {/* Stats - Mobile optimized */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 max-w-lg mx-auto lg:mx-0">
-              {currentSlideData.stats.map((stat, index) => {
-                const IconComponent = iconMap[stat.icon as keyof typeof iconMap] || Users
-                return (
-                  <div
-                    key={index}
-                    className="flex items-center justify-center lg:justify-start space-x-2 text-blue-100"
-                  >
-                    <IconComponent className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
-                    <div className="text-center lg:text-left">
-                      <div className="font-bold text-white text-sm sm:text-base">{stat.value}</div>
-                      <div className="text-xs sm:text-sm">{stat.label}</div>
+            {currentSlideData.stats && Array.isArray(currentSlideData.stats) && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 max-w-lg mx-auto lg:mx-0">
+                {currentSlideData.stats.map((stat, index) => {
+                  const IconComponent = iconMap[stat.icon as keyof typeof iconMap] || Users
+                  return (
+                    <div
+                      key={index}
+                      className="flex items-center justify-center lg:justify-start space-x-2 text-blue-100"
+                    >
+                      <IconComponent className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+                      <div className="text-center lg:text-left">
+                        <div className="font-bold text-white text-sm sm:text-base">{stat.value}</div>
+                        <div className="text-xs sm:text-sm">{stat.label}</div>
+                      </div>
                     </div>
-                  </div>
-                )
-              })}
-            </div>
+                  )
+                })}
+              </div>
+            )}
 
             {/* CTA Buttons - Mobile optimized */}
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-4 sm:pt-6 max-w-lg mx-auto lg:mx-0">

@@ -8,12 +8,11 @@ export async function GET() {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Obtener cursos con conteo de lecciones
     const { data: courses, error } = await supabase
       .from("courses")
       .select(`
         *,
-        lessons(count)
+        lessons:lessons(count)
       `)
       .order("created_at", { ascending: false })
 
@@ -30,17 +29,15 @@ export async function GET() {
     }
 
     // Transformar los datos para incluir el conteo de lecciones
-    const coursesWithStats =
+    const coursesWithLessonCount =
       courses?.map((course) => ({
         ...course,
-        lessonsCount: course.lessons?.[0]?.count || 0,
-        students: 0, // Por ahora, se puede implementar después
-        revenue: 0, // Por ahora, se puede implementar después
+        lesson_count: course.lessons?.[0]?.count || 0,
       })) || []
 
     return NextResponse.json({
       success: true,
-      data: coursesWithStats,
+      data: coursesWithLessonCount,
     })
   } catch (error) {
     console.error("Error en GET cursos:", error)
@@ -60,14 +57,14 @@ export async function POST(request: NextRequest) {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
     const body = await request.json()
 
-    const { title, description, price, instructor, thumbnail_url } = body
+    const { title, description, price, instructor, thumbnail_url, category } = body
 
     // Validar campos requeridos
-    if (!title || !description || !instructor) {
+    if (!title || !description || !price || !instructor) {
       return NextResponse.json(
         {
           success: false,
-          message: "Los campos título, descripción e instructor son requeridos",
+          message: "Los campos título, descripción, precio e instructor son requeridos",
         },
         { status: 400 },
       )
@@ -80,9 +77,10 @@ export async function POST(request: NextRequest) {
         {
           title,
           description,
-          price: Number.parseFloat(price) || 0,
-          instructor_name: instructor,
+          price: Number.parseFloat(price),
+          instructor,
           thumbnail_url: thumbnail_url || null,
+          category: category || "General",
           archived: false,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),

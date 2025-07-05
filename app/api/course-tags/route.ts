@@ -8,10 +8,7 @@ export async function GET() {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    const { data: tags, error } = await supabase
-      .from("course_tags")
-      .select("*")
-      .order("created_at", { ascending: false })
+    const { data: tags, error } = await supabase.from("course_tags").select("*").order("name", { ascending: true })
 
     if (error) {
       console.error("Error obteniendo tags:", error)
@@ -54,7 +51,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          message: "El campo 'name' es requerido",
+          message: "El campo nombre es requerido",
         },
         { status: 400 },
       )

@@ -8,12 +8,11 @@ export async function GET() {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Obtener lecciones con información del curso
     const { data: lessons, error } = await supabase
       .from("lessons")
       .select(`
         *,
-        courses(
+        course:courses(
           id,
           title
         )
@@ -55,14 +54,14 @@ export async function POST(request: NextRequest) {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
     const body = await request.json()
 
-    const { title, description, video_url, duration_minutes, course_id, order_index } = body
+    const { title, content, video_url, course_id, order_index, duration } = body
 
     // Validar campos requeridos
-    if (!title || !course_id) {
+    if (!title || !content || !course_id) {
       return NextResponse.json(
         {
           success: false,
-          message: "Los campos título y curso son requeridos",
+          message: "Los campos título, contenido y curso son requeridos",
         },
         { status: 400 },
       )
@@ -91,11 +90,11 @@ export async function POST(request: NextRequest) {
       .insert([
         {
           title,
-          description: description || "",
-          video_url: video_url || "",
-          duration_minutes: Number.parseInt(duration_minutes) || 0,
-          course_id,
+          content,
+          video_url: video_url || null,
+          course_id: Number.parseInt(course_id),
           order_index: Number.parseInt(order_index) || 1,
+          duration: duration || null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         },

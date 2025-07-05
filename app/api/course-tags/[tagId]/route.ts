@@ -12,19 +12,39 @@ export async function PUT(request: NextRequest, { params }: { params: { tagId: s
 
     const { name, color } = body
 
-    const { data: tag, error } = await supabase
+    // Validar campos requeridos
+    if (!name) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "El campo nombre es requerido",
+        },
+        { status: 400 },
+      )
+    }
+
+    // Actualizar el tag
+    const { data: tag, error: tagError } = await supabase
       .from("course_tags")
       .update({
-        name: name,
-        color: color,
+        name,
+        color: color || "#3B82F6",
         updated_at: new Date().toISOString(),
       })
       .eq("id", tagId)
       .select()
       .single()
 
-    if (error) {
-      return NextResponse.json({ success: false, message: "Error actualizando tag", error }, { status: 500 })
+    if (tagError) {
+      console.error("Error actualizando tag:", tagError)
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Error actualizando tag",
+          error: tagError,
+        },
+        { status: 500 },
+      )
     }
 
     return NextResponse.json({
@@ -33,7 +53,15 @@ export async function PUT(request: NextRequest, { params }: { params: { tagId: s
       data: tag,
     })
   } catch (error) {
-    return NextResponse.json({ success: false, message: "Error interno del servidor" }, { status: 500 })
+    console.error("Error en PUT tag:", error)
+    return NextResponse.json(
+      {
+        success: false,
+        message: "Error interno del servidor",
+        error: error instanceof Error ? error.message : "Error desconocido",
+      },
+      { status: 500 },
+    )
   }
 }
 
@@ -42,10 +70,19 @@ export async function DELETE(request: NextRequest, { params }: { params: { tagId
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
     const { tagId } = params
 
-    const { error } = await supabase.from("course_tags").delete().eq("id", tagId)
+    // Eliminar el tag
+    const { error: tagError } = await supabase.from("course_tags").delete().eq("id", tagId)
 
-    if (error) {
-      return NextResponse.json({ success: false, message: "Error eliminando tag", error }, { status: 500 })
+    if (tagError) {
+      console.error("Error eliminando tag:", tagError)
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Error eliminando tag",
+          error: tagError,
+        },
+        { status: 500 },
+      )
     }
 
     return NextResponse.json({
@@ -53,6 +90,14 @@ export async function DELETE(request: NextRequest, { params }: { params: { tagId
       message: "Tag eliminado exitosamente",
     })
   } catch (error) {
-    return NextResponse.json({ success: false, message: "Error interno del servidor" }, { status: 500 })
+    console.error("Error en DELETE tag:", error)
+    return NextResponse.json(
+      {
+        success: false,
+        message: "Error interno del servidor",
+        error: error instanceof Error ? error.message : "Error desconocido",
+      },
+      { status: 500 },
+    )
   }
 }
