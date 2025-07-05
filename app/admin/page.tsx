@@ -310,21 +310,22 @@ export default function AdminPanel() {
         body: JSON.stringify({
           title: courseForm.title,
           description: courseForm.description,
-          price: Number.parseFloat(courseForm.price),
+          price: courseForm.price,
           instructor: courseForm.instructor,
           thumbnail_url: courseForm.thumbnail_url,
         }),
       })
 
-      if (response.ok) {
+      const result = await response.json()
+
+      if (response.ok && result.success) {
         toast({ title: "Éxito", description: "Curso creado correctamente" })
         setCourseDialogOpen(false)
         setCourseForm({ title: "", description: "", price: "", instructor: "", thumbnail_url: "" })
-        fetchCourses()
-        fetchStats()
+        await fetchCourses()
+        await fetchStats()
       } else {
-        const errorData = await response.json()
-        throw new Error(errorData.message || "Error al crear curso")
+        throw new Error(result.message || "Error al crear curso")
       }
     } catch (error) {
       console.error("Error creating course:", error)
@@ -342,22 +343,25 @@ export default function AdminPanel() {
         body: JSON.stringify({
           title: courseForm.title,
           description: courseForm.description,
-          price: Number.parseFloat(courseForm.price),
+          price: courseForm.price,
           instructor: courseForm.instructor,
           thumbnail_url: courseForm.thumbnail_url,
         }),
       })
 
-      if (response.ok) {
+      const result = await response.json()
+
+      if (response.ok && result.success) {
         toast({ title: "Éxito", description: "Curso actualizado correctamente" })
         setCourseDialogOpen(false)
         setEditingCourse(null)
         setCourseForm({ title: "", description: "", price: "", instructor: "", thumbnail_url: "" })
-        fetchCourses()
+        await fetchCourses()
       } else {
-        throw new Error("Error al actualizar curso")
+        throw new Error(result.message || "Error al actualizar curso")
       }
     } catch (error) {
+      console.error("Error updating course:", error)
       toast({ title: "Error", description: "Error al actualizar curso", variant: "destructive" })
     }
   }
@@ -370,14 +374,17 @@ export default function AdminPanel() {
         body: JSON.stringify({ archived: true }),
       })
 
-      if (response.ok) {
+      const result = await response.json()
+
+      if (response.ok && result.success) {
         toast({ title: "Éxito", description: "Curso archivado correctamente" })
-        fetchCourses()
-        fetchStats()
+        await fetchCourses()
+        await fetchStats()
       } else {
-        throw new Error("Error al archivar curso")
+        throw new Error(result.message || "Error al archivar curso")
       }
     } catch (error) {
+      console.error("Error archiving course:", error)
       toast({ title: "Error", description: "Error al archivar curso", variant: "destructive" })
     }
   }
@@ -388,14 +395,17 @@ export default function AdminPanel() {
         method: "DELETE",
       })
 
-      if (response.ok) {
+      const result = await response.json()
+
+      if (response.ok && result.success) {
         toast({ title: "Éxito", description: "Curso eliminado correctamente" })
-        fetchCourses()
-        fetchStats()
+        await fetchCourses()
+        await fetchStats()
       } else {
-        throw new Error("Error al eliminar curso")
+        throw new Error(result.message || "Error al eliminar curso")
       }
     } catch (error) {
+      console.error("Error deleting course:", error)
       toast({ title: "Error", description: "Error al eliminar curso", variant: "destructive" })
     }
   }
@@ -432,13 +442,15 @@ export default function AdminPanel() {
           title: lessonForm.title,
           description: lessonForm.description,
           video_url: lessonForm.video_url,
-          duration_minutes: Number.parseInt(lessonForm.duration_minutes),
+          duration_minutes: lessonForm.duration_minutes,
           course_id: selectedCourseId,
-          order_index: Number.parseInt(lessonForm.order_index),
+          order_index: lessonForm.order_index,
         }),
       })
 
-      if (response.ok) {
+      const result = await response.json()
+
+      if (response.ok && result.success) {
         toast({ title: "Éxito", description: "Lección creada correctamente" })
         setLessonDialogOpen(false)
         setLessonForm({
@@ -449,11 +461,10 @@ export default function AdminPanel() {
           order_index: "",
         })
         setSelectedCourseId("")
-        fetchLessons()
-        fetchStats()
+        await fetchLessons()
+        await fetchStats()
       } else {
-        const errorData = await response.json()
-        throw new Error(errorData.message || "Error al crear lección")
+        throw new Error(result.message || "Error al crear lección")
       }
     } catch (error) {
       console.error("Error creating lesson:", error)
@@ -472,13 +483,15 @@ export default function AdminPanel() {
           title: lessonForm.title,
           description: lessonForm.description,
           video_url: lessonForm.video_url,
-          duration_minutes: Number.parseInt(lessonForm.duration_minutes),
+          duration_minutes: lessonForm.duration_minutes,
           course_id: editingLesson.course_id,
-          order_index: Number.parseInt(lessonForm.order_index),
+          order_index: lessonForm.order_index,
         }),
       })
 
-      if (response.ok) {
+      const result = await response.json()
+
+      if (response.ok && result.success) {
         toast({ title: "Éxito", description: "Lección actualizada correctamente" })
         setLessonDialogOpen(false)
         setEditingLesson(null)
@@ -489,11 +502,12 @@ export default function AdminPanel() {
           duration_minutes: "",
           order_index: "",
         })
-        fetchLessons()
+        await fetchLessons()
       } else {
-        throw new Error("Error al actualizar lección")
+        throw new Error(result.message || "Error al actualizar lección")
       }
     } catch (error) {
+      console.error("Error updating lesson:", error)
       toast({ title: "Error", description: "Error al actualizar lección", variant: "destructive" })
     }
   }
@@ -504,14 +518,17 @@ export default function AdminPanel() {
         method: "DELETE",
       })
 
-      if (response.ok) {
+      const result = await response.json()
+
+      if (response.ok && result.success) {
         toast({ title: "Éxito", description: "Lección eliminada correctamente" })
-        fetchLessons()
-        fetchStats()
+        await fetchLessons()
+        await fetchStats()
       } else {
-        throw new Error("Error al eliminar lección")
+        throw new Error(result.message || "Error al eliminar lección")
       }
     } catch (error) {
+      console.error("Error deleting lesson:", error)
       toast({ title: "Error", description: "Error al eliminar lección", variant: "destructive" })
     }
   }
@@ -563,15 +580,18 @@ export default function AdminPanel() {
         body: JSON.stringify(tagForm),
       })
 
-      if (response.ok) {
+      const result = await response.json()
+
+      if (response.ok && result.success) {
         toast({ title: "Éxito", description: "Tag creado correctamente" })
         setTagDialogOpen(false)
         setTagForm({ name: "", color: "#3B82F6" })
-        fetchCourseTags()
+        await fetchCourseTags()
       } else {
-        throw new Error("Error al crear tag")
+        throw new Error(result.message || "Error al crear tag")
       }
     } catch (error) {
+      console.error("Error creating tag:", error)
       toast({ title: "Error", description: "Error al crear tag", variant: "destructive" })
     }
   }
@@ -586,16 +606,19 @@ export default function AdminPanel() {
         body: JSON.stringify(tagForm),
       })
 
-      if (response.ok) {
+      const result = await response.json()
+
+      if (response.ok && result.success) {
         toast({ title: "Éxito", description: "Tag actualizado correctamente" })
         setTagDialogOpen(false)
         setEditingTag(null)
         setTagForm({ name: "", color: "#3B82F6" })
-        fetchCourseTags()
+        await fetchCourseTags()
       } else {
-        throw new Error("Error al actualizar tag")
+        throw new Error(result.message || "Error al actualizar tag")
       }
     } catch (error) {
+      console.error("Error updating tag:", error)
       toast({ title: "Error", description: "Error al actualizar tag", variant: "destructive" })
     }
   }
@@ -606,13 +629,16 @@ export default function AdminPanel() {
         method: "DELETE",
       })
 
-      if (response.ok) {
+      const result = await response.json()
+
+      if (response.ok && result.success) {
         toast({ title: "Éxito", description: "Tag eliminado correctamente" })
-        fetchCourseTags()
+        await fetchCourseTags()
       } else {
-        throw new Error("Error al eliminar tag")
+        throw new Error(result.message || "Error al eliminar tag")
       }
     } catch (error) {
+      console.error("Error deleting tag:", error)
       toast({ title: "Error", description: "Error al eliminar tag", variant: "destructive" })
     }
   }
@@ -643,19 +669,22 @@ export default function AdminPanel() {
           image_url: slideForm.image_url,
           link_url: slideForm.link_url,
           is_active: slideForm.is_active,
-          order_index: Number.parseInt(slideForm.order_index),
+          order_index: slideForm.order_index,
         }),
       })
 
-      if (response.ok) {
+      const result = await response.json()
+
+      if (response.ok && result.success) {
         toast({ title: "Éxito", description: "Slide creado correctamente" })
         setSlideDialogOpen(false)
         setSlideForm({ title: "", description: "", image_url: "", link_url: "", is_active: true, order_index: "" })
-        fetchCarouselSlides()
+        await fetchCarouselSlides()
       } else {
-        throw new Error("Error al crear slide")
+        throw new Error(result.message || "Error al crear slide")
       }
     } catch (error) {
+      console.error("Error creating slide:", error)
       toast({ title: "Error", description: "Error al crear slide", variant: "destructive" })
     }
   }
@@ -673,20 +702,23 @@ export default function AdminPanel() {
           image_url: slideForm.image_url,
           link_url: slideForm.link_url,
           is_active: slideForm.is_active,
-          order_index: Number.parseInt(slideForm.order_index),
+          order_index: slideForm.order_index,
         }),
       })
 
-      if (response.ok) {
+      const result = await response.json()
+
+      if (response.ok && result.success) {
         toast({ title: "Éxito", description: "Slide actualizado correctamente" })
         setSlideDialogOpen(false)
         setEditingSlide(null)
         setSlideForm({ title: "", description: "", image_url: "", link_url: "", is_active: true, order_index: "" })
-        fetchCarouselSlides()
+        await fetchCarouselSlides()
       } else {
-        throw new Error("Error al actualizar slide")
+        throw new Error(result.message || "Error al actualizar slide")
       }
     } catch (error) {
+      console.error("Error updating slide:", error)
       toast({ title: "Error", description: "Error al actualizar slide", variant: "destructive" })
     }
   }
@@ -699,13 +731,16 @@ export default function AdminPanel() {
         body: JSON.stringify({ is_active: !isActive }),
       })
 
-      if (response.ok) {
+      const result = await response.json()
+
+      if (response.ok && result.success) {
         toast({ title: "Éxito", description: `Slide ${!isActive ? "activado" : "desactivado"} correctamente` })
-        fetchCarouselSlides()
+        await fetchCarouselSlides()
       } else {
-        throw new Error("Error al cambiar estado del slide")
+        throw new Error(result.message || "Error al cambiar estado del slide")
       }
     } catch (error) {
+      console.error("Error toggling slide:", error)
       toast({ title: "Error", description: "Error al cambiar estado del slide", variant: "destructive" })
     }
   }
@@ -716,13 +751,16 @@ export default function AdminPanel() {
         method: "DELETE",
       })
 
-      if (response.ok) {
+      const result = await response.json()
+
+      if (response.ok && result.success) {
         toast({ title: "Éxito", description: "Slide eliminado correctamente" })
-        fetchCarouselSlides()
+        await fetchCarouselSlides()
       } else {
-        throw new Error("Error al eliminar slide")
+        throw new Error(result.message || "Error al eliminar slide")
       }
     } catch (error) {
+      console.error("Error deleting slide:", error)
       toast({ title: "Error", description: "Error al eliminar slide", variant: "destructive" })
     }
   }
