@@ -59,42 +59,6 @@ export async function GET() {
       })
     }
 
-    // Obtener etiquetas de cursos
-    const { data: courseTags, error: courseTagsError } = await supabase.from("course_tags").select("*")
-
-    if (courseTagsError) {
-      console.error("Error obteniendo course_tags:", courseTagsError)
-    }
-
-    // Obtener todas las etiquetas
-    const { data: allTags, error: tagsError } = await supabase.from("tags").select("*")
-
-    if (tagsError) {
-      console.error("Error obteniendo tags:", tagsError)
-    }
-
-    // Crear un mapa de etiquetas por ID
-    const tagsById = new Map()
-    if (allTags) {
-      allTags.forEach((tag) => {
-        tagsById.set(tag.id, tag)
-      })
-    }
-
-    // Crear un mapa de etiquetas por curso
-    const tagsByCourse = new Map()
-    if (courseTags) {
-      courseTags.forEach((ct) => {
-        if (!tagsByCourse.has(ct.course_id)) {
-          tagsByCourse.set(ct.course_id, [])
-        }
-        const tag = tagsById.get(ct.tag_id)
-        if (tag) {
-          tagsByCourse.get(ct.course_id).push(tag)
-        }
-      })
-    }
-
     // Procesar cursos y agregar datos calculados
     const processedCourses =
       courses?.map((course) => {
@@ -105,7 +69,7 @@ export async function GET() {
 
         return {
           ...course,
-          tags: tagsByCourse.get(course.id) || [],
+          tags: [],
           students: enrollmentData.count,
           revenue: revenue,
           lessonsCount: lessonsCount,
@@ -162,20 +126,6 @@ export async function POST(request: NextRequest) {
         },
         { status: 500 },
       )
-    }
-
-    // Asociar etiquetas si se proporcionaron
-    if (tags && tags.length > 0) {
-      const courseTagsData = tags.map((tagId: string) => ({
-        course_id: course.id,
-        tag_id: tagId,
-      }))
-
-      const { error: tagsError } = await supabase.from("course_tags").insert(courseTagsData)
-
-      if (tagsError) {
-        console.error("Error asociando etiquetas:", tagsError)
-      }
     }
 
     return NextResponse.json({
