@@ -10,21 +10,36 @@ export async function PUT(request: NextRequest, { params }: { params: { slideId:
     const body = await request.json()
     const { slideId } = params
 
+    const {
+      title,
+      subtitle,
+      description,
+      image_url,
+      cta_text,
+      cta_link,
+      background_color,
+      badge_text,
+      badge_color,
+      order_index,
+      slide_type,
+      is_active,
+    } = body
+
     const { data: slide, error } = await supabase
       .from("carousel_slides")
       .update({
-        title: body.title,
-        subtitle: body.subtitle,
-        description: body.description,
-        image_url: body.image_url,
-        cta_text: body.cta_text,
-        cta_link: body.cta_link,
-        background_color: body.background_color,
-        badge_text: body.badge_text,
-        badge_color: body.badge_color,
-        order_index: body.order_index,
-        slide_type: body.slide_type,
-        is_active: body.is_active,
+        title: title,
+        subtitle: subtitle,
+        description: description,
+        image_url: image_url,
+        cta_text: cta_text,
+        cta_link: cta_link,
+        background_color: background_color,
+        badge_text: badge_text,
+        badge_color: badge_color,
+        order_index: order_index,
+        slide_type: slide_type,
+        is_active: is_active,
         updated_at: new Date().toISOString(),
       })
       .eq("id", slideId)

@@ -8,70 +8,58 @@ export async function GET() {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Obtener total de usuarios
-    const { count: totalUsers, error: usersError } = await supabase
-      .from("users")
-      .select("*", { count: "exact", head: true })
+    // Obtener estadísticas de usuarios
+    const { data: users, error: usersError } = await supabase.from("users").select("id")
 
     if (usersError) {
       console.error("Error obteniendo usuarios:", usersError)
     }
 
-    // Obtener total de cursos
-    const { count: totalCourses, error: coursesError } = await supabase
-      .from("courses")
-      .select("*", { count: "exact", head: true })
-      .eq("archived", false)
+    // Obtener estadísticas de cursos
+    const { data: courses, error: coursesError } = await supabase.from("courses").select("id, price")
 
     if (coursesError) {
       console.error("Error obteniendo cursos:", coursesError)
     }
 
-    // Obtener total de lecciones
-    const { count: totalLessons, error: lessonsError } = await supabase
-      .from("lessons")
-      .select("*", { count: "exact", head: true })
-      .eq("archived", false)
+    // Obtener estadísticas de lecciones
+    const { data: lessons, error: lessonsError } = await supabase.from("lessons").select("id")
 
     if (lessonsError) {
       console.error("Error obteniendo lecciones:", lessonsError)
     }
 
-    // Obtener enrollments
-    const { data: enrollments, error: enrollmentsError } = await supabase.from("enrollments").select("course_id")
+    // Obtener estadísticas de inscripciones (si existe la tabla)
+    const { data: enrollments, error: enrollmentsError } = await supabase.from("enrollments").select("id, course_id")
 
-    let totalRevenue = 0
-    if (enrollments && !enrollmentsError) {
-      // Obtener precios de cursos por separado
-      const courseIds = [...new Set(enrollments.map((e) => e.course_id))]
-      if (courseIds.length > 0) {
-        const { data: courses, error: coursesRevenueError } = await supabase
-          .from("courses")
-          .select("id, price")
-          .in("id", courseIds)
+    if (enrollmentsError) {
+      console.error("Error obteniendo inscripciones:", enrollmentsError)
+    }
 
-        if (courses && !coursesRevenueError) {
-          // Calcular revenue basado en enrollments y precios
-          const courseMap = new Map(courses.map((c) => [c.id, c.price]))
-          totalRevenue = enrollments.reduce((sum, enrollment) => {
-            const coursePrice = courseMap.get(enrollment.course_id) || 0
-            return sum + coursePrice
-          }, 0)
-        }
-      }
+    // Calcular estadísticas
+    const totalUsers = users?.length || 0
+    const totalCourses = courses?.length || 0
+    const totalLessons = lessons?.length || 0
+    const totalEnrollments = enrollments?.length || 0
+
+    // Calcular ingresos estimados (precio promedio * inscripciones)
+    const averagePrice = courses?.reduce((sum, course) => sum + (course.price || 0), 0) / (courses?.length || 1) || 0
+    const totalRevenue = averagePrice * totalEnrollments
+
+    const stats = {
+      totalUsers,
+      totalCourses,
+      totalLessons,
+      totalRevenue: Math.round(totalRevenue),
+      totalEnrollments,
     }
 
     return NextResponse.json({
       success: true,
-      data: {
-        totalUsers: totalUsers || 0,
-        totalCourses: totalCourses || 0,
-        totalLessons: totalLessons || 0,
-        totalRevenue: totalRevenue,
-      },
+      data: stats,
     })
   } catch (error) {
-    console.error("Error en la ruta de estadísticas:", error)
+    console.error("Error en GET stats:", error)
     return NextResponse.json(
       {
         success: false,

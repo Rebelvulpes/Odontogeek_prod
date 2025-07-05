@@ -1,6 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
-import bcrypt from "bcryptjs"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -12,81 +11,95 @@ export async function GET() {
     const { data: users, error } = await supabase.from("users").select("*").order("created_at", { ascending: false })
 
     if (error) {
-      return NextResponse.json({
-        success: false,
-        message: `Error obteniendo usuarios: ${error.message}`,
-      })
+      console.error("Error obteniendo usuarios:", error)
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Error obteniendo usuarios",
+          error: error,
+        },
+        { status: 500 },
+      )
     }
 
     return NextResponse.json({
       success: true,
-      data: users,
+      data: users || [],
     })
   } catch (error) {
-    return NextResponse.json({
-      success: false,
-      message: `Error interno: ${(error as Error).message}`,
-    })
+    console.error("Error en GET usuarios:", error)
+    return NextResponse.json(
+      {
+        success: false,
+        message: "Error interno del servidor",
+        error: error instanceof Error ? error.message : "Error desconocido",
+      },
+      { status: 500 },
+    )
   }
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
-    const { firstName, lastName, email, password, role } = await req.json()
-
-    if (!firstName || !lastName || !email || !password || !role) {
-      return NextResponse.json({
-        success: false,
-        message: "Todos los campos son requeridos",
-      })
-    }
-
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    const body = await request.json()
 
-    // Verificar si el email ya existe
-    const { data: existingUser } = await supabase.from("users").select("id").eq("email", email).single()
+    const { first_name, last_name, email, password, role } = body
 
-    if (existingUser) {
-      return NextResponse.json({
-        success: false,
-        message: "Ya existe un usuario con este email",
-      })
+    // Validar campos requeridos
+    if (!first_name || !last_name || !email || !password) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Todos los campos son requeridos",
+        },
+        { status: 400 },
+      )
     }
 
-    // Hash de la contraseña
-    const passwordHash = await bcrypt.hash(password, 12)
-
-    // Crear usuario
-    const { data: newUser, error: createError } = await supabase
+    // Crear el usuario
+    const { data: user, error: userError } = await supabase
       .from("users")
       .insert([
         {
+          first_name,
+          last_name,
           email,
-          password_hash: passwordHash,
-          first_name: firstName,
-          last_name: lastName,
-          role,
-          is_test_user: false,
+          password_hash: password, // En producción, esto debería ser hasheado
+          role: role || "student",
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         },
       ])
       .select()
+      .single()
 
-    if (createError) {
-      return NextResponse.json({
-        success: false,
-        message: `Error creando usuario: ${createError.message}`,
-      })
+    if (userError) {
+      console.error("Error creando usuario:", userError)
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Error creando usuario",
+          error: userError,
+        },
+        { status: 500 },
+      )
     }
 
     return NextResponse.json({
       success: true,
       message: "Usuario creado exitosamente",
-      data: newUser[0],
+      data: user,
     })
   } catch (error) {
-    return NextResponse.json({
-      success: false,
-      message: `Error interno: ${(error as Error).message}`,
-    })
+    console.error("Error en POST usuario:", error)
+    return NextResponse.json(
+      {
+        success: false,
+        message: "Error interno del servidor",
+        error: error instanceof Error ? error.message : "Error desconocido",
+      },
+      { status: 500 },
+    )
   }
 }

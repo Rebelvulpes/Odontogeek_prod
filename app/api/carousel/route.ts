@@ -11,6 +11,7 @@ export async function GET() {
     const { data: slides, error } = await supabase
       .from("carousel_slides")
       .select("*")
+      .eq("is_active", true)
       .order("order_index", { ascending: true })
 
     if (error) {
@@ -47,7 +48,20 @@ export async function POST(request: NextRequest) {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
     const body = await request.json()
 
-    const { title, description, image_url, link_url, is_active, order_index } = body
+    const {
+      title,
+      subtitle,
+      description,
+      image_url,
+      cta_text,
+      cta_link,
+      background_color,
+      badge_text,
+      badge_color,
+      order_index,
+      slide_type,
+      is_active,
+    } = body
 
     // Validar campos requeridos
     if (!title || !image_url) {
@@ -66,11 +80,17 @@ export async function POST(request: NextRequest) {
       .insert([
         {
           title,
+          subtitle: subtitle || "",
           description: description || "",
           image_url,
-          link_url: link_url || null,
-          is_active: is_active !== undefined ? is_active : true,
+          cta_text: cta_text || "Ver más",
+          cta_link: cta_link || "/courses",
+          background_color: background_color || "from-blue-900 to-indigo-900",
+          badge_text: badge_text || "Nuevo",
+          badge_color: badge_color || "bg-green-500",
           order_index: Number.parseInt(order_index) || 1,
+          slide_type: slide_type || "course",
+          is_active: is_active !== undefined ? is_active : true,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         },
