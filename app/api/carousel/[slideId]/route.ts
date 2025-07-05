@@ -10,45 +10,29 @@ export async function PUT(request: NextRequest, { params }: { params: { slideId:
     const body = await request.json()
     const { slideId } = params
 
-    const { title, description, image_url, link_url, is_active, order_index } = body
-
-    // Validar campos requeridos
-    if (!title || !description || !image_url) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Los campos título, descripción e imagen son requeridos",
-        },
-        { status: 400 },
-      )
-    }
-
-    // Actualizar el slide
-    const { data: slide, error: slideError } = await supabase
+    const { data: slide, error } = await supabase
       .from("carousel_slides")
       .update({
-        title,
-        description,
-        image_url,
-        link_url: link_url || null,
-        is_active: is_active !== undefined ? is_active : true,
-        order_index: Number.parseInt(order_index) || 1,
+        title: body.title,
+        subtitle: body.subtitle,
+        description: body.description,
+        image_url: body.image_url,
+        cta_text: body.cta_text,
+        cta_link: body.cta_link,
+        background_color: body.background_color,
+        badge_text: body.badge_text,
+        badge_color: body.badge_color,
+        order_index: body.order_index,
+        slide_type: body.slide_type,
+        is_active: body.is_active,
         updated_at: new Date().toISOString(),
       })
       .eq("id", slideId)
       .select()
       .single()
 
-    if (slideError) {
-      console.error("Error actualizando slide:", slideError)
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Error actualizando slide",
-          error: slideError,
-        },
-        { status: 500 },
-      )
+    if (error) {
+      return NextResponse.json({ success: false, message: "Error actualizando slide", error }, { status: 500 })
     }
 
     return NextResponse.json({
@@ -57,64 +41,7 @@ export async function PUT(request: NextRequest, { params }: { params: { slideId:
       data: slide,
     })
   } catch (error) {
-    console.error("Error en PUT slide:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Error interno del servidor",
-        error: error instanceof Error ? error.message : "Error desconocido",
-      },
-      { status: 500 },
-    )
-  }
-}
-
-export async function PATCH(request: NextRequest, { params }: { params: { slideId: string } }) {
-  try {
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
-    const body = await request.json()
-    const { slideId } = params
-
-    const { is_active } = body
-
-    // Actualizar el estado activo del slide
-    const { data: slide, error: slideError } = await supabase
-      .from("carousel_slides")
-      .update({
-        is_active: is_active,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", slideId)
-      .select()
-      .single()
-
-    if (slideError) {
-      console.error("Error cambiando estado del slide:", slideError)
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Error cambiando estado del slide",
-          error: slideError,
-        },
-        { status: 500 },
-      )
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: `Slide ${is_active ? "activado" : "desactivado"} exitosamente`,
-      data: slide,
-    })
-  } catch (error) {
-    console.error("Error en PATCH slide:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Error interno del servidor",
-        error: error instanceof Error ? error.message : "Error desconocido",
-      },
-      { status: 500 },
-    )
+    return NextResponse.json({ success: false, message: "Error interno del servidor" }, { status: 500 })
   }
 }
 
@@ -123,19 +50,10 @@ export async function DELETE(request: NextRequest, { params }: { params: { slide
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
     const { slideId } = params
 
-    // Eliminar el slide
-    const { error: slideError } = await supabase.from("carousel_slides").delete().eq("id", slideId)
+    const { error } = await supabase.from("carousel_slides").delete().eq("id", slideId)
 
-    if (slideError) {
-      console.error("Error eliminando slide:", slideError)
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Error eliminando slide",
-          error: slideError,
-        },
-        { status: 500 },
-      )
+    if (error) {
+      return NextResponse.json({ success: false, message: "Error eliminando slide", error }, { status: 500 })
     }
 
     return NextResponse.json({
@@ -143,14 +61,6 @@ export async function DELETE(request: NextRequest, { params }: { params: { slide
       message: "Slide eliminado exitosamente",
     })
   } catch (error) {
-    console.error("Error en DELETE slide:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Error interno del servidor",
-        error: error instanceof Error ? error.message : "Error desconocido",
-      },
-      { status: 500 },
-    )
+    return NextResponse.json({ success: false, message: "Error interno del servidor" }, { status: 500 })
   }
 }

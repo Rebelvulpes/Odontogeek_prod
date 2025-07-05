@@ -8,12 +8,11 @@ export async function GET() {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Obtener lecciones con información del curso
     const { data: lessons, error } = await supabase
       .from("lessons")
       .select(`
         *,
-        courses!inner (
+        courses:course_id(
           id,
           title
         )
@@ -22,14 +21,10 @@ export async function GET() {
 
     if (error) {
       console.error("Error obteniendo lecciones:", error)
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Error obteniendo lecciones",
-          error: error,
-        },
-        { status: 500 },
-      )
+      return NextResponse.json({
+        success: false,
+        message: `Error obteniendo lecciones: ${error.message}`,
+      })
     }
 
     return NextResponse.json({
@@ -37,97 +32,55 @@ export async function GET() {
       data: lessons || [],
     })
   } catch (error) {
-    console.error("Error en GET lecciones:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Error interno del servidor",
-        error: error instanceof Error ? error.message : "Error desconocido",
-      },
-      { status: 500 },
-    )
+    console.error("Error interno en GET /api/admin/lessons:", error)
+    return NextResponse.json({
+      success: false,
+      message: `Error interno: ${(error as Error).message}`,
+    })
   }
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
+    const body = await req.json()
+    const { course_id, title, description, video_url, duration_minutes, order_index, is_free } = body
+
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
-    const body = await request.json()
-
-    const { title, description, video_url, duration_minutes, course_id, order_index } = body
-
-    // Validar campos requeridos
-    if (!title || !description || !video_url || !course_id) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Los campos título, descripción, URL del video y curso son requeridos",
-        },
-        { status: 400 },
-      )
-    }
-
-    // Verificar que el curso existe
-    const { data: course, error: courseError } = await supabase
-      .from("courses")
-      .select("id")
-      .eq("id", course_id)
-      .single()
-
-    if (courseError || !course) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "El curso especificado no existe",
-        },
-        { status: 400 },
-      )
-    }
 
     // Crear la lección
     const { data: lesson, error: lessonError } = await supabase
       .from("lessons")
-      .insert([
-        {
-          title,
-          description,
-          video_url,
-          duration_minutes: Number.parseInt(duration_minutes) || 0,
-          course_id,
-          order_index: Number.parseInt(order_index) || 1,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-      ])
+      .insert({
+        course_id,
+        title,
+        description,
+        video_url,
+        duration_minutes,
+        order_index,
+        is_free: is_free || false,
+        archived: false,
+      })
       .select()
       .single()
 
     if (lessonError) {
       console.error("Error creando lección:", lessonError)
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Error creando lección",
-          error: lessonError,
-        },
-        { status: 500 },
-      )
+      return NextResponse.json({
+        success: false,
+        message: `Error creando lección: ${lessonError.message}`,
+      })
     }
 
     return NextResponse.json({
       success: true,
-      message: "Lección creada exitosamente",
       data: lesson,
+      message: "Lección creada exitosamente",
     })
   } catch (error) {
-    console.error("Error en POST lección:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Error interno del servidor",
-        error: error instanceof Error ? error.message : "Error desconocido",
-      },
-      { status: 500 },
-    )
+    console.error("Error interno en POST /api/admin/lessons:", error)
+    return NextResponse.json({
+      success: false,
+      message: `Error interno: ${(error as Error).message}`,
+    })
   }
 }
