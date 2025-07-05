@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server"
+import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -10,60 +10,27 @@ export async function GET() {
 
     const { data: slides, error } = await supabase
       .from("carousel_slides")
-      .select(`
-        *,
-        carousel_slide_stats (
-          icon_name,
-          label,
-          value,
-          order_index
-        )
-      `)
-      .eq("is_active", true)
+      .select("*")
       .order("order_index", { ascending: true })
 
     if (error) {
-      console.error("Error obteniendo slides del carrusel:", error)
+      console.error("Error obteniendo slides:", error)
       return NextResponse.json(
         {
           success: false,
-          message: "Error obteniendo slides del carrusel",
+          message: "Error obteniendo slides",
           error: error,
         },
         { status: 500 },
       )
     }
 
-    // Procesar los slides para el formato esperado por el frontend
-    const processedSlides =
-      slides?.map((slide) => ({
-        id: slide.id,
-        title: slide.title,
-        subtitle: slide.subtitle,
-        description: slide.description,
-        backgroundColor: slide.background_color,
-        promoImage: slide.image_url,
-        badge: slide.badge_text,
-        badgeColor: slide.badge_color,
-        cta: slide.cta_text,
-        ctaLink: slide.cta_link,
-        type: slide.slide_type,
-        stats:
-          slide.carousel_slide_stats
-            ?.sort((a, b) => a.order_index - b.order_index)
-            .map((stat) => ({
-              icon: stat.icon_name,
-              label: stat.label,
-              value: stat.value,
-            })) || [],
-      })) || []
-
     return NextResponse.json({
       success: true,
-      data: processedSlides,
+      data: slides || [],
     })
   } catch (error) {
-    console.error("Error en la API del carrusel:", error)
+    console.error("Error en GET slides:", error)
     return NextResponse.json(
       {
         success: false,
@@ -75,31 +42,54 @@ export async function GET() {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
     const body = await request.json()
 
-    const { data: slide, error } = await supabase
+    const { title, description, image_url, link_url, is_active, order_index } = body
+
+    if (!title || !image_url) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Título e imagen son requeridos",
+        },
+        { status: 400 },
+      )
+    }
+
+    const { data: slide, error: slideError } = await supabase
       .from("carousel_slides")
       .insert({
-        title: body.title,
-        subtitle: body.subtitle,
-        description: body.description,
-        image_url: body.image_url,
-        cta_text: body.cta_text,
-        cta_link: body.cta_link,
-        background_color: body.background_color,
-        badge_text: body.badge_text,
-        badge_color: body.badge_color,
-        order_index: body.order_index,
-        slide_type: body.slide_type,
+        title,
+        subtitle: null,
+        description: description || null,
+        image_url,
+        cta_text: null,
+        cta_link: link_url || null,
+        background_color: null,
+        badge_text: null,
+        badge_color: null,
+        order_index: order_index ? Number.parseInt(order_index) : 1,
+        slide_type: "default",
+        is_active: is_active !== undefined ? is_active : true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       })
       .select()
       .single()
 
-    if (error) {
-      return NextResponse.json({ success: false, message: "Error creando slide", error }, { status: 500 })
+    if (slideError) {
+      console.error("Error creando slide:", slideError)
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Error creando slide",
+          error: slideError,
+        },
+        { status: 500 },
+      )
     }
 
     return NextResponse.json({
@@ -108,6 +98,14 @@ export async function POST(request: Request) {
       data: slide,
     })
   } catch (error) {
-    return NextResponse.json({ success: false, message: "Error interno del servidor" }, { status: 500 })
+    console.error("Error en POST slide:", error)
+    return NextResponse.json(
+      {
+        success: false,
+        message: "Error interno del servidor",
+        error: error instanceof Error ? error.message : "Error desconocido",
+      },
+      { status: 500 },
+    )
   }
 }

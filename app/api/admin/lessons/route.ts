@@ -12,19 +12,24 @@ export async function GET() {
       .from("lessons")
       .select(`
         *,
-        courses:course_id(
+        courses!inner(
           id,
           title
         )
       `)
-      .order("created_at", { ascending: false })
+      .order("course_id", { ascending: true })
+      .order("order_index", { ascending: true })
 
     if (error) {
       console.error("Error obteniendo lecciones:", error)
-      return NextResponse.json({
-        success: false,
-        message: `Error obteniendo lecciones: ${error.message}`,
-      })
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Error obteniendo lecciones",
+          error: error,
+        },
+        { status: 500 },
+      )
     }
 
     return NextResponse.json({
@@ -32,55 +37,95 @@ export async function GET() {
       data: lessons || [],
     })
   } catch (error) {
-    console.error("Error interno en GET /api/admin/lessons:", error)
-    return NextResponse.json({
-      success: false,
-      message: `Error interno: ${(error as Error).message}`,
-    })
+    console.error("Error en GET lecciones:", error)
+    return NextResponse.json(
+      {
+        success: false,
+        message: "Error interno del servidor",
+        error: error instanceof Error ? error.message : "Error desconocido",
+      },
+      { status: 500 },
+    )
   }
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
-    const body = await req.json()
-    const { course_id, title, description, video_url, duration_minutes, order_index, is_free } = body
-
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    const body = await request.json()
 
-    // Crear la lección
+    const { title, description, video_url, duration_minutes, course_id, order_index } = body
+
+    if (!title || !description || !course_id) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Faltan campos requeridos: título, descripción y curso",
+        },
+        { status: 400 },
+      )
+    }
+
+    // Verificar que el curso existe
+    const { data: courseExists, error: courseError } = await supabase
+      .from("courses")
+      .select("id")
+      .eq("id", course_id)
+      .single()
+
+    if (courseError || !courseExists) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "El curso especificado no existe",
+        },
+        { status: 400 },
+      )
+    }
+
     const { data: lesson, error: lessonError } = await supabase
       .from("lessons")
       .insert({
-        course_id,
         title,
         description,
-        video_url,
-        duration_minutes,
-        order_index,
-        is_free: is_free || false,
+        video_url: video_url || null,
+        duration_minutes: duration_minutes ? Number.parseInt(duration_minutes) : 0,
+        course_id,
+        order_index: order_index ? Number.parseInt(order_index) : 1,
+        is_free: false,
         archived: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       })
       .select()
       .single()
 
     if (lessonError) {
       console.error("Error creando lección:", lessonError)
-      return NextResponse.json({
-        success: false,
-        message: `Error creando lección: ${lessonError.message}`,
-      })
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Error creando lección",
+          error: lessonError,
+        },
+        { status: 500 },
+      )
     }
 
     return NextResponse.json({
       success: true,
-      data: lesson,
       message: "Lección creada exitosamente",
+      data: lesson,
     })
   } catch (error) {
-    console.error("Error interno en POST /api/admin/lessons:", error)
-    return NextResponse.json({
-      success: false,
-      message: `Error interno: ${(error as Error).message}`,
-    })
+    console.error("Error en POST lección:", error)
+    return NextResponse.json(
+      {
+        success: false,
+        message: "Error interno del servidor",
+        error: error instanceof Error ? error.message : "Error desconocido",
+      },
+      { status: 500 },
+    )
   }
 }
