@@ -63,10 +63,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (result.success && result.user) {
         setUser(result.user)
+
+        // Determinar redirección basada en el rol
+        let redirectTo = "/dashboard"
+        if (result.user.role === "admin") {
+          redirectTo = "/admin"
+        }
+
         return {
           success: true,
           message: result.message,
-          redirectTo: result.redirectTo,
+          redirectTo: redirectTo,
         }
       } else {
         return {

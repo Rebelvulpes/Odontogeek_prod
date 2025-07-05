@@ -9,14 +9,14 @@ import { useEffect } from "react"
 interface RouteGuardProps {
   children: React.ReactNode
   requireAuth?: boolean
-  requireRole?: "admin" | "student"
+  requiredRole?: "admin" | "student"
   redirectTo?: string
 }
 
 export function RouteGuard({
   children,
   requireAuth = false,
-  requireRole,
+  requiredRole,
   redirectTo = "/auth/login",
 }: RouteGuardProps) {
   const { user, loading } = useAuth()
@@ -32,7 +32,7 @@ export function RouteGuard({
     }
 
     // Si requiere un rol específico y el usuario no lo tiene
-    if (requireRole && user && user.role !== requireRole) {
+    if (requiredRole && user && user.role !== requiredRole) {
       if (user.role === "admin") {
         router.push("/admin")
       } else if (user.role === "student") {
@@ -42,7 +42,7 @@ export function RouteGuard({
       }
       return
     }
-  }, [user, loading, requireAuth, requireRole, redirectTo, router])
+  }, [user, loading, requireAuth, requiredRole, redirectTo, router])
 
   // Mostrar loading mientras se verifica la autenticación
   if (loading) {
@@ -62,7 +62,7 @@ export function RouteGuard({
   }
 
   // Si requiere un rol específico y el usuario no lo tiene, no mostrar nada (se redirige)
-  if (requireRole && user && user.role !== requireRole) {
+  if (requiredRole && user && user.role !== requiredRole) {
     return null
   }
 
