@@ -39,11 +39,8 @@ export async function GET() {
       )
     }
 
-    // Obtener el número de inscripciones por curso (sin columna amount por ahora)
-    const { data: enrollments, error: enrollmentsError } = await supabase
-      .from("enrollments")
-      .select("course_id")
-      .eq("payment_status", "completed")
+    // Obtener el número de inscripciones por curso (sin filtro de payment_status por ahora)
+    const { data: enrollments, error: enrollmentsError } = await supabase.from("enrollments").select("course_id")
 
     if (enrollmentsError) {
       console.error("Error obteniendo inscripciones:", enrollmentsError)
@@ -59,7 +56,6 @@ export async function GET() {
         }
         const current = enrollmentsByCourse.get(courseId)
         current.count += 1
-        // Por ahora calculamos revenue basado en el precio del curso
       })
     }
 

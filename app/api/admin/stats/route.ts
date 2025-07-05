@@ -38,15 +38,12 @@ export async function GET() {
     }
 
     // Calcular ingresos totales basado en enrollments y precios de cursos
-    const { data: enrollments, error: enrollmentsError } = await supabase
-      .from("enrollments")
-      .select(`
+    const { data: enrollments, error: enrollmentsError } = await supabase.from("enrollments").select(`
         course_id,
         courses (
           price
         )
       `)
-      .eq("payment_status", "completed")
 
     if (enrollmentsError) {
       console.error("Error obteniendo enrollments:", enrollmentsError)
