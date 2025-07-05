@@ -9,7 +9,7 @@ import { ChevronLeft, ChevronRight, Play, Calendar, Users, Award, TrendingUp } f
 const slides = [
   {
     id: 1,
-    type: "course",
+    type: "Curso",
     title: "Nuevo Curso: Férulas Oclusales",
     subtitle: "Incrementa tus ingresos rápidamente imprimiendo tus propias férulas",
     description: "Olvídate de mandar a laboratorio y hazlas tú mismo",
@@ -22,18 +22,18 @@ const slides = [
     stats: [
       { icon: Users, label: "1,250+ estudiantes", value: "1,250+" },
       { icon: Play, label: "24 lecciones", value: "24" },
-      { icon: Award, label: "Certificado incluido", value: "Certificado" },
+      { icon: Award, label: "Certificado SEP", value: "Certificado" },
     ],
   },
   {
     id: 2,
-    type: "news",
-    title: "Congreso Internacional de Odontología 2024",
-    subtitle: "Participa en el Evento Dental del Año",
-    description: "Únete a más de 5,000 profesionales dentales en el congreso más importante de Latinoamérica.",
+    type: "Noticias",
+    title: "¡Bienvenidos a Odontogeek!",
+    subtitle: "Tu nueva plataforma de actualización continua para odontólogos modernos",
+    description: "Únete a la comunidad más moderna y prometedora del rubro. El inicio de este proyecto está enfocado en llevar las técnicas y conocimientos más modernos de la odontología dental, incluyendo el futuro de la industria: La Odontología Digital.",
     backgroundColor: "from-purple-900 to-blue-900",
     promoImage: "/placeholder.svg?height=500&width=400&text=Congreso+2024",
-    badge: "Evento Especial",
+    badge: "Inauguración",
     badgeColor: "bg-blue-500",
     cta: "Más Información",
     ctaLink: "/events/congress-2024",
