@@ -1,284 +1,278 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { ChevronLeft, ChevronRight, Play, Clock, Users, Star, BookOpen } from "lucide-react"
 import Link from "next/link"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { ChevronLeft, ChevronRight, Play, Calendar, Users, Award, TrendingUp } from "lucide-react"
 
-interface Course {
-  id: string
-  title: string
-  description: string
-  price: number
-  instructor_name: string
-  thumbnail_url: string
-  duration_hours: number
-  lessons: Array<{
-    id: string
-    title: string
-    duration_minutes: number
-    is_free: boolean
-  }>
-  tags: Array<{
-    id: string
-    name: string
-    color: string
-  }>
-  students_count: number
-}
+const slides = [
+  {
+    id: 1,
+    type: "course",
+    title: "Nuevo Curso: Férulas Oclusales",
+    subtitle: "Incrementa tus ingresos rápidamente imprimiendo tus propias férulas",
+    description: "Olvídate de mandar a laboratorio y hazlas tú mismo",
+    backgroundColor: "from-blue-900 to-indigo-900",
+    promoImage: "https://res.cloudinary.com/dxe6ugbzi/image/upload/v1746227801/fe%CC%81rulas_medit_qozti5.jpg",
+    badge: "Nuevo Curso",
+    badgeColor: "bg-green-500",
+    cta: "Ver Curso",
+    ctaLink: "/courses/1",
+    stats: [
+      { icon: Users, label: "1,250+ estudiantes", value: "1,250+" },
+      { icon: Play, label: "24 lecciones", value: "24" },
+      { icon: Award, label: "Certificado incluido", value: "Certificado" },
+    ],
+  },
+  {
+    id: 2,
+    type: "news",
+    title: "Congreso Internacional de Odontología 2024",
+    subtitle: "Participa en el Evento Dental del Año",
+    description: "Únete a más de 5,000 profesionales dentales en el congreso más importante de Latinoamérica.",
+    backgroundColor: "from-purple-900 to-blue-900",
+    promoImage: "/placeholder.svg?height=500&width=400&text=Congreso+2024",
+    badge: "Evento Especial",
+    badgeColor: "bg-blue-500",
+    cta: "Más Información",
+    ctaLink: "/events/congress-2024",
+    stats: [
+      { icon: Calendar, label: "15-17 Marzo", value: "3 días" },
+      { icon: Users, label: "5,000+ asistentes", value: "5,000+" },
+      { icon: Award, label: "50+ ponentes", value: "50+" },
+    ],
+  },
+  {
+    id: 3,
+    type: "promotion",
+    title: "Oferta Especial: 40% de Descuento",
+    subtitle: "Acceso Completo a Todos los Cursos",
+    description:
+      "Por tiempo limitado, obtén acceso a nuestra biblioteca completa de cursos dentales con un descuento exclusivo.",
+    backgroundColor: "from-red-900 to-pink-900",
+    promoImage: "/placeholder.svg?height=500&width=400&text=40%+Descuento",
+    badge: "Oferta Limitada",
+    badgeColor: "bg-red-500",
+    cta: "Aprovechar Oferta",
+    ctaLink: "/courses?promo=special40",
+    stats: [
+      { icon: TrendingUp, label: "40% descuento", value: "40%" },
+      { icon: Play, label: "15+ cursos", value: "15+" },
+      { icon: Calendar, label: "Válido hasta fin de mes", value: "Limitado" },
+    ],
+  },
+  {
+    id: 4,
+    type: "success",
+    title: "Más de 10,000 Profesionales Capacitados",
+    subtitle: "Únete a la Comunidad OdontoGeek",
+    description:
+      "Miles de dentistas ya han mejorado sus habilidades con nuestros cursos. Forma parte de la comunidad más grande.",
+    backgroundColor: "from-green-900 to-teal-900",
+    promoImage: "/placeholder.svg?height=500&width=400&text=10K+Profesionales",
+    badge: "Comunidad",
+    badgeColor: "bg-purple-500",
+    cta: "Únete Ahora",
+    ctaLink: "/auth/register",
+    stats: [
+      { icon: Users, label: "10,000+ profesionales", value: "10,000+" },
+      { icon: Award, label: "5,000+ certificados", value: "5,000+" },
+      { icon: TrendingUp, label: "95% satisfacción", value: "95%" },
+    ],
+  },
+]
 
 export function HeroCarousel() {
-  const [courses, setCourses] = useState<Course[]>([])
-  const [currentIndex, setCurrentIndex] = useState(0)
-  const [loading, setLoading] = useState(true)
+  const [currentSlide, setCurrentSlide] = useState(0)
+  const [isAutoPlaying, setIsAutoPlaying] = useState(true)
 
+  // Auto-play functionality
   useEffect(() => {
-    loadFeaturedCourses()
-  }, [])
+    if (!isAutoPlaying) return
 
-  useEffect(() => {
-    if (courses.length > 0) {
-      const timer = setInterval(() => {
-        setCurrentIndex((prevIndex) => (prevIndex + 1) % courses.length)
-      }, 5000)
-      return () => clearInterval(timer)
-    }
-  }, [courses.length])
+    const interval = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % slides.length)
+    }, 5000)
 
-  const loadFeaturedCourses = async () => {
-    try {
-      const response = await fetch("/api/courses?limit=5")
-      const result = await response.json()
-      if (result.success && result.data.courses) {
-        setCourses(result.data.courses)
-      }
-    } catch (error) {
-      console.error("Error cargando cursos destacados:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
+    return () => clearInterval(interval)
+  }, [isAutoPlaying])
 
   const nextSlide = () => {
-    setCurrentIndex((prevIndex) => (prevIndex + 1) % courses.length)
+    setCurrentSlide((prev) => (prev + 1) % slides.length)
+    setIsAutoPlaying(false)
   }
 
   const prevSlide = () => {
-    setCurrentIndex((prevIndex) => (prevIndex - 1 + courses.length) % courses.length)
+    setCurrentSlide((prev) => (prev - 1 + slides.length) % slides.length)
+    setIsAutoPlaying(false)
   }
 
-  if (loading) {
-    return (
-      <div className="relative h-[600px] bg-gradient-to-r from-blue-600 to-blue-800 flex items-center justify-center">
-        <div className="text-center text-white">
-          <div className="animate-spin w-8 h-8 border-4 border-white border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p>Cargando cursos destacados...</p>
-        </div>
-      </div>
-    )
+  const goToSlide = (index: number) => {
+    setCurrentSlide(index)
+    setIsAutoPlaying(false)
   }
 
-  if (courses.length === 0) {
-    return (
-      <div className="relative h-[600px] bg-gradient-to-r from-blue-600 to-blue-800 flex items-center justify-center">
-        <div className="text-center text-white max-w-2xl mx-auto px-4">
-          <BookOpen className="w-16 h-16 mx-auto mb-6 opacity-80" />
-          <h2 className="text-4xl font-bold mb-4">Cursos de Odontología Profesional</h2>
-          <p className="text-xl mb-8 opacity-90">
-            Descubre nuestra plataforma de educación especializada en odontología
-          </p>
-          <Button asChild size="lg" className="bg-white text-blue-600 hover:bg-gray-100">
-            <Link href="/courses">Explorar Cursos</Link>
-          </Button>
-        </div>
-      </div>
-    )
-  }
-
-  const currentCourse = courses[currentIndex]
+  const currentSlideData = slides[currentSlide]
 
   return (
-    <div className="relative h-[600px] overflow-hidden bg-gradient-to-r from-gray-900 to-gray-800">
-      {/* Imagen de fondo */}
-      <div className="absolute inset-0">
-        {currentCourse.thumbnail_url ? (
-          <img
-            src={currentCourse.thumbnail_url || "/placeholder.svg"}
-            alt={currentCourse.title}
-            className="w-full h-full object-cover opacity-30"
-          />
-        ) : (
-          <div className="w-full h-full bg-gradient-to-r from-blue-600 to-blue-800 opacity-80" />
-        )}
-        <div className="absolute inset-0 bg-black bg-opacity-50" />
+    <div className="relative min-h-[500px] sm:min-h-[600px] lg:min-h-[700px] overflow-hidden">
+      {/* Color Background */}
+      <div
+        className={`absolute inset-0 bg-gradient-to-br ${currentSlideData.backgroundColor} transition-all duration-1000`}
+      />
+
+      {/* Mobile Background Image with High Transparency */}
+      <div className="absolute inset-0 lg:hidden">
+        <img
+          src={currentSlideData.promoImage || "/placeholder.svg"}
+          alt={currentSlideData.title}
+          className="w-full h-full object-cover opacity-10"
+          onError={(e) => {
+            const target = e.target as HTMLImageElement
+            target.src = "/placeholder.svg?height=500&width=400&text=Imagen+no+disponible"
+          }}
+        />
       </div>
 
-      {/* Contenido */}
-      <div className="relative z-10 h-full flex items-center">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            {/* Información del curso */}
-            <div className="text-white space-y-6">
-              {/* Tags */}
-              <div className="flex flex-wrap gap-2">
-                {currentCourse.tags?.slice(0, 3).map((tag) => (
-                  <Badge
-                    key={tag.id}
-                    className="text-xs font-medium px-3 py-1"
-                    style={{
-                      backgroundColor: tag.color + "40",
-                      color: "white",
-                      borderColor: tag.color,
-                    }}
-                  >
-                    {tag.name}
-                  </Badge>
-                ))}
-                {currentCourse.price === 0 && (
-                  <Badge className="bg-green-500 text-white font-medium px-3 py-1">Gratuito</Badge>
-                )}
-              </div>
-
-              {/* Título */}
-              <h1 className="text-4xl lg:text-5xl font-bold leading-tight">{currentCourse.title}</h1>
-
-              {/* Descripción */}
-              <p className="text-xl text-gray-200 leading-relaxed max-w-2xl">{currentCourse.description}</p>
-
-              {/* Instructor */}
-              <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-                  <Users className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <p className="font-semibold text-lg">{currentCourse.instructor_name}</p>
-                  <p className="text-gray-300 text-sm">Especialista en Odontología</p>
-                </div>
-              </div>
-
-              {/* Estadísticas */}
-              <div className="flex items-center space-x-8 text-sm">
-                <div className="flex items-center space-x-2">
-                  <Play className="w-5 h-5" />
-                  <span className="font-medium">{currentCourse.lessons?.length || 0} lecciones</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Clock className="w-5 h-5" />
-                  <span className="font-medium">{currentCourse.duration_hours}h</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Users className="w-5 h-5" />
-                  <span className="font-medium">{currentCourse.students_count} estudiantes</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Star className="w-5 h-5 text-yellow-400 fill-current" />
-                  <span className="font-medium">4.8</span>
-                </div>
-              </div>
-
-              {/* Lecciones gratuitas */}
-              {currentCourse.lessons?.some((lesson) => lesson.is_free) && (
-                <div className="bg-green-500 bg-opacity-20 border border-green-400 rounded-lg px-4 py-3">
-                  <p className="text-green-200 font-medium">✓ Incluye lecciones gratuitas para probar</p>
-                </div>
-              )}
-
-              {/* Botones de acción */}
-              <div className="flex flex-col sm:flex-row gap-4">
-                <Button
-                  asChild
-                  size="lg"
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 text-lg font-semibold"
-                >
-                  <Link href={`/courses/${currentCourse.id}`}>
-                    {currentCourse.price === 0 ? "Ver Curso Gratis" : `Comprar por $${currentCourse.price}`}
-                  </Link>
-                </Button>
-                <Button
-                  asChild
-                  variant="outline"
-                  size="lg"
-                  className="border-white text-white hover:bg-white hover:text-gray-900 px-8 py-3 text-lg bg-transparent"
-                >
-                  <Link href="/courses">Ver Todos los Cursos</Link>
-                </Button>
-              </div>
+      {/* Content */}
+      <div className="relative z-10 container mx-auto px-4 h-full min-h-[500px] sm:min-h-[600px] lg:min-h-[700px] flex items-center">
+        <div className="w-full lg:grid lg:grid-cols-2 lg:gap-12 lg:items-center">
+          {/* Text Content */}
+          <div className="text-white space-y-4 sm:space-y-6 text-center lg:text-left">
+            {/* Badge */}
+            <div className="flex justify-center lg:justify-start">
+              <Badge className={`${currentSlideData.badgeColor} text-white border-0 text-xs sm:text-sm px-3 py-1`}>
+                {currentSlideData.badge}
+              </Badge>
             </div>
 
-            {/* Imagen del curso */}
-            <div className="hidden lg:block">
-              <Card className="bg-white bg-opacity-10 backdrop-blur-sm border-white border-opacity-20 overflow-hidden">
-                <CardContent className="p-0">
-                  <div className="relative">
-                    {currentCourse.thumbnail_url ? (
-                      <img
-                        src={currentCourse.thumbnail_url || "/placeholder.svg"}
-                        alt={currentCourse.title}
-                        className="w-full h-80 object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-80 bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center">
-                        <BookOpen className="w-20 h-20 text-white opacity-50" />
-                      </div>
-                    )}
+            {/* Title */}
+            <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold leading-tight">
+              {currentSlideData.title}
+            </h1>
 
-                    {/* Overlay con botón de play */}
-                    <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity duration-300">
-                      <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-lg">
-                        <Play className="w-8 h-8 text-blue-600 ml-1" />
-                      </div>
-                    </div>
+            {/* Subtitle */}
+            <h2 className="text-lg sm:text-xl md:text-2xl text-blue-100 font-medium">{currentSlideData.subtitle}</h2>
 
-                    {/* Precio */}
-                    {currentCourse.price > 0 && (
-                      <div className="absolute top-4 right-4">
-                        <Badge className="bg-blue-600 text-white font-bold px-4 py-2 text-lg">
-                          ${currentCourse.price}
-                        </Badge>
-                      </div>
-                    )}
+            {/* Description */}
+            <p className="text-sm sm:text-base lg:text-lg text-blue-50 leading-relaxed max-w-lg mx-auto lg:mx-0">
+              {currentSlideData.description}
+            </p>
+
+            {/* Stats - Mobile optimized */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 max-w-lg mx-auto lg:mx-0">
+              {currentSlideData.stats.map((stat, index) => (
+                <div key={index} className="flex items-center justify-center lg:justify-start space-x-2 text-blue-100">
+                  <stat.icon className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+                  <div className="text-center lg:text-left">
+                    <div className="font-bold text-white text-sm sm:text-base">{stat.value}</div>
+                    <div className="text-xs sm:text-sm">{stat.label}</div>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              ))}
+            </div>
+
+            {/* CTA Buttons - Mobile optimized */}
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-4 sm:pt-6 max-w-lg mx-auto lg:mx-0">
+              <Link href={currentSlideData.ctaLink} className="w-full sm:w-auto">
+                <Button
+                  size="lg"
+                  className="w-full sm:w-auto text-base sm:text-lg px-6 sm:px-8 py-3 bg-white text-blue-600 hover:bg-blue-50"
+                >
+                  {currentSlideData.cta}
+                  <Play className="ml-2 w-4 h-4 sm:w-5 sm:h-5" />
+                </Button>
+              </Link>
+              <Link href="/courses" className="w-full sm:w-auto">
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="w-full sm:w-auto text-base sm:text-lg px-6 sm:px-8 py-3 border-white text-white hover:bg-white hover:text-blue-600 bg-transparent"
+                >
+                  Explorar Cursos
+                </Button>
+              </Link>
+            </div>
+          </div>
+
+          {/* Promotional Image - Desktop Only */}
+          <div className="hidden lg:flex lg:justify-center lg:items-center">
+            <div className="relative">
+              {/* Main promotional image - Square container for 1080x1080 images */}
+              <div className="relative z-10 w-80 h-80 xl:w-96 xl:h-96">
+                <img
+                  src={currentSlideData.promoImage || "/placeholder.svg"}
+                  alt={currentSlideData.title}
+                  className="w-full h-full object-cover rounded-2xl shadow-2xl border-4 border-white/20"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement
+                    target.src = "/placeholder.svg?height=400&width=400&text=Imagen+no+disponible"
+                  }}
+                />
+              </div>
+
+              {/* Decorative elements */}
+              <div className="absolute -top-4 -right-4 w-16 h-16 xl:w-20 xl:h-20 bg-yellow-400 rounded-full flex items-center justify-center animate-bounce z-20">
+                <Award className="w-6 h-6 xl:w-8 xl:h-8 text-yellow-800" />
+              </div>
+              <div className="absolute -bottom-4 -left-4 w-12 h-12 xl:w-16 xl:h-16 bg-green-400 rounded-full flex items-center justify-center animate-pulse z-20">
+                <Users className="w-5 h-5 xl:w-6 xl:h-6 text-green-800" />
+              </div>
+
+              {/* Background glow effect */}
+              <div className="absolute inset-0 bg-white/10 rounded-2xl blur-xl scale-110 -z-10"></div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Controles de navegación */}
-      {courses.length > 1 && (
-        <>
-          <button
-            onClick={prevSlide}
-            className="absolute left-4 top-1/2 transform -translate-y-1/2 z-20 bg-white bg-opacity-20 hover:bg-opacity-30 backdrop-blur-sm rounded-full p-3 transition-all duration-200"
-          >
-            <ChevronLeft className="w-6 h-6 text-white" />
-          </button>
-          <button
-            onClick={nextSlide}
-            className="absolute right-4 top-1/2 transform -translate-y-1/2 z-20 bg-white bg-opacity-20 hover:bg-opacity-30 backdrop-blur-sm rounded-full p-3 transition-all duration-200"
-          >
-            <ChevronRight className="w-6 h-6 text-white" />
-          </button>
-        </>
-      )}
+      {/* Navigation Arrows - Mobile optimized */}
+      <button
+        onClick={prevSlide}
+        className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 sm:w-12 sm:h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-white/30 transition-colors"
+        aria-label="Slide anterior"
+      >
+        <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
+      </button>
 
-      {/* Indicadores */}
-      {courses.length > 1 && (
-        <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20">
-          <div className="flex space-x-2">
-            {courses.map((_, index) => (
-              <button
-                key={index}
-                onClick={() => setCurrentIndex(index)}
-                className={`w-3 h-3 rounded-full transition-all duration-200 ${
-                  index === currentIndex ? "bg-white" : "bg-white bg-opacity-50 hover:bg-opacity-75"
-                }`}
-              />
-            ))}
-          </div>
+      <button
+        onClick={nextSlide}
+        className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 sm:w-12 sm:h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-white/30 transition-colors"
+        aria-label="Siguiente slide"
+      >
+        <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
+      </button>
+
+      {/* Dots Indicator - Mobile optimized */}
+      <div className="absolute bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-20 flex space-x-2">
+        {slides.map((_, index) => (
+          <button
+            key={index}
+            onClick={() => goToSlide(index)}
+            className={`w-2 h-2 sm:w-3 sm:h-3 rounded-full transition-all duration-300 ${
+              index === currentSlide ? "bg-white scale-125" : "bg-white/50 hover:bg-white/75"
+            }`}
+            aria-label={`Ir al slide ${index + 1}`}
+          />
+        ))}
+      </div>
+
+      {/* Progress Bar */}
+      <div className="absolute bottom-0 left-0 w-full h-1 bg-white/20">
+        <div
+          className="h-full bg-white transition-all duration-300 ease-linear"
+          style={{
+            width: `${((currentSlide + 1) / slides.length) * 100}%`,
+          }}
+        />
+      </div>
+
+      {/* Auto-play indicator - Hidden on mobile */}
+      {isAutoPlaying && (
+        <div className="hidden sm:flex absolute top-4 right-4 z-20 items-center space-x-2 text-white/80 text-sm">
+          <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
+          <span>Auto</span>
         </div>
       )}
     </div>
