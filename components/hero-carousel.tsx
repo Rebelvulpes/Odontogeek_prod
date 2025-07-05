@@ -195,12 +195,12 @@ export function HeroCarousel() {
           {/* Promotional Image - Desktop Only */}
           <div className="hidden lg:flex lg:justify-center lg:items-center">
             <div className="relative">
-              {/* Main promotional image */}
-              <div className="relative z-10">
+              {/* Main promotional image - Now Square */}
+              <div className="relative z-10 w-80 h-80 xl:w-96 xl:h-96">
                 <img
                   src={currentSlideData.promoImage || "/placeholder.svg"}
                   alt={currentSlideData.title}
-                  className="w-80 h-96 xl:w-96 xl:h-[480px] object-cover rounded-2xl shadow-2xl border-4 border-white/20"
+                  className="w-full h-full object-cover rounded-2xl shadow-2xl border-4 border-white/20"
                 />
               </div>
 
