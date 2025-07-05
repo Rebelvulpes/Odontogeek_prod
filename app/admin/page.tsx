@@ -29,7 +29,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { toast } from "@/hooks/use-toast"
 import { Navigation } from "@/components/navigation"
@@ -46,7 +45,10 @@ import {
   Archive,
   Play,
   Pause,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 
 interface User {
   id: string
@@ -119,6 +121,7 @@ export default function AdminPanel() {
   const [courseTags, setCourseTags] = useState<CourseTag[]>([])
   const [carouselSlides, setCarouselSlides] = useState<CarouselSlide[]>([])
   const [loading, setLoading] = useState(true)
+  const [openCourses, setOpenCourses] = useState<Set<string>>(new Set())
 
   // Dialog states
   const [courseDialogOpen, setCourseDialogOpen] = useState(false)
@@ -129,6 +132,7 @@ export default function AdminPanel() {
   const [editingLesson, setEditingLesson] = useState<Lesson | null>(null)
   const [editingTag, setEditingTag] = useState<CourseTag | null>(null)
   const [editingSlide, setEditingSlide] = useState<CarouselSlide | null>(null)
+  const [selectedCourseId, setSelectedCourseId] = useState<string>("")
 
   // Form states
   const [courseForm, setCourseForm] = useState({
@@ -144,7 +148,6 @@ export default function AdminPanel() {
     description: "",
     video_url: "",
     duration_minutes: "",
-    course_id: "",
     order_index: "",
   })
 
@@ -416,8 +419,8 @@ export default function AdminPanel() {
   }
 
   const handleCreateLesson = async () => {
-    if (!lessonForm.course_id) {
-      toast({ title: "Error", description: "Debes seleccionar un curso", variant: "destructive" })
+    if (!selectedCourseId) {
+      toast({ title: "Error", description: "Error: No se ha seleccionado un curso", variant: "destructive" })
       return
     }
 
@@ -430,7 +433,7 @@ export default function AdminPanel() {
           description: lessonForm.description,
           video_url: lessonForm.video_url,
           duration_minutes: Number.parseInt(lessonForm.duration_minutes),
-          course_id: lessonForm.course_id,
+          course_id: selectedCourseId,
           order_index: Number.parseInt(lessonForm.order_index),
         }),
       })
@@ -443,9 +446,9 @@ export default function AdminPanel() {
           description: "",
           video_url: "",
           duration_minutes: "",
-          course_id: "",
           order_index: "",
         })
+        setSelectedCourseId("")
         fetchLessons()
         fetchStats()
       } else {
@@ -470,7 +473,7 @@ export default function AdminPanel() {
           description: lessonForm.description,
           video_url: lessonForm.video_url,
           duration_minutes: Number.parseInt(lessonForm.duration_minutes),
-          course_id: lessonForm.course_id,
+          course_id: editingLesson.course_id,
           order_index: Number.parseInt(lessonForm.order_index),
         }),
       })
@@ -484,7 +487,6 @@ export default function AdminPanel() {
           description: "",
           video_url: "",
           duration_minutes: "",
-          course_id: "",
           order_index: "",
         })
         fetchLessons()
@@ -521,36 +523,36 @@ export default function AdminPanel() {
       description: lesson.description || "",
       video_url: lesson.video_url || "",
       duration_minutes: lesson.duration_minutes?.toString() || "",
-      course_id: lesson.course_id || "",
       order_index: lesson.order_index?.toString() || "",
-    })
-    setLessonDialogOpen(true)
-  }
-
-  const openNewLessonDialog = () => {
-    setEditingLesson(null)
-    setLessonForm({
-      title: "",
-      description: "",
-      video_url: "",
-      duration_minutes: "",
-      course_id: "",
-      order_index: "",
     })
     setLessonDialogOpen(true)
   }
 
   const openNewLessonDialogForCourse = (courseId: string) => {
     setEditingLesson(null)
+    setSelectedCourseId(courseId)
     setLessonForm({
       title: "",
       description: "",
       video_url: "",
       duration_minutes: "",
-      course_id: courseId,
       order_index: "",
     })
     setLessonDialogOpen(true)
+  }
+
+  const toggleCourseOpen = (courseId: string) => {
+    const newOpenCourses = new Set(openCourses)
+    if (newOpenCourses.has(courseId)) {
+      newOpenCourses.delete(courseId)
+    } else {
+      newOpenCourses.add(courseId)
+    }
+    setOpenCourses(newOpenCourses)
+  }
+
+  const getLessonsForCourse = (courseId: string) => {
+    return lessons.filter((lesson) => lesson.course_id === courseId).sort((a, b) => a.order_index - b.order_index)
   }
 
   const handleCreateTag = async () => {
@@ -947,19 +949,7 @@ export default function AdminPanel() {
                             <TableCell className="font-medium">{course.title}</TableCell>
                             <TableCell>{course.instructor_name}</TableCell>
                             <TableCell>${course.price}</TableCell>
-                            <TableCell>
-                              <div className="flex items-center space-x-2">
-                                <span>{course.lessonsCount || 0} lecciones</span>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => openNewLessonDialogForCourse(course.id)}
-                                >
-                                  <Plus className="w-4 h-4 mr-1" />
-                                  Agregar
-                                </Button>
-                              </div>
-                            </TableCell>
+                            <TableCell>{course.lessonsCount || 0}</TableCell>
                             <TableCell>{course.students || 0}</TableCell>
                             <TableCell>
                               <Badge variant={course.archived ? "secondary" : "default"}>
@@ -1018,198 +1008,226 @@ export default function AdminPanel() {
               </Card>
             </TabsContent>
 
-            {/* Lessons Tab */}
+            {/* Lessons Tab - Organized by Course */}
             <TabsContent value="lessons">
               <Card>
                 <CardHeader>
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <CardTitle>Gestión de Lecciones</CardTitle>
-                      <CardDescription>Administra las lecciones de los cursos</CardDescription>
-                    </div>
-                    <Dialog open={lessonDialogOpen} onOpenChange={setLessonDialogOpen}>
-                      <DialogTrigger asChild>
-                        <Button onClick={openNewLessonDialog}>
-                          <Plus className="w-4 h-4 mr-2" />
-                          Nueva Lección
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-2xl">
-                        <DialogHeader>
-                          <DialogTitle>{editingLesson ? "Editar Lección" : "Crear Nueva Lección"}</DialogTitle>
-                          <DialogDescription>
-                            {editingLesson
-                              ? "Modifica los datos de la lección"
-                              : "Completa la información de la nueva lección"}
-                          </DialogDescription>
-                        </DialogHeader>
-                        <div className="grid gap-4 py-4">
-                          <div className="grid gap-2">
-                            <Label htmlFor="course-select">Curso *</Label>
-                            <Select
-                              value={lessonForm.course_id}
-                              onValueChange={(value) => setLessonForm({ ...lessonForm, course_id: value })}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Seleccionar curso" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {Array.isArray(courses) &&
-                                  courses
-                                    .filter((course) => !course.archived)
-                                    .map((course) => (
-                                      <SelectItem key={course.id} value={course.id}>
-                                        {course.title}
-                                      </SelectItem>
-                                    ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          {lessonForm.course_id && (
-                            <div className="grid gap-2">
-                              <Label>Curso seleccionado</Label>
-                              <div className="rounded-md border px-3 py-2 text-sm">
-                                {courses.find((c) => c.id === lessonForm.course_id)?.title}
-                              </div>
-                            </div>
-                          )}
-                          <div className="grid gap-2">
-                            <Label htmlFor="lesson-title">Título</Label>
-                            <Input
-                              id="lesson-title"
-                              value={lessonForm.title}
-                              onChange={(e) => setLessonForm({ ...lessonForm, title: e.target.value })}
-                              placeholder="Título de la lección"
-                            />
-                          </div>
-                          <div className="grid gap-2">
-                            <Label htmlFor="lesson-description">Descripción</Label>
-                            <Textarea
-                              id="lesson-description"
-                              value={lessonForm.description}
-                              onChange={(e) => setLessonForm({ ...lessonForm, description: e.target.value })}
-                              placeholder="Descripción de la lección"
-                              rows={3}
-                            />
-                          </div>
-                          <div className="grid gap-2">
-                            <Label htmlFor="video-url">URL del Video</Label>
-                            <Input
-                              id="video-url"
-                              value={lessonForm.video_url}
-                              onChange={(e) => setLessonForm({ ...lessonForm, video_url: e.target.value })}
-                              placeholder="https://ejemplo.com/video.mp4"
-                            />
-                          </div>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="grid gap-2">
-                              <Label htmlFor="duration">Duración (min)</Label>
-                              <Input
-                                id="duration"
-                                type="number"
-                                value={lessonForm.duration_minutes}
-                                onChange={(e) => setLessonForm({ ...lessonForm, duration_minutes: e.target.value })}
-                                placeholder="30"
-                              />
-                            </div>
-                            <div className="grid gap-2">
-                              <Label htmlFor="order">Orden</Label>
-                              <Input
-                                id="order"
-                                type="number"
-                                value={lessonForm.order_index}
-                                onChange={(e) => setLessonForm({ ...lessonForm, order_index: e.target.value })}
-                                placeholder="1"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                        <DialogFooter>
-                          <Button variant="outline" onClick={() => setLessonDialogOpen(false)}>
-                            Cancelar
-                          </Button>
-                          <Button onClick={editingLesson ? handleUpdateLesson : handleCreateLesson}>
-                            {editingLesson ? "Actualizar" : "Crear"}
-                          </Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
-                  </div>
+                  <CardTitle>Gestión de Lecciones por Curso</CardTitle>
+                  <CardDescription>Administra las lecciones organizadas por curso</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Título</TableHead>
-                        <TableHead>Curso</TableHead>
-                        <TableHead>Duración</TableHead>
-                        <TableHead>Orden</TableHead>
-                        <TableHead>Fecha</TableHead>
-                        <TableHead>Acciones</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {Array.isArray(lessons) && lessons.length > 0 ? (
-                        lessons.map((lesson) => {
-                          const course = Array.isArray(courses) ? courses.find((c) => c.id === lesson.course_id) : null
-                          return (
-                            <TableRow key={lesson.id}>
-                              <TableCell className="font-medium">{lesson.title}</TableCell>
-                              <TableCell>
-                                <div className="flex items-center space-x-2">
-                                  <span>{lesson.courses?.title || course?.title || "Curso no encontrado"}</span>
-                                  {course?.archived && (
-                                    <Badge variant="secondary" className="text-xs">
-                                      Archivado
-                                    </Badge>
-                                  )}
+                <CardContent className="space-y-6">
+                  {Array.isArray(courses) && courses.length > 0 ? (
+                    courses.map((course) => {
+                      const courseLessons = getLessonsForCourse(course.id)
+                      const isOpen = openCourses.has(course.id)
+
+                      return (
+                        <div key={course.id} className="border rounded-lg">
+                          <Collapsible open={isOpen} onOpenChange={() => toggleCourseOpen(course.id)}>
+                            <CollapsibleTrigger asChild>
+                              <div className="flex items-center justify-between p-4 hover:bg-gray-50 cursor-pointer">
+                                <div className="flex items-center space-x-4">
+                                  {isOpen ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
+                                  <img
+                                    src={course.thumbnail_url || "/placeholder.svg"}
+                                    alt={course.title}
+                                    className="w-12 h-8 object-cover rounded"
+                                    onError={(e) => {
+                                      const target = e.target as HTMLImageElement
+                                      target.src = "/placeholder.jpg"
+                                    }}
+                                  />
+                                  <div>
+                                    <h3 className="font-semibold text-lg">{course.title}</h3>
+                                    <p className="text-sm text-gray-600">
+                                      {courseLessons.length} lecciones • {course.instructor_name}
+                                    </p>
+                                  </div>
                                 </div>
-                              </TableCell>
-                              <TableCell>{lesson.duration_minutes} min</TableCell>
-                              <TableCell>{lesson.order_index}</TableCell>
-                              <TableCell>{new Date(lesson.created_at).toLocaleDateString()}</TableCell>
-                              <TableCell>
                                 <div className="flex items-center space-x-2">
-                                  <Button variant="ghost" size="sm" onClick={() => openEditLessonDialog(lesson)}>
-                                    <Edit className="w-4 h-4" />
+                                  <Badge variant={course.archived ? "secondary" : "default"}>
+                                    {course.archived ? "Archivado" : "Activo"}
+                                  </Badge>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      openNewLessonDialogForCourse(course.id)
+                                    }}
+                                    disabled={course.archived}
+                                  >
+                                    <Plus className="w-4 h-4 mr-1" />
+                                    Nueva Lección
                                   </Button>
-                                  <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                      <Button variant="ghost" size="sm">
-                                        <Trash2 className="w-4 h-4 text-red-500" />
-                                      </Button>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                      <AlertDialogHeader>
-                                        <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                          Esta acción no se puede deshacer. Se eliminará permanentemente la lección.
-                                        </AlertDialogDescription>
-                                      </AlertDialogHeader>
-                                      <AlertDialogFooter>
-                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                        <AlertDialogAction onClick={() => handleDeleteLesson(lesson.id)}>
-                                          Eliminar
-                                        </AlertDialogAction>
-                                      </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                  </AlertDialog>
                                 </div>
-                              </TableCell>
-                            </TableRow>
-                          )
-                        })
-                      ) : (
-                        <TableRow>
-                          <TableCell colSpan={6} className="text-center py-8">
-                            No hay lecciones disponibles
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
+                              </div>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent>
+                              <div className="px-4 pb-4">
+                                {courseLessons.length > 0 ? (
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow>
+                                        <TableHead>Orden</TableHead>
+                                        <TableHead>Título</TableHead>
+                                        <TableHead>Duración</TableHead>
+                                        <TableHead>Fecha</TableHead>
+                                        <TableHead>Acciones</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {courseLessons.map((lesson) => (
+                                        <TableRow key={lesson.id}>
+                                          <TableCell className="font-medium">#{lesson.order_index}</TableCell>
+                                          <TableCell>{lesson.title}</TableCell>
+                                          <TableCell>{lesson.duration_minutes} min</TableCell>
+                                          <TableCell>{new Date(lesson.created_at).toLocaleDateString()}</TableCell>
+                                          <TableCell>
+                                            <div className="flex items-center space-x-2">
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => openEditLessonDialog(lesson)}
+                                              >
+                                                <Edit className="w-4 h-4" />
+                                              </Button>
+                                              <AlertDialog>
+                                                <AlertDialogTrigger asChild>
+                                                  <Button variant="ghost" size="sm">
+                                                    <Trash2 className="w-4 h-4 text-red-500" />
+                                                  </Button>
+                                                </AlertDialogTrigger>
+                                                <AlertDialogContent>
+                                                  <AlertDialogHeader>
+                                                    <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                                                    <AlertDialogDescription>
+                                                      Esta acción no se puede deshacer. Se eliminará permanentemente la
+                                                      lección.
+                                                    </AlertDialogDescription>
+                                                  </AlertDialogHeader>
+                                                  <AlertDialogFooter>
+                                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                    <AlertDialogAction onClick={() => handleDeleteLesson(lesson.id)}>
+                                                      Eliminar
+                                                    </AlertDialogAction>
+                                                  </AlertDialogFooter>
+                                                </AlertDialogContent>
+                                              </AlertDialog>
+                                            </div>
+                                          </TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
+                                ) : (
+                                  <div className="text-center py-8 text-gray-500">
+                                    <GraduationCap className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                                    <p>No hay lecciones en este curso</p>
+                                    <Button
+                                      variant="outline"
+                                      className="mt-2 bg-transparent"
+                                      onClick={() => openNewLessonDialogForCourse(course.id)}
+                                      disabled={course.archived}
+                                    >
+                                      <Plus className="w-4 h-4 mr-1" />
+                                      Crear primera lección
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+                            </CollapsibleContent>
+                          </Collapsible>
+                        </div>
+                      )
+                    })
+                  ) : (
+                    <div className="text-center py-12">
+                      <BookOpen className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                      <h3 className="text-lg font-semibold mb-2">No hay cursos disponibles</h3>
+                      <p className="text-gray-600 mb-4">Crea tu primer curso para comenzar a agregar lecciones</p>
+                      <Button onClick={openNewCourseDialog}>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Crear Primer Curso
+                      </Button>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
+
+              {/* Lesson Dialog */}
+              <Dialog open={lessonDialogOpen} onOpenChange={setLessonDialogOpen}>
+                <DialogContent className="max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle>{editingLesson ? "Editar Lección" : "Crear Nueva Lección"}</DialogTitle>
+                    <DialogDescription>
+                      {editingLesson
+                        ? "Modifica los datos de la lección"
+                        : `Crear nueva lección para: ${courses.find((c) => c.id === selectedCourseId)?.title || "Curso seleccionado"}`}
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="lesson-title">Título</Label>
+                      <Input
+                        id="lesson-title"
+                        value={lessonForm.title}
+                        onChange={(e) => setLessonForm({ ...lessonForm, title: e.target.value })}
+                        placeholder="Título de la lección"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="lesson-description">Descripción</Label>
+                      <Textarea
+                        id="lesson-description"
+                        value={lessonForm.description}
+                        onChange={(e) => setLessonForm({ ...lessonForm, description: e.target.value })}
+                        placeholder="Descripción de la lección"
+                        rows={3}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="video-url">URL del Video</Label>
+                      <Input
+                        id="video-url"
+                        value={lessonForm.video_url}
+                        onChange={(e) => setLessonForm({ ...lessonForm, video_url: e.target.value })}
+                        placeholder="https://ejemplo.com/video.mp4"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="duration">Duración (min)</Label>
+                        <Input
+                          id="duration"
+                          type="number"
+                          value={lessonForm.duration_minutes}
+                          onChange={(e) => setLessonForm({ ...lessonForm, duration_minutes: e.target.value })}
+                          placeholder="30"
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="order">Orden</Label>
+                        <Input
+                          id="order"
+                          type="number"
+                          value={lessonForm.order_index}
+                          onChange={(e) => setLessonForm({ ...lessonForm, order_index: e.target.value })}
+                          placeholder="1"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setLessonDialogOpen(false)}>
+                      Cancelar
+                    </Button>
+                    <Button onClick={editingLesson ? handleUpdateLesson : handleCreateLesson}>
+                      {editingLesson ? "Actualizar" : "Crear"}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </TabsContent>
 
             {/* Tags Tab */}
