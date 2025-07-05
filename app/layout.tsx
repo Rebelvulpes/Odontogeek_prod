@@ -9,8 +9,8 @@ import { AuthProvider } from "@/contexts/auth-context"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Plataforma de Cursos Dentales",
-  description: "Aprende odontología con nuestros cursos especializados",
+  title: "OdontoGeek - Cursos de Odontología",
+  description: "Plataforma de cursos especializados en odontología",
     generator: 'v0.dev'
 }
 
@@ -22,13 +22,7 @@ export default function RootLayout({
   return (
     <html lang="es" suppressHydrationWarning>
       <body className={inter.className}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="light"
-          forcedTheme="light"
-          enableSystem={false}
-          disableTransitionOnChange
-        >
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
           <AuthProvider>
             {children}
             <Toaster />
