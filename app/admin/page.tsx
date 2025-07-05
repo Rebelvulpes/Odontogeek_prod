@@ -724,16 +724,16 @@ const AdminPage = () => {
   const openEditSlideDialog = (slide: CarouselSlide) => {
     setEditingSlide(slide)
     setNewSlide({
-      title: slide.title,
-      subtitle: slide.subtitle,
-      description: slide.description,
-      image_url: slide.image_url,
-      cta_text: slide.cta_text,
-      cta_link: slide.cta_link,
-      background_color: slide.background_color,
-      badge_text: slide.badge_text,
-      badge_color: slide.badge_color,
-      slide_type: slide.slide_type,
+      title: slide.title || "",
+      subtitle: slide.subtitle || "",
+      description: slide.description || "",
+      image_url: slide.image_url || "",
+      cta_text: slide.cta_text || "Ver Más",
+      cta_link: slide.cta_link || "/courses",
+      background_color: slide.background_color || "from-blue-900 to-indigo-900",
+      badge_text: slide.badge_text || "",
+      badge_color: slide.badge_color || "bg-blue-500",
+      slide_type: slide.slide_type || "general",
     })
     setIsEditSlideDialogOpen(true)
   }
