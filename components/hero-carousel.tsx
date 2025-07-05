@@ -43,44 +43,7 @@ const slides = [
       { icon: Award, label: "50+ ponentes", value: "50+" },
     ],
   },
-  {
-    id: 3,
-    type: "promotion",
-    title: "Oferta Especial: 40% de Descuento",
-    subtitle: "Acceso Completo a Todos los Cursos",
-    description:
-      "Por tiempo limitado, obtén acceso a nuestra biblioteca completa de cursos dentales con un descuento exclusivo.",
-    backgroundColor: "from-red-900 to-pink-900",
-    promoImage: "/placeholder.svg?height=500&width=400&text=40%+Descuento",
-    badge: "Oferta Limitada",
-    badgeColor: "bg-red-500",
-    cta: "Aprovechar Oferta",
-    ctaLink: "/courses?promo=special40",
-    stats: [
-      { icon: TrendingUp, label: "40% descuento", value: "40%" },
-      { icon: Play, label: "15+ cursos", value: "15+" },
-      { icon: Calendar, label: "Válido hasta fin de mes", value: "Limitado" },
-    ],
-  },
-  {
-    id: 4,
-    type: "success",
-    title: "Más de 10,000 Profesionales Capacitados",
-    subtitle: "Únete a la Comunidad OdontoGeek",
-    description:
-      "Miles de dentistas ya han mejorado sus habilidades con nuestros cursos. Forma parte de la comunidad más grande.",
-    backgroundColor: "from-green-900 to-teal-900",
-    promoImage: "/placeholder.svg?height=500&width=400&text=10K+Profesionales",
-    badge: "Comunidad",
-    badgeColor: "bg-purple-500",
-    cta: "Únete Ahora",
-    ctaLink: "/auth/register",
-    stats: [
-      { icon: Users, label: "10,000+ profesionales", value: "10,000+" },
-      { icon: Award, label: "5,000+ certificados", value: "5,000+" },
-      { icon: TrendingUp, label: "95% satisfacción", value: "95%" },
-    ],
-  },
+ 
 ]
 
 export function HeroCarousel() {
