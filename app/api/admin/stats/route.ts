@@ -37,10 +37,15 @@ export async function GET() {
       console.error("Error obteniendo lecciones:", lessonsError)
     }
 
-    // Obtener ingresos totales de la tabla enrollments
+    // Calcular ingresos totales basado en enrollments y precios de cursos
     const { data: enrollments, error: enrollmentsError } = await supabase
       .from("enrollments")
-      .select("amount")
+      .select(`
+        course_id,
+        courses (
+          price
+        )
+      `)
       .eq("payment_status", "completed")
 
     if (enrollmentsError) {
@@ -48,7 +53,13 @@ export async function GET() {
     }
 
     // Calcular ingresos totales
-    const totalRevenue = enrollments?.reduce((sum, enrollment) => sum + (enrollment.amount || 0), 0) || 0
+    let totalRevenue = 0
+    if (enrollments) {
+      totalRevenue = enrollments.reduce((sum, enrollment) => {
+        const coursePrice = enrollment.courses?.price || 0
+        return sum + coursePrice
+      }, 0)
+    }
 
     return NextResponse.json({
       success: true,

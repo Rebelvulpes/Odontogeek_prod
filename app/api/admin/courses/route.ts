@@ -39,10 +39,10 @@ export async function GET() {
       )
     }
 
-    // Obtener el número de inscripciones por curso
+    // Obtener el número de inscripciones por curso (sin columna amount por ahora)
     const { data: enrollments, error: enrollmentsError } = await supabase
       .from("enrollments")
-      .select("course_id, amount")
+      .select("course_id")
       .eq("payment_status", "completed")
 
     if (enrollmentsError) {
@@ -59,7 +59,7 @@ export async function GET() {
         }
         const current = enrollmentsByCourse.get(courseId)
         current.count += 1
-        current.revenue += enrollment.amount || 0
+        // Por ahora calculamos revenue basado en el precio del curso
       })
     }
 
@@ -103,13 +103,15 @@ export async function GET() {
     const processedCourses =
       courses?.map((course) => {
         const enrollmentData = enrollmentsByCourse.get(course.id) || { count: 0, revenue: 0 }
+        // Calcular revenue basado en el precio del curso y número de estudiantes
+        const revenue = enrollmentData.count * (course.price || 0)
         const lessonsCount = course.lessons ? course.lessons.filter((lesson) => !lesson.archived).length : 0
 
         return {
           ...course,
           tags: tagsByCourse.get(course.id) || [],
           students: enrollmentData.count,
-          revenue: enrollmentData.revenue,
+          revenue: revenue,
           lessonsCount: lessonsCount,
           status: course.archived ? "archived" : "published",
         }
