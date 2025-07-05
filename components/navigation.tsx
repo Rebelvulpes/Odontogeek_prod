@@ -2,175 +2,195 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { Menu, BookOpen, Users, Award, Phone, LogIn, UserPlus, LogOut } from "lucide-react"
+import { Menu, User, LogOut, Settings, BookOpen, Home } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 
 export function Navigation() {
-  const [isOpen, setIsOpen] = useState(false)
   const { user, logout } = useAuth()
-
-  const navigationItems = [
-    { name: "Cursos", href: "/courses", icon: BookOpen },
-    { name: "Nosotros", href: "/about", icon: Users },
-    { name: "Certificaciones", href: "/certifications", icon: Award },
-    { name: "Contacto", href: "/contact", icon: Phone },
-  ]
+  const router = useRouter()
+  const [isOpen, setIsOpen] = useState(false)
 
   const handleLogout = async () => {
-    await logout()
+    try {
+      await logout()
+      router.push("/")
+    } catch (error) {
+      console.error("Error al cerrar sesión:", error)
+    }
   }
 
+  const navigationItems = [
+    { href: "/", label: "Inicio", icon: Home },
+    { href: "/courses", label: "Cursos", icon: BookOpen },
+  ]
+
+  const adminItems = user?.role === "admin" ? [{ href: "/admin", label: "Admin", icon: Settings }] : []
+
+  const userItems = user ? [{ href: "/dashboard", label: "Mi Dashboard", icon: User }] : []
+
+  const allItems = [...navigationItems, ...userItems, ...adminItems]
+
   return (
-    <header className="bg-white border-b sticky top-0 z-50">
+    <nav className="border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60 sticky top-0 z-50">
       <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-16">
+        <div className="flex h-16 items-center justify-between">
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-2">
             <img src="/images/odontogeek-logo-new.png" alt="OdontoGeek" className="h-8 w-auto" />
+            <span className="font-bold text-xl text-gray-900">OdontoGeek</span>
           </Link>
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center space-x-8">
+          <div className="hidden md:flex items-center space-x-6">
             {navigationItems.map((item) => (
               <Link
-                key={item.name}
+                key={item.href}
                 href={item.href}
-                className="text-gray-700 hover:text-blue-600 font-medium transition-colors duration-200 flex items-center space-x-1"
+                className="text-gray-600 hover:text-gray-900 transition-colors font-medium"
               >
-                <item.icon className="w-4 h-4" />
-                <span>{item.name}</span>
+                {item.label}
               </Link>
             ))}
-          </nav>
 
-          {/* Desktop Auth Buttons */}
-          <div className="hidden md:flex items-center space-x-3">
-            {user ? (
-              <div className="flex items-center space-x-3">
-                <span className="text-gray-700">Hola, {user.name}</span>
+            {user && (
+              <>
+                <Link href="/dashboard" className="text-gray-600 hover:text-gray-900 transition-colors font-medium">
+                  Mi Dashboard
+                </Link>
                 {user.role === "admin" && (
-                  <Link href="/admin">
-                    <Button variant="outline" size="sm">
-                      Admin
-                    </Button>
+                  <Link href="/admin" className="text-gray-600 hover:text-gray-900 transition-colors font-medium">
+                    Admin
                   </Link>
                 )}
-                <Link href="/dashboard">
-                  <Button variant="outline" size="sm">
-                    Mi Panel
-                  </Button>
-                </Link>
-                <Button variant="ghost" size="sm" onClick={handleLogout} className="flex items-center space-x-1">
-                  <LogOut className="w-4 h-4" />
-                  <span>Salir</span>
-                </Button>
-              </div>
-            ) : (
-              <>
-                <Link href="/auth/login">
-                  <Button variant="ghost" size="sm" className="flex items-center space-x-1">
-                    <LogIn className="w-4 h-4" />
-                    <span>Iniciar Sesión</span>
-                  </Button>
-                </Link>
-                <Link href="/auth/register">
-                  <Button size="sm" className="flex items-center space-x-1">
-                    <UserPlus className="w-4 h-4" />
-                    <span>Registrarse</span>
-                  </Button>
-                </Link>
               </>
             )}
           </div>
 
-          {/* Mobile Menu Button */}
-          <Sheet open={isOpen} onOpenChange={setIsOpen}>
-            <SheetTrigger asChild className="md:hidden">
-              <Button variant="ghost" size="sm">
-                <Menu className="w-5 h-5" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="right" className="w-80">
-              <div className="flex flex-col h-full">
-                {/* Mobile Logo */}
-                <div className="flex items-center justify-between pb-6 border-b">
-                  <Link href="/" className="flex items-center space-x-2" onClick={() => setIsOpen(false)}>
-                    <img src="/images/odontogeek-logo-new.png" alt="OdontoGeek" className="h-8 w-auto" />
-                  </Link>
-                </div>
-
-                {/* Mobile Navigation */}
-                <nav className="flex-1 py-6">
-                  <div className="space-y-4">
-                    {navigationItems.map((item) => (
-                      <Link
-                        key={item.name}
-                        href={item.href}
-                        className="flex items-center space-x-3 text-gray-700 hover:text-blue-600 font-medium transition-colors duration-200 py-2"
-                        onClick={() => setIsOpen(false)}
-                      >
-                        <item.icon className="w-5 h-5" />
-                        <span>{item.name}</span>
+          {/* User Menu / Auth Buttons */}
+          <div className="flex items-center space-x-4">
+            {user ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src="/placeholder-user.jpg" alt={user.name} />
+                      <AvatarFallback>{user.name?.charAt(0)?.toUpperCase()}</AvatarFallback>
+                    </Avatar>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-56" align="end" forceMount>
+                  <DropdownMenuLabel className="font-normal">
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-sm font-medium leading-none">{user.name}</p>
+                      <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link href="/dashboard" className="cursor-pointer">
+                      <User className="mr-2 h-4 w-4" />
+                      <span>Mi Dashboard</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  {user.role === "admin" && (
+                    <DropdownMenuItem asChild>
+                      <Link href="/admin" className="cursor-pointer">
+                        <Settings className="mr-2 h-4 w-4" />
+                        <span>Administración</span>
                       </Link>
-                    ))}
-                  </div>
-                </nav>
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>Cerrar sesión</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <div className="hidden md:flex items-center space-x-2">
+                <Button variant="ghost" asChild>
+                  <Link href="/auth/login">Iniciar Sesión</Link>
+                </Button>
+                <Button asChild>
+                  <Link href="/auth/register">Registrarse</Link>
+                </Button>
+              </div>
+            )}
 
-                {/* Mobile Auth Buttons */}
-                <div className="border-t pt-6 space-y-3">
-                  {user ? (
-                    <div className="space-y-3">
-                      <div className="text-gray-700 font-medium">Hola, {user.name}</div>
-                      {user.role === "admin" && (
-                        <Link href="/admin" onClick={() => setIsOpen(false)}>
-                          <Button variant="outline" className="w-full justify-start bg-transparent">
-                            <Users className="w-4 h-4 mr-2" />
-                            Panel de Admin
-                          </Button>
+            {/* Mobile Menu */}
+            <Sheet open={isOpen} onOpenChange={setIsOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="md:hidden">
+                  <Menu className="h-5 w-5" />
+                  <span className="sr-only">Abrir menú</span>
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-[300px] sm:w-[400px]">
+                <div className="flex flex-col space-y-4 mt-4">
+                  {allItems.map((item) => (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors"
+                      onClick={() => setIsOpen(false)}
+                    >
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.label}</span>
+                    </Link>
+                  ))}
+
+                  {!user && (
+                    <div className="flex flex-col space-y-2 pt-4 border-t">
+                      <Button variant="ghost" asChild>
+                        <Link href="/auth/login" onClick={() => setIsOpen(false)}>
+                          Iniciar Sesión
                         </Link>
-                      )}
-                      <Link href="/dashboard" onClick={() => setIsOpen(false)}>
-                        <Button variant="outline" className="w-full justify-start bg-transparent">
-                          <BookOpen className="w-4 h-4 mr-2" />
-                          Mi Panel
-                        </Button>
-                      </Link>
-                      <Button
-                        variant="outline"
-                        className="w-full justify-start bg-transparent text-red-600 hover:text-red-700 hover:bg-red-50"
-                        onClick={() => {
-                          setIsOpen(false)
-                          handleLogout()
-                        }}
-                      >
-                        <LogOut className="w-4 h-4 mr-2" />
-                        Cerrar Sesión
+                      </Button>
+                      <Button asChild>
+                        <Link href="/auth/register" onClick={() => setIsOpen(false)}>
+                          Registrarse
+                        </Link>
                       </Button>
                     </div>
-                  ) : (
-                    <>
-                      <Link href="/auth/login" onClick={() => setIsOpen(false)}>
-                        <Button variant="outline" className="w-full justify-start bg-transparent">
-                          <LogIn className="w-4 h-4 mr-2" />
-                          Iniciar Sesión
-                        </Button>
-                      </Link>
-                      <Link href="/auth/register" onClick={() => setIsOpen(false)}>
-                        <Button className="w-full justify-start">
-                          <UserPlus className="w-4 h-4 mr-2" />
-                          Registrarse
-                        </Button>
-                      </Link>
-                    </>
+                  )}
+
+                  {user && (
+                    <div className="pt-4 border-t">
+                      <div className="flex items-center space-x-2 mb-4">
+                        <Avatar className="h-8 w-8">
+                          <AvatarImage src="/placeholder-user.jpg" alt={user.name} />
+                          <AvatarFallback>{user.name?.charAt(0)?.toUpperCase()}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="text-sm font-medium">{user.name}</p>
+                          <p className="text-xs text-gray-500">{user.email}</p>
+                        </div>
+                      </div>
+                      <Button variant="ghost" onClick={handleLogout} className="w-full justify-start">
+                        <LogOut className="mr-2 h-4 w-4" />
+                        Cerrar sesión
+                      </Button>
+                    </div>
                   )}
                 </div>
-              </div>
-            </SheetContent>
-          </Sheet>
+              </SheetContent>
+            </Sheet>
+          </div>
         </div>
       </div>
-    </header>
+    </nav>
   )
 }

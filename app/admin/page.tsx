@@ -170,50 +170,90 @@ export default function AdminPanel() {
   }
 
   const fetchStats = async () => {
-    const response = await fetch("/api/admin/stats")
-    if (response.ok) {
-      const data = await response.json()
-      setStats(data)
+    try {
+      const response = await fetch("/api/admin/stats")
+      if (response.ok) {
+        const result = await response.json()
+        if (result.success) {
+          setStats(result.data)
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching stats:", error)
     }
   }
 
   const fetchUsers = async () => {
-    const response = await fetch("/api/admin/users")
-    if (response.ok) {
-      const data = await response.json()
-      setUsers(data)
+    try {
+      const response = await fetch("/api/admin/users")
+      if (response.ok) {
+        const result = await response.json()
+        if (result.success && Array.isArray(result.data)) {
+          setUsers(result.data)
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching users:", error)
     }
   }
 
   const fetchCourses = async () => {
-    const response = await fetch("/api/admin/courses")
-    if (response.ok) {
-      const data = await response.json()
-      setCourses(data)
+    try {
+      const response = await fetch("/api/admin/courses")
+      if (response.ok) {
+        const result = await response.json()
+        if (result.success && Array.isArray(result.data)) {
+          setCourses(result.data)
+        } else {
+          console.error("Courses data is not an array:", result)
+          setCourses([])
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching courses:", error)
+      setCourses([])
     }
   }
 
   const fetchLessons = async () => {
-    const response = await fetch("/api/admin/lessons")
-    if (response.ok) {
-      const data = await response.json()
-      setLessons(data)
+    try {
+      const response = await fetch("/api/admin/lessons")
+      if (response.ok) {
+        const result = await response.json()
+        if (result.success && Array.isArray(result.data)) {
+          setLessons(result.data)
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching lessons:", error)
     }
   }
 
   const fetchCourseTags = async () => {
-    const response = await fetch("/api/course-tags")
-    if (response.ok) {
-      const data = await response.json()
-      setCourseTags(data)
+    try {
+      const response = await fetch("/api/course-tags")
+      if (response.ok) {
+        const result = await response.json()
+        if (result.success && Array.isArray(result.data)) {
+          setCourseTags(result.data)
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching course tags:", error)
     }
   }
 
   const fetchCarouselSlides = async () => {
-    const response = await fetch("/api/carousel")
-    if (response.ok) {
-      const data = await response.json()
-      setCarouselSlides(data)
+    try {
+      const response = await fetch("/api/carousel")
+      if (response.ok) {
+        const result = await response.json()
+        if (result.success && Array.isArray(result.data)) {
+          setCarouselSlides(result.data)
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching carousel slides:", error)
     }
   }
 
@@ -640,7 +680,7 @@ export default function AdminPanel() {
 
           {/* Main Content Tabs */}
           <Tabs defaultValue="courses" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-6">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="courses">Cursos</TabsTrigger>
               <TabsTrigger value="lessons">Lecciones</TabsTrigger>
               <TabsTrigger value="users">Usuarios</TabsTrigger>
@@ -752,56 +792,64 @@ export default function AdminPanel() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {courses.map((course) => (
-                        <TableRow key={course.id}>
-                          <TableCell className="font-medium">{course.title}</TableCell>
-                          <TableCell>{course.instructor}</TableCell>
-                          <TableCell>${course.price}</TableCell>
-                          <TableCell>
-                            <Badge variant={course.archived ? "secondary" : "default"}>
-                              {course.archived ? "Archivado" : "Activo"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>{new Date(course.created_at).toLocaleDateString()}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center space-x-2">
-                              <Button variant="ghost" size="sm" onClick={() => openEditCourseDialog(course)}>
-                                <Edit className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleArchiveCourse(course.id)}
-                                disabled={course.archived}
-                              >
-                                {course.archived ? <EyeOff className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
-                              </Button>
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button variant="ghost" size="sm">
-                                    <Trash2 className="w-4 h-4 text-red-500" />
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Esta acción no se puede deshacer. Se eliminará permanentemente el curso y todas
-                                      sus lecciones.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                    <AlertDialogAction onClick={() => handleDeleteCourse(course.id)}>
-                                      Eliminar
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            </div>
+                      {Array.isArray(courses) && courses.length > 0 ? (
+                        courses.map((course) => (
+                          <TableRow key={course.id}>
+                            <TableCell className="font-medium">{course.title}</TableCell>
+                            <TableCell>{course.instructor}</TableCell>
+                            <TableCell>${course.price}</TableCell>
+                            <TableCell>
+                              <Badge variant={course.archived ? "secondary" : "default"}>
+                                {course.archived ? "Archivado" : "Activo"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{new Date(course.created_at).toLocaleDateString()}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center space-x-2">
+                                <Button variant="ghost" size="sm" onClick={() => openEditCourseDialog(course)}>
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleArchiveCourse(course.id)}
+                                  disabled={course.archived}
+                                >
+                                  {course.archived ? <EyeOff className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
+                                </Button>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button variant="ghost" size="sm">
+                                      <Trash2 className="w-4 h-4 text-red-500" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Esta acción no se puede deshacer. Se eliminará permanentemente el curso y todas
+                                        sus lecciones.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                      <AlertDialogAction onClick={() => handleDeleteCourse(course.id)}>
+                                        Eliminar
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={6} className="text-center py-8">
+                            No hay cursos disponibles
                           </TableCell>
                         </TableRow>
-                      ))}
+                      )}
                     </TableBody>
                   </Table>
                 </CardContent>
@@ -895,11 +943,12 @@ export default function AdminPanel() {
                                   <SelectValue placeholder="Seleccionar curso" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {courses.map((course) => (
-                                    <SelectItem key={course.id} value={course.id}>
-                                      {course.title}
-                                    </SelectItem>
-                                  ))}
+                                  {Array.isArray(courses) &&
+                                    courses.map((course) => (
+                                      <SelectItem key={course.id} value={course.id}>
+                                        {course.title}
+                                      </SelectItem>
+                                    ))}
                                 </SelectContent>
                               </Select>
                             </div>
@@ -940,46 +989,54 @@ export default function AdminPanel() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {lessons.map((lesson) => {
-                        const course = courses.find((c) => c.id === lesson.course_id)
-                        return (
-                          <TableRow key={lesson.id}>
-                            <TableCell className="font-medium">{lesson.title}</TableCell>
-                            <TableCell>{course?.title || "Curso no encontrado"}</TableCell>
-                            <TableCell>{lesson.duration} min</TableCell>
-                            <TableCell>{lesson.order_index}</TableCell>
-                            <TableCell>{new Date(lesson.created_at).toLocaleDateString()}</TableCell>
-                            <TableCell>
-                              <div className="flex items-center space-x-2">
-                                <Button variant="ghost" size="sm" onClick={() => openEditLessonDialog(lesson)}>
-                                  <Edit className="w-4 h-4" />
-                                </Button>
-                                <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                    <Button variant="ghost" size="sm">
-                                      <Trash2 className="w-4 h-4 text-red-500" />
-                                    </Button>
-                                  </AlertDialogTrigger>
-                                  <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                      <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
-                                      <AlertDialogDescription>
-                                        Esta acción no se puede deshacer. Se eliminará permanentemente la lección.
-                                      </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                      <AlertDialogAction onClick={() => handleDeleteLesson(lesson.id)}>
-                                        Eliminar
-                                      </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                  </AlertDialogContent>
-                                </AlertDialog>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        )
-                      })}
+                      {Array.isArray(lessons) && lessons.length > 0 ? (
+                        lessons.map((lesson) => {
+                          const course = Array.isArray(courses) ? courses.find((c) => c.id === lesson.course_id) : null
+                          return (
+                            <TableRow key={lesson.id}>
+                              <TableCell className="font-medium">{lesson.title}</TableCell>
+                              <TableCell>{course?.title || "Curso no encontrado"}</TableCell>
+                              <TableCell>{lesson.duration} min</TableCell>
+                              <TableCell>{lesson.order_index}</TableCell>
+                              <TableCell>{new Date(lesson.created_at).toLocaleDateString()}</TableCell>
+                              <TableCell>
+                                <div className="flex items-center space-x-2">
+                                  <Button variant="ghost" size="sm" onClick={() => openEditLessonDialog(lesson)}>
+                                    <Edit className="w-4 h-4" />
+                                  </Button>
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <Button variant="ghost" size="sm">
+                                        <Trash2 className="w-4 h-4 text-red-500" />
+                                      </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          Esta acción no se puede deshacer. Se eliminará permanentemente la lección.
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                        <AlertDialogAction onClick={() => handleDeleteLesson(lesson.id)}>
+                                          Eliminar
+                                        </AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )
+                        })
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={6} className="text-center py-8">
+                            No hay lecciones disponibles
+                          </TableCell>
+                        </TableRow>
+                      )}
                     </TableBody>
                   </Table>
                 </CardContent>
@@ -1004,16 +1061,24 @@ export default function AdminPanel() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {users.map((user) => (
-                        <TableRow key={user.id}>
-                          <TableCell className="font-medium">{user.name}</TableCell>
-                          <TableCell>{user.email}</TableCell>
-                          <TableCell>
-                            <Badge variant={user.role === "admin" ? "default" : "secondary"}>{user.role}</Badge>
+                      {Array.isArray(users) && users.length > 0 ? (
+                        users.map((user) => (
+                          <TableRow key={user.id}>
+                            <TableCell className="font-medium">{user.name}</TableCell>
+                            <TableCell>{user.email}</TableCell>
+                            <TableCell>
+                              <Badge variant={user.role === "admin" ? "default" : "secondary"}>{user.role}</Badge>
+                            </TableCell>
+                            <TableCell>{new Date(user.created_at).toLocaleDateString()}</TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={4} className="text-center py-8">
+                            No hay usuarios registrados
                           </TableCell>
-                          <TableCell>{new Date(user.created_at).toLocaleDateString()}</TableCell>
                         </TableRow>
-                      ))}
+                      )}
                     </TableBody>
                   </Table>
                 </CardContent>
@@ -1091,46 +1156,54 @@ export default function AdminPanel() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {courseTags.map((tag) => (
-                        <TableRow key={tag.id}>
-                          <TableCell className="font-medium">{tag.name}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center space-x-2">
-                              <div className="w-4 h-4 rounded-full" style={{ backgroundColor: tag.color }} />
-                              <span>{tag.color}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell>{new Date(tag.created_at).toLocaleDateString()}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center space-x-2">
-                              <Button variant="ghost" size="sm" onClick={() => openEditTagDialog(tag)}>
-                                <Edit className="w-4 h-4" />
-                              </Button>
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button variant="ghost" size="sm">
-                                    <Trash2 className="w-4 h-4 text-red-500" />
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Esta acción no se puede deshacer. Se eliminará permanentemente el tag.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                    <AlertDialogAction onClick={() => handleDeleteTag(tag.id)}>
-                                      Eliminar
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            </div>
+                      {Array.isArray(courseTags) && courseTags.length > 0 ? (
+                        courseTags.map((tag) => (
+                          <TableRow key={tag.id}>
+                            <TableCell className="font-medium">{tag.name}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center space-x-2">
+                                <div className="w-4 h-4 rounded-full" style={{ backgroundColor: tag.color }} />
+                                <span>{tag.color}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>{new Date(tag.created_at).toLocaleDateString()}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center space-x-2">
+                                <Button variant="ghost" size="sm" onClick={() => openEditTagDialog(tag)}>
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button variant="ghost" size="sm">
+                                      <Trash2 className="w-4 h-4 text-red-500" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Esta acción no se puede deshacer. Se eliminará permanentemente el tag.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                      <AlertDialogAction onClick={() => handleDeleteTag(tag.id)}>
+                                        Eliminar
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={4} className="text-center py-8">
+                            No hay tags disponibles
                           </TableCell>
                         </TableRow>
-                      ))}
+                      )}
                     </TableBody>
                   </Table>
                 </CardContent>
@@ -1256,64 +1329,72 @@ export default function AdminPanel() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {carouselSlides.map((slide) => (
-                        <TableRow key={slide.id}>
-                          <TableCell>
-                            <img
-                              src={slide.image_url || "/placeholder.svg"}
-                              alt={slide.title}
-                              className="w-16 h-10 object-cover rounded"
-                              onError={(e) => {
-                                const target = e.target as HTMLImageElement
-                                target.src = "/placeholder.jpg"
-                              }}
-                            />
-                          </TableCell>
-                          <TableCell className="font-medium">{slide.title}</TableCell>
-                          <TableCell>
-                            <Badge variant={slide.is_active ? "default" : "secondary"}>
-                              {slide.is_active ? "Activo" : "Inactivo"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>{slide.order_index}</TableCell>
-                          <TableCell>{new Date(slide.created_at).toLocaleDateString()}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center space-x-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleToggleSlideActive(slide.id, slide.is_active)}
-                              >
-                                {slide.is_active ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-                              </Button>
-                              <Button variant="ghost" size="sm" onClick={() => openEditSlideDialog(slide)}>
-                                <Edit className="w-4 h-4" />
-                              </Button>
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button variant="ghost" size="sm">
-                                    <Trash2 className="w-4 h-4 text-red-500" />
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Esta acción no se puede deshacer. Se eliminará permanentemente el slide.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                    <AlertDialogAction onClick={() => handleDeleteSlide(slide.id)}>
-                                      Eliminar
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            </div>
+                      {Array.isArray(carouselSlides) && carouselSlides.length > 0 ? (
+                        carouselSlides.map((slide) => (
+                          <TableRow key={slide.id}>
+                            <TableCell>
+                              <img
+                                src={slide.image_url || "/placeholder.svg"}
+                                alt={slide.title}
+                                className="w-16 h-10 object-cover rounded"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement
+                                  target.src = "/placeholder.jpg"
+                                }}
+                              />
+                            </TableCell>
+                            <TableCell className="font-medium">{slide.title}</TableCell>
+                            <TableCell>
+                              <Badge variant={slide.is_active ? "default" : "secondary"}>
+                                {slide.is_active ? "Activo" : "Inactivo"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{slide.order_index}</TableCell>
+                            <TableCell>{new Date(slide.created_at).toLocaleDateString()}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center space-x-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleToggleSlideActive(slide.id, slide.is_active)}
+                                >
+                                  {slide.is_active ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                                </Button>
+                                <Button variant="ghost" size="sm" onClick={() => openEditSlideDialog(slide)}>
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button variant="ghost" size="sm">
+                                      <Trash2 className="w-4 h-4 text-red-500" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Esta acción no se puede deshacer. Se eliminará permanentemente el slide.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                      <AlertDialogAction onClick={() => handleDeleteSlide(slide.id)}>
+                                        Eliminar
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={6} className="text-center py-8">
+                            No hay slides disponibles
                           </TableCell>
                         </TableRow>
-                      ))}
+                      )}
                     </TableBody>
                   </Table>
                 </CardContent>
