@@ -1,8 +1,6 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import { useSession } from "next-auth/react"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 
@@ -13,8 +11,6 @@ import { Separator } from "@/components/ui/separator"
 import { Edit, Trash2, Eye, Archive } from "lucide-react"
 
 const Page = () => {
-  const router = useRouter()
-  const { data: session, status } = useSession()
   const [stats, setStats] = useState({
     totalCourses: 0,
     totalUsers: 0,
@@ -24,17 +20,9 @@ const Page = () => {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push("/login")
-    }
-  }, [status, router])
-
-  useEffect(() => {
-    if (status === "authenticated") {
-      loadStats()
-      loadCourses()
-    }
-  }, [status])
+    loadStats()
+    loadCourses()
+  }, [])
 
   const loadStats = async () => {
     try {
@@ -113,14 +101,6 @@ const Page = () => {
         alert("Error desarchivando curso")
       }
     }
-  }
-
-  if (status === "loading") {
-    return <div>Cargando...</div>
-  }
-
-  if (status === "unauthenticated") {
-    return <div>Redirigiendo al login...</div>
   }
 
   return (
@@ -202,7 +182,7 @@ const Page = () => {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => router.push(`/admin/course/${course.id}`)}
+                        onClick={() => alert("Funcionalidad de edición no implementada aún")}
                         title="Editar curso"
                       >
                         <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
