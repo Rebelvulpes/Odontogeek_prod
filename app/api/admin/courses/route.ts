@@ -1,84 +1,137 @@
-import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
+import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
+import { NextResponse } from "next/server"
+import { cookies } from "next/headers"
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+export const dynamic = "force-dynamic"
 
-export async function GET() {
+export async function GET(request: Request) {
+  const supabase = createRouteHandlerClient({ cookies })
+
   try {
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
-
-    // Obtener cursos con lecciones, etiquetas y estadísticas
+    // Obtener todos los cursos con lecciones
     const { data: courses, error: coursesError } = await supabase
       .from("courses")
       .select(`
         *,
-        lessons:lessons(*),
-        course_tags:course_tags(
-          tag:course_tag(*)
+        lessons (
+          id,
+          title,
+          description,
+          video_url,
+          duration_minutes,
+          order_index,
+          is_free,
+          archived,
+          created_at
         )
       `)
       .order("created_at", { ascending: false })
 
     if (coursesError) {
       console.error("Error obteniendo cursos:", coursesError)
-      return NextResponse.json({
-        success: false,
-        message: "Error obteniendo cursos: " + coursesError.message,
-      })
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Error obteniendo cursos",
+          error: coursesError,
+        },
+        { status: 500 },
+      )
     }
 
-    // Obtener estadísticas de inscripciones por curso
-    const { data: enrollmentStats, error: enrollmentError } = await supabase
+    // Obtener el número de inscripciones por curso usando la tabla correcta "enrollments"
+    const { data: enrollments, error: enrollmentsError } = await supabase
       .from("enrollments")
-      .select("course_id, user_id, amount")
+      .select("course_id")
+      .eq("payment_status", "completed")
 
-    if (enrollmentError) {
-      console.error("Error obteniendo inscripciones:", enrollmentError)
-      return NextResponse.json({
-        success: false,
-        message: "Error obteniendo inscripciones: " + enrollmentError.message,
+    if (enrollmentsError) {
+      console.error("Error obteniendo inscripciones:", enrollmentsError)
+      // No fallar si no hay inscripciones, solo usar 0
+    }
+
+    // Crear un mapa de inscripciones por curso
+    const enrollmentsByCourse = new Map()
+    if (enrollments) {
+      enrollments.forEach((enrollment) => {
+        enrollmentsByCourse.set(enrollment.course_id, (enrollmentsByCourse.get(enrollment.course_id) || 0) + 1)
       })
     }
 
-    // Procesar datos de cursos
-    const processedCourses = courses?.map((course) => {
-      // Contar estudiantes y calcular ingresos
-      const courseEnrollments = enrollmentStats?.filter((e) => e.course_id === course.id) || []
-      const students = courseEnrollments.length
-      const revenue = courseEnrollments.reduce((sum, e) => sum + (e.amount || 0), 0)
+    // Obtener etiquetas de cursos usando consultas separadas para evitar problemas de relación
+    const { data: courseTags, error: courseTagsError } = await supabase.from("course_tags").select("course_id, tag_id")
 
-      // Procesar etiquetas
-      const tags = course.course_tags?.map((ct: any) => ct.tag).filter(Boolean) || []
+    if (courseTagsError) {
+      console.error("Error obteniendo course_tags:", courseTagsError)
+    }
+
+    // Obtener todas las etiquetas
+    const { data: allTags, error: tagsError } = await supabase.from("course_tag").select("id, name, color, slug")
+
+    if (tagsError) {
+      console.error("Error obteniendo tags:", tagsError)
+    }
+
+    // Crear un mapa de etiquetas por ID
+    const tagsById = new Map()
+    if (allTags) {
+      allTags.forEach((tag) => {
+        tagsById.set(tag.id, tag)
+      })
+    }
+
+    // Crear un mapa de etiquetas por curso
+    const tagsByCourse = new Map()
+    if (courseTags) {
+      courseTags.forEach((ct) => {
+        if (!tagsByCourse.has(ct.course_id)) {
+          tagsByCourse.set(ct.course_id, [])
+        }
+        const tag = tagsById.get(ct.tag_id)
+        if (tag) {
+          tagsByCourse.get(ct.course_id).push(tag)
+        }
+      })
+    }
+
+    // Procesar cursos y agregar datos calculados
+    const processedCourses = courses.map((course) => {
+      const studentCount = enrollmentsByCourse.get(course.id) || 0
+      const revenue = studentCount * (course.price || 0)
+      const lessonsCount = course.lessons ? course.lessons.filter((lesson) => !lesson.archived).length : 0
 
       return {
         ...course,
-        lessons: course.lessons || [],
-        lessonsCount: course.lessons?.length || 0,
-        tags,
-        students,
-        revenue,
+        tags: tagsByCourse.get(course.id) || [],
+        students: studentCount,
+        revenue: revenue,
+        lessonsCount: lessonsCount,
+        status: course.archived ? "archived" : "published",
       }
     })
 
     return NextResponse.json({
       success: true,
-      data: processedCourses || [],
+      data: processedCourses,
     })
   } catch (error) {
-    console.error("Error en API de cursos admin:", error)
-    return NextResponse.json({
-      success: false,
-      message: "Error interno del servidor",
-    })
+    console.error("Error en la ruta de cursos admin:", error)
+    return NextResponse.json(
+      {
+        success: false,
+        message: "Error interno del servidor",
+        error: error.message,
+      },
+      { status: 500 },
+    )
   }
 }
 
-export async function POST(request: NextRequest) {
-  try {
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
-    const body = await request.json()
+export async function POST(request: Request) {
+  const supabase = createRouteHandlerClient({ cookies })
 
+  try {
+    const body = await request.json()
     const { title, description, price, instructor, thumbnail_url, duration_hours, tags } = body
 
     // Crear el curso
@@ -91,44 +144,53 @@ export async function POST(request: NextRequest) {
         instructor_name: instructor,
         thumbnail_url,
         duration_hours: duration_hours ? Number.parseInt(duration_hours) : null,
-        status: "draft",
+        status: "published",
+        archived: false,
       })
       .select()
       .single()
 
     if (courseError) {
       console.error("Error creando curso:", courseError)
-      return NextResponse.json({
-        success: false,
-        message: "Error creando curso: " + courseError.message,
-      })
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Error creando curso",
+          error: courseError,
+        },
+        { status: 500 },
+      )
     }
 
     // Asociar etiquetas si se proporcionaron
-    if (tags && tags.length > 0 && course) {
-      const tagAssociations = tags.map((tagId: string) => ({
+    if (tags && tags.length > 0) {
+      const courseTagsData = tags.map((tagId) => ({
         course_id: course.id,
         tag_id: tagId,
       }))
 
-      const { error: tagsError } = await supabase.from("course_tags").insert(tagAssociations)
+      const { error: tagsError } = await supabase.from("course_tags").insert(courseTagsData)
 
       if (tagsError) {
         console.error("Error asociando etiquetas:", tagsError)
-        // No fallar completamente, solo log el error
+        // No fallar por las etiquetas, el curso ya se creó
       }
     }
 
     return NextResponse.json({
       success: true,
-      data: course,
       message: "Curso creado exitosamente",
+      data: course,
     })
   } catch (error) {
     console.error("Error en POST de cursos admin:", error)
-    return NextResponse.json({
-      success: false,
-      message: "Error interno del servidor",
-    })
+    return NextResponse.json(
+      {
+        success: false,
+        message: "Error interno del servidor",
+        error: error.message,
+      },
+      { status: 500 },
+    )
   }
 }
