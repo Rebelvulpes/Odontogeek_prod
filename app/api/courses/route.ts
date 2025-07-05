@@ -25,7 +25,8 @@ export async function GET(req: NextRequest) {
         duration_hours,
         thumbnail_url,
         created_at,
-        status
+        status,
+        instructor_name
       `)
       .eq("status", "published")
       .neq("archived", true)
@@ -59,11 +60,11 @@ export async function GET(req: NextRequest) {
     // Procesar cada curso para obtener datos adicionales
     const coursesWithDetails = await Promise.all(
       (courses || []).map(async (course) => {
-        // Obtener etiquetas del curso
+        // Obtener etiquetas del curso usando la relación correcta
         const { data: courseTags } = await supabase
           .from("course_tag_relations")
           .select(`
-            course_tags(
+            course_tags!course_tag_relations_tag_id_fkey(
               id,
               name,
               slug,
@@ -72,12 +73,18 @@ export async function GET(req: NextRequest) {
           `)
           .eq("course_id", course.id)
 
-        // Obtener número de lecciones
-        const { count: lessonsCount } = await supabase
+        // Obtener lecciones del curso
+        const { data: lessons } = await supabase
           .from("lessons")
-          .select("*", { count: "exact", head: true })
+          .select(`
+            id,
+            title,
+            duration_minutes,
+            is_free
+          `)
           .eq("course_id", course.id)
           .neq("archived", true)
+          .order("order_index", { ascending: true })
 
         // Obtener número de estudiantes inscritos
         const { count: studentsCount } = await supabase
@@ -87,7 +94,7 @@ export async function GET(req: NextRequest) {
 
         return {
           ...course,
-          lessons_count: lessonsCount || 0,
+          lessons: lessons || [],
           students_count: studentsCount || 0,
           tags: courseTags?.map((relation) => relation.course_tags).filter(Boolean) || [],
         }

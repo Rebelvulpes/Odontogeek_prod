@@ -31,6 +31,7 @@ interface Course {
     name: string
     color: string
   }>
+  students_count: number
 }
 
 interface Tag {
@@ -58,10 +59,11 @@ export default function CoursesPage() {
       const response = await fetch("/api/courses")
       const result = await response.json()
       if (result.success) {
-        setCourses(result.data)
+        setCourses(result.data.courses || [])
       }
     } catch (error) {
       console.error("Error cargando cursos:", error)
+      setCourses([])
     } finally {
       setLoading(false)
     }
@@ -72,10 +74,11 @@ export default function CoursesPage() {
       const response = await fetch("/api/course-tags")
       const result = await response.json()
       if (result.success) {
-        setTags(result.data)
+        setTags(result.data || [])
       }
     } catch (error) {
       console.error("Error cargando etiquetas:", error)
+      setTags([])
     }
   }
 
