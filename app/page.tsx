@@ -5,24 +5,88 @@ import { Badge } from "@/components/ui/badge"
 import { CheckCircle, Play, Users, Star } from "lucide-react"
 import { HeroCarousel } from "@/components/hero-carousel"
 import { NewsTicker } from "@/components/news-ticker"
+import { createClient } from "@supabase/supabase-js"
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 async function getFeaturedCourses() {
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/api/courses?limit=3`, {
-      cache: "no-store",
-    })
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    if (!response.ok) {
-      throw new Error("Failed to fetch courses")
+    // Obtener los primeros 3 cursos publicados
+    const { data: courses, error: coursesError } = await supabase
+      .from("courses")
+      .select(`
+        id,
+        title,
+        description,
+        price,
+        duration_hours,
+        thumbnail_url,
+        created_at,
+        status,
+        instructor_name
+      `)
+      .eq("status", "published")
+      .neq("archived", true)
+      .order("created_at", { ascending: false })
+      .limit(3)
+
+    if (coursesError) {
+      console.error("Error obteniendo cursos:", coursesError)
+      return []
     }
 
-    const result = await response.json()
-
-    if (result.success && result.data?.courses) {
-      return result.data.courses
+    if (!courses || courses.length === 0) {
+      return []
     }
 
-    return []
+    // Procesar cada curso para obtener datos adicionales
+    const coursesWithDetails = await Promise.all(
+      courses.map(async (course) => {
+        // Obtener etiquetas del curso
+        const { data: courseTags } = await supabase
+          .from("course_tags")
+          .select(`
+            tags (
+              id,
+              name,
+              slug,
+              color
+            )
+          `)
+          .eq("course_id", course.id)
+
+        // Obtener lecciones del curso
+        const { data: lessons } = await supabase
+          .from("lessons")
+          .select(`
+            id,
+            title,
+            duration_minutes,
+            is_free
+          `)
+          .eq("course_id", course.id)
+          .neq("archived", true)
+          .order("order_index", { ascending: true })
+
+        // Obtener número de estudiantes inscritos
+        const { count: studentsCount } = await supabase
+          .from("enrollments")
+          .select("*", { count: "exact", head: true })
+          .eq("course_id", course.id)
+
+        return {
+          ...course,
+          lessons: lessons || [],
+          students_count: studentsCount || 0,
+          tags: courseTags?.map((relation) => relation.tags).filter(Boolean) || [],
+        }
+      }),
+    )
+
+    return coursesWithDetails
   } catch (error) {
     console.error("Error fetching featured courses:", error)
     return []
