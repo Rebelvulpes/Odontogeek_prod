@@ -6,43 +6,32 @@ import { CheckCircle, Play, Users, Star } from "lucide-react"
 import { HeroCarousel } from "@/components/hero-carousel"
 import { NewsTicker } from "@/components/news-ticker"
 
-const featuredCourses = [
-  {
-    id: 1,
-    title: "Implantología Avanzada",
-    description: "Técnicas modernas de implantes dentales con casos clínicos reales",
-    price: 299,
-    duration: "12 horas",
-    students: 1250,
-    rating: 4.9,
-    image: "/placeholder.svg?height=200&width=300",
-    instructor: "Dr. María González",
-  },
-  {
-    id: 2,
-    title: "Endodoncia Contemporánea",
-    description: "Protocolos actualizados en tratamiento de conductos",
-    price: 199,
-    duration: "8 horas",
-    students: 890,
-    rating: 4.8,
-    image: "/placeholder.svg?height=200&width=300",
-    instructor: "Dr. Carlos Ruiz",
-  },
-  {
-    id: 3,
-    title: "Ortodoncia Digital",
-    description: "Planificación y tratamiento con tecnología 3D",
-    price: 399,
-    duration: "15 horas",
-    students: 650,
-    rating: 4.9,
-    image: "/placeholder.svg?height=200&width=300",
-    instructor: "Dra. Ana Martín",
-  },
-]
+async function getFeaturedCourses() {
+  try {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/api/courses?limit=3`, {
+      cache: "no-store",
+    })
 
-export default function HomePage() {
+    if (!response.ok) {
+      throw new Error("Failed to fetch courses")
+    }
+
+    const result = await response.json()
+
+    if (result.success && result.data?.courses) {
+      return result.data.courses
+    }
+
+    return []
+  } catch (error) {
+    console.error("Error fetching featured courses:", error)
+    return []
+  }
+}
+
+export default async function HomePage() {
+  const featuredCourses = await getFeaturedCourses()
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
       {/* Header - Mobile optimized */}
@@ -136,41 +125,62 @@ export default function HomePage() {
       <section className="py-12 sm:py-16 px-4 bg-gray-50">
         <div className="container mx-auto">
           <h2 className="text-2xl sm:text-3xl font-bold text-center mb-8 sm:mb-12">Cursos Destacados</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-            {featuredCourses.map((course) => (
-              <Card key={course.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-                <div className="aspect-video bg-gray-200 relative">
-                  <img
-                    src={course.image || "/placeholder.svg"}
-                    alt={course.title}
-                    className="w-full h-full object-cover"
-                  />
-                  <Badge className="absolute top-3 right-3 bg-blue-600 text-xs sm:text-sm">${course.price}</Badge>
-                </div>
-                <CardHeader className="p-4 sm:p-6">
-                  <CardTitle className="text-base sm:text-lg">{course.title}</CardTitle>
-                  <CardDescription className="text-sm">{course.description}</CardDescription>
-                </CardHeader>
-                <CardContent className="p-4 sm:p-6 pt-0">
-                  <div className="flex items-center justify-between text-xs sm:text-sm text-gray-600 mb-4">
-                    <span>{course.duration}</span>
-                    <div className="flex items-center">
-                      <Star className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-400 fill-current mr-1" />
-                      <span>{course.rating}</span>
+
+          {featuredCourses.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+              {featuredCourses.map((course) => (
+                <Card key={course.id} className="overflow-hidden hover:shadow-lg transition-shadow">
+                  <div className="aspect-video bg-gray-200 relative">
+                    <img
+                      src={course.thumbnail_url || "/placeholder.svg?height=200&width=300"}
+                      alt={course.title}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement
+                        target.src = "/placeholder.svg?height=200&width=300&text=Imagen+no+disponible"
+                      }}
+                    />
+                    <Badge className="absolute top-3 right-3 bg-blue-600 text-xs sm:text-sm">${course.price}</Badge>
+                  </div>
+                  <CardHeader className="p-4 sm:p-6">
+                    <CardTitle className="text-base sm:text-lg">{course.title}</CardTitle>
+                    <CardDescription className="text-sm">{course.description}</CardDescription>
+                  </CardHeader>
+                  <CardContent className="p-4 sm:p-6 pt-0">
+                    <div className="flex items-center justify-between text-xs sm:text-sm text-gray-600 mb-4">
+                      <span>{course.duration_hours} horas</span>
+                      <div className="flex items-center">
+                        <Star className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-400 fill-current mr-1" />
+                        <span>4.9</span>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs sm:text-sm text-gray-600">{course.students} estudiantes</span>
-                    <Link href={`/courses/${course.id}`}>
-                      <Button size="sm" className="text-xs sm:text-sm">
-                        Ver Curso
-                      </Button>
-                    </Link>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs sm:text-sm text-gray-600">{course.students_count} estudiantes</span>
+                      <Link href={`/courses/${course.id}`}>
+                        <Button size="sm" className="text-xs sm:text-sm">
+                          Ver Curso
+                        </Button>
+                      </Link>
+                    </div>
+                    {course.instructor_name && (
+                      <div className="mt-2 text-xs text-gray-500">Instructor: {course.instructor_name}</div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Play className="w-8 h-8 text-gray-400" />
+              </div>
+              <h3 className="text-lg font-semibold mb-2 text-gray-600">Próximamente</h3>
+              <p className="text-gray-500 mb-6">Estamos preparando cursos increíbles para ti. ¡Mantente atento!</p>
+              <Link href="/courses">
+                <Button>Explorar Todos los Cursos</Button>
+              </Link>
+            </div>
+          )}
         </div>
       </section>
 

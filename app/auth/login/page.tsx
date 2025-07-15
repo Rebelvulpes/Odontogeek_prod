@@ -3,24 +3,26 @@
 import type React from "react"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import Link from "next/link"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Eye, EyeOff, LogIn } from "lucide-react"
-import { useAuth } from "@/components/auth-provider"
+import { Eye, EyeOff, Shield } from "lucide-react"
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [formData, setFormData] = useState({
+    email: "",
+    password: "",
+  })
   const router = useRouter()
-  const { login } = useAuth()
+  const searchParams = useSearchParams()
+  const isAdminLogin = searchParams.get("admin") === "true"
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -33,20 +35,18 @@ export default function LoginPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ email, password }),
-        credentials: "include",
+        body: JSON.stringify(formData),
       })
 
-      const data = await response.json()
+      const result = await response.json()
 
-      if (data.success) {
-        login(data.user)
-        router.push(data.redirectTo || "/dashboard")
+      if (result.success) {
+        // Redirigir según el rol del usuario
+        router.push(result.redirectTo)
       } else {
-        setError(data.message || "Error al iniciar sesión")
+        setError(result.message || "Error en el login")
       }
-    } catch (error) {
-      console.error("Error:", error)
+    } catch (err) {
       setError("Error de conexión. Intenta nuevamente.")
     } finally {
       setLoading(false)
@@ -54,109 +54,111 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        {/* Logo */}
-        <div className="text-center">
-          <Link href="/" className="inline-block">
-            <img src="/images/odontogeek-logo-new.png" alt="OdontoGeek" className="h-12 w-auto mx-auto" />
-          </Link>
-          <h2 className="mt-6 text-3xl font-bold text-gray-900">Iniciar Sesión</h2>
-          <p className="mt-2 text-sm text-gray-600">
-            ¿No tienes cuenta?{" "}
-            <Link href="/auth/register" className="font-medium text-blue-600 hover:text-blue-500">
-              Regístrate aquí
-            </Link>
-          </p>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="text-center">
+          <div className="flex items-center justify-center space-x-2 mb-4">
+            <img src="/images/odontogeek-logo-new.png" alt="OdontoGeek" className="h-16 w-auto max-w-[200px]" />
+          </div>
+          <div className="flex items-center justify-center space-x-2">
+            {isAdminLogin && <Shield className="w-5 h-5 text-blue-600" />}
+            <CardTitle className="text-2xl">{isAdminLogin ? "Acceso Administrativo" : "Iniciar Sesión"}</CardTitle>
+          </div>
+          <CardDescription>
+            {isAdminLogin
+              ? "Accede al panel de administración de OdontoGeek"
+              : "Accede a tu cuenta de OdontoGeek para continuar aprendiendo"}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder={isAdminLogin ? "admin@tudominio.com" : "juan@ejemplo.com"}
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                required
+              />
+            </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <LogIn className="w-5 h-5 mr-2" />
-              Accede a tu cuenta
-            </CardTitle>
-            <CardDescription>Ingresa tus credenciales para continuar</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {error && (
-                <Alert variant="destructive">
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
-
-              <div>
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="mt-1"
-                  placeholder="tu@email.com"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="password">Contraseña</Label>
-                <div className="relative mt-1">
-                  <Input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    className="pr-10"
-                    placeholder="Tu contraseña"
-                  />
-                  <button
-                    type="button"
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4 text-gray-400" />
-                    ) : (
-                      <Eye className="h-4 w-4 text-gray-400" />
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="text-sm">
-                  <Link href="/auth/forgot-password" className="font-medium text-blue-600 hover:text-blue-500">
-                    ¿Olvidaste tu contraseña?
-                  </Link>
-                </div>
-              </div>
-
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Iniciando sesión..." : "Iniciar Sesión"}
-              </Button>
-            </form>
-
-            <div className="mt-6">
+            <div className="space-y-2">
+              <Label htmlFor="password">Contraseña</Label>
               <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-300" />
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-white text-gray-500">O continúa con</span>
-                </div>
-              </div>
-
-              <div className="mt-6 text-center">
-                <Link href="/" className="text-sm text-gray-600 hover:text-gray-900">
-                  ← Volver al inicio
-                </Link>
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  required
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
               </div>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+
+            {error && (
+              <Alert className="border-red-200 bg-red-50">
+                <AlertDescription className="text-red-800">{error}</AlertDescription>
+              </Alert>
+            )}
+
+            <div className="flex items-center justify-between">
+              <Link href="/auth/forgot-password" className="text-sm text-blue-600 hover:underline">
+                ¿Olvidaste tu contraseña?
+              </Link>
+            </div>
+
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? (
+                <>
+                  <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>
+                  Iniciando sesión...
+                </>
+              ) : (
+                <>
+                  {isAdminLogin && <Shield className="w-4 h-4 mr-2" />}
+                  Iniciar Sesión
+                </>
+              )}
+            </Button>
+          </form>
+
+          <div className="mt-6 text-center space-y-2">
+            {!isAdminLogin && (
+              <p className="text-sm text-gray-600">
+                ¿No tienes cuenta?{" "}
+                <Link href="/auth/register" className="text-blue-600 hover:underline">
+                  Registrarse
+                </Link>
+              </p>
+            )}
+
+            <div className="flex items-center justify-center space-x-2 text-sm">
+              {isAdminLogin ? (
+                <Link href="/auth/login" className="text-gray-600 hover:underline">
+                  ← Acceso de estudiantes
+                </Link>
+              ) : (
+                <Link href="/auth/login?admin=true" className="text-blue-600 hover:underline flex items-center">
+                  <Shield className="w-3 h-3 mr-1" />
+                  Acceso administrativo
+                </Link>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

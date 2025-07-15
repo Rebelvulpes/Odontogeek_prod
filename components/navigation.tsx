@@ -2,263 +2,164 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Menu, LogOut, Settings, BookOpen, Home, Shield, Users, Award, Phone, LogIn, UserPlus } from "lucide-react"
-import { useAuth } from "@/components/auth-provider"
+import { Menu, BookOpen, Users, Award, Phone, LogIn, UserPlus } from "lucide-react"
 
-export function Navigation() {
+interface User {
+  name: string
+  email: string
+  role?: string
+}
+
+interface NavigationProps {
+  user: User | null
+}
+
+export function Navigation({ user }: NavigationProps) {
   const [isOpen, setIsOpen] = useState(false)
-  const pathname = usePathname()
-  const { user, logout } = useAuth()
 
-  // No mostrar navegación en páginas de auth y setup
-  if (pathname.startsWith("/auth") || pathname.startsWith("/setup")) {
-    return null
-  }
-
-  const publicNavigationItems = [
-    { name: "Inicio", href: "/", icon: Home },
+  const navigationItems = [
     { name: "Cursos", href: "/courses", icon: BookOpen },
     { name: "Nosotros", href: "/about", icon: Users },
     { name: "Certificaciones", href: "/certifications", icon: Award },
     { name: "Contacto", href: "/contact", icon: Phone },
   ]
 
-  const handleLogout = () => {
-    logout()
-  }
-
-  const getUserInitials = (name: string) => {
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2)
-  }
-
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
+    <header className="bg-white border-b sticky top-0 z-50">
+      <div className="container mx-auto px-4">
+        <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <div className="flex items-center">
-            <Link href="/" className="flex items-center space-x-2">
-              <img src="/images/odontogeek-logo-new.png" alt="OdontoGeek" className="h-8 w-auto" />
-            </Link>
-          </div>
+          <Link href="/" className="flex items-center space-x-2">
+            <img src="/images/odontogeek-logo-new.png" alt="OdontoGeek" className="h-8 w-auto" />
+          </Link>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-8">
-            {publicNavigationItems.map((item) => {
-              const Icon = item.icon
-              const isActive = pathname === item.href
-              return (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  className={`flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    isActive ? "text-blue-600 bg-blue-50" : "text-gray-700 hover:text-blue-600 hover:bg-gray-50"
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                  <span>{item.name}</span>
-                </Link>
-              )
-            })}
-          </div>
+          <nav className="hidden md:flex items-center space-x-8">
+            {navigationItems.map((item) => (
+              <Link
+                key={item.name}
+                href={item.href}
+                className="text-gray-700 hover:text-blue-600 font-medium transition-colors duration-200 flex items-center space-x-1"
+              >
+                <item.icon className="w-4 h-4" />
+                <span>{item.name}</span>
+              </Link>
+            ))}
+          </nav>
 
-          {/* User Menu */}
-          <div className="flex items-center space-x-4">
+          {/* Desktop Auth Buttons */}
+          <div className="hidden md:flex items-center space-x-3">
             {user ? (
               <div className="flex items-center space-x-3">
-                {/* Dashboard Link */}
-                <Button variant="ghost" size="sm" asChild>
-                  <Link href="/dashboard" className="flex items-center space-x-1">
-                    <Home className="w-4 h-4" />
-                    <span className="hidden sm:inline">Dashboard</span>
-                  </Link>
-                </Button>
-
-                {/* Admin Link (solo para admins) */}
+                <span className="text-gray-700">Hola, {user.name}</span>
                 {user.role === "admin" && (
-                  <Button variant="ghost" size="sm" asChild>
-                    <Link href="/admin" className="flex items-center space-x-1">
-                      <Shield className="w-4 h-4" />
-                      <span className="hidden sm:inline">Admin</span>
-                    </Link>
-                  </Button>
-                )}
-
-                {/* User Avatar con Dropdown */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                      <Avatar className="h-8 w-8">
-                        <AvatarFallback className="bg-blue-600 text-white text-xs">
-                          {getUserInitials(user.name)}
-                        </AvatarFallback>
-                      </Avatar>
+                  <Link href="/admin">
+                    <Button variant="outline" size="sm">
+                      Admin
                     </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent className="w-56" align="end" forceMount>
-                    <div className="flex items-center justify-start gap-2 p-2">
-                      <div className="flex flex-col space-y-1 leading-none">
-                        <p className="font-medium">{user.name}</p>
-                        <p className="w-[200px] truncate text-sm text-muted-foreground">{user.email}</p>
-                      </div>
-                    </div>
-                    <DropdownMenuItem asChild>
-                      <Link href="/settings" className="flex items-center">
-                        <Settings className="mr-2 h-4 w-4" />
-                        <span>Configuración</span>
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleLogout} className="text-red-600">
-                      <LogOut className="mr-2 h-4 w-4" />
-                      <span>Cerrar Sesión</span>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-
-                {/* Botón de Logout directo (visible en desktop) */}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleLogout}
-                  className="hidden lg:flex items-center space-x-1 text-red-600 border-red-200 hover:bg-red-50 bg-transparent"
-                >
-                  <LogOut className="w-4 h-4" />
-                  <span>Salir</span>
-                </Button>
+                  </Link>
+                )}
+                <Link href="/dashboard">
+                  <Button variant="outline" size="sm">
+                    Mi Panel
+                  </Button>
+                </Link>
               </div>
             ) : (
-              <div className="flex items-center space-x-2">
-                <Button variant="ghost" asChild className="flex items-center space-x-1">
-                  <Link href="/auth/login">
+              <>
+                <Link href="/auth/login">
+                  <Button variant="ghost" size="sm" className="flex items-center space-x-1">
                     <LogIn className="w-4 h-4" />
                     <span>Iniciar Sesión</span>
-                  </Link>
-                </Button>
-                <Button asChild className="flex items-center space-x-1">
-                  <Link href="/auth/register">
+                  </Button>
+                </Link>
+                <Link href="/auth/register">
+                  <Button size="sm" className="flex items-center space-x-1">
                     <UserPlus className="w-4 h-4" />
                     <span>Registrarse</span>
-                  </Link>
-                </Button>
-              </div>
+                  </Button>
+                </Link>
+              </>
             )}
+          </div>
 
-            {/* Mobile menu button */}
-            <Sheet open={isOpen} onOpenChange={setIsOpen}>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="md:hidden">
-                  <Menu className="h-5 w-5" />
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="right" className="w-[300px] sm:w-[400px]">
-                <div className="flex flex-col space-y-4 mt-4">
-                  {/* Mobile Logo */}
-                  <div className="flex items-center justify-between pb-6 border-b">
-                    <Link href="/" className="flex items-center space-x-2" onClick={() => setIsOpen(false)}>
-                      <img src="/images/odontogeek-logo-new.png" alt="OdontoGeek" className="h-8 w-auto" />
-                    </Link>
-                  </div>
+          {/* Mobile Menu Button */}
+          <Sheet open={isOpen} onOpenChange={setIsOpen}>
+            <SheetTrigger asChild className="md:hidden">
+              <Button variant="ghost" size="sm">
+                <Menu className="w-5 h-5" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="w-80">
+              <div className="flex flex-col h-full">
+                {/* Mobile Logo */}
+                <div className="flex items-center justify-between pb-6 border-b">
+                  <Link href="/" className="flex items-center space-x-2" onClick={() => setIsOpen(false)}>
+                    <img src="/images/odontogeek-logo-new.png" alt="OdontoGeek" className="h-8 w-auto" />
+                  </Link>
+                </div>
 
-                  {/* Mobile Navigation */}
-                  {publicNavigationItems.map((item) => {
-                    const Icon = item.icon
-                    const isActive = pathname === item.href
-                    return (
+                {/* Mobile Navigation */}
+                <nav className="flex-1 py-6">
+                  <div className="space-y-4">
+                    {navigationItems.map((item) => (
                       <Link
                         key={item.name}
                         href={item.href}
+                        className="flex items-center space-x-3 text-gray-700 hover:text-blue-600 font-medium transition-colors duration-200 py-2"
                         onClick={() => setIsOpen(false)}
-                        className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                          isActive ? "text-blue-600 bg-blue-50" : "text-gray-700 hover:text-blue-600 hover:bg-gray-50"
-                        }`}
                       >
-                        <Icon className="w-4 h-4" />
+                        <item.icon className="w-5 h-5" />
                         <span>{item.name}</span>
                       </Link>
-                    )
-                  })}
+                    ))}
+                  </div>
+                </nav>
 
-                  {/* Mobile User Menu */}
-                  <hr className="my-4" />
+                {/* Mobile Auth Buttons */}
+                <div className="border-t pt-6 space-y-3">
                   {user ? (
-                    <>
-                      <div className="px-3 py-2">
-                        <p className="font-medium text-gray-900">{user.name}</p>
-                        <p className="text-sm text-gray-500">{user.email}</p>
-                      </div>
-                      <Link
-                        href="/dashboard"
-                        onClick={() => setIsOpen(false)}
-                        className="flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50"
-                      >
-                        <Home className="w-4 h-4" />
-                        <span>Mi Dashboard</span>
-                      </Link>
+                    <div className="space-y-3">
+                      <div className="text-gray-700 font-medium">Hola, {user.name}</div>
                       {user.role === "admin" && (
-                        <Link
-                          href="/admin"
-                          onClick={() => setIsOpen(false)}
-                          className="flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50"
-                        >
-                          <Shield className="w-4 h-4" />
-                          <span>Panel Admin</span>
+                        <Link href="/admin" onClick={() => setIsOpen(false)}>
+                          <Button variant="outline" className="w-full justify-start bg-transparent">
+                            <Users className="w-4 h-4 mr-2" />
+                            Panel de Admin
+                          </Button>
                         </Link>
                       )}
-                      <Link
-                        href="/settings"
-                        onClick={() => setIsOpen(false)}
-                        className="flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50"
-                      >
-                        <Settings className="w-4 h-4" />
-                        <span>Configuración</span>
+                      <Link href="/dashboard" onClick={() => setIsOpen(false)}>
+                        <Button variant="outline" className="w-full justify-start bg-transparent">
+                          <BookOpen className="w-4 h-4 mr-2" />
+                          Mi Panel
+                        </Button>
                       </Link>
-                      <button
-                        onClick={() => {
-                          handleLogout()
-                          setIsOpen(false)
-                        }}
-                        className="flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium text-red-600 hover:bg-red-50 w-full text-left"
-                      >
-                        <LogOut className="w-4 h-4" />
-                        <span>Cerrar Sesión</span>
-                      </button>
-                    </>
+                    </div>
                   ) : (
                     <>
-                      <Link
-                        href="/auth/login"
-                        onClick={() => setIsOpen(false)}
-                        className="flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50"
-                      >
-                        <LogIn className="w-4 h-4" />
-                        <span>Iniciar Sesión</span>
+                      <Link href="/auth/login" onClick={() => setIsOpen(false)}>
+                        <Button variant="outline" className="w-full justify-start bg-transparent">
+                          <LogIn className="w-4 h-4 mr-2" />
+                          Iniciar Sesión
+                        </Button>
                       </Link>
-                      <Link
-                        href="/auth/register"
-                        onClick={() => setIsOpen(false)}
-                        className="flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700"
-                      >
-                        <UserPlus className="w-4 h-4" />
-                        <span>Registrarse</span>
+                      <Link href="/auth/register" onClick={() => setIsOpen(false)}>
+                        <Button className="w-full justify-start">
+                          <UserPlus className="w-4 h-4 mr-2" />
+                          Registrarse
+                        </Button>
                       </Link>
                     </>
                   )}
                 </div>
-              </SheetContent>
-            </Sheet>
-          </div>
+              </div>
+            </SheetContent>
+          </Sheet>
         </div>
       </div>
-    </nav>
+    </header>
   )
 }

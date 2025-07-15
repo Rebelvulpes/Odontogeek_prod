@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { Clock, Users, Star, Search, Filter, ChevronLeft, ChevronRight, Play, BookOpen } from "lucide-react"
+import { Navigation } from "@/components/navigation"
 
 interface Course {
   id: string
@@ -164,6 +165,7 @@ export default function CoursesPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
+        <Navigation user={null} />
         <div className="container mx-auto px-4 py-8">
           <div className="flex items-center justify-center py-20">
             <div className="text-center">
@@ -178,6 +180,8 @@ export default function CoursesPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <Navigation user={null} />
+
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
