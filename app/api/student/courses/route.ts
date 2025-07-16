@@ -20,67 +20,59 @@ export async function GET(req: NextRequest) {
     const { data: enrollments, error: enrollmentsError } = await supabase
       .from("enrollments")
       .select(`
-        id,
-        course_id,
-        progress_percentage,
-        enrolled_at,
-        status,
-        completed_at,
+        *,
         courses (
           id,
           title,
           description,
           thumbnail_url,
+          instructor,
+          price,
           duration_hours,
-          instructor_name,
-          status
+          created_at
         )
       `)
       .eq("user_id", userData.id)
-      .eq("status", "active")
 
     if (enrollmentsError) {
       console.error("Error fetching enrollments:", enrollmentsError)
-      return NextResponse.json({ error: "Error al obtener cursos" }, { status: 500 })
+      return NextResponse.json({ error: "Error obteniendo cursos" }, { status: 500 })
     }
 
-    if (!enrollments || enrollments.length === 0) {
-      return NextResponse.json({
-        success: true,
-        courses: [],
-      })
-    }
-
-    // Procesar cada enrollment para obtener información detallada
+    // Obtener progreso de lecciones para cada curso
     const coursesWithProgress = await Promise.all(
-      enrollments.map(async (enrollment) => {
-        // Contar lecciones totales del curso
+      (enrollments || []).map(async (enrollment) => {
+        const courseId = enrollment.course_id
+
+        // Contar total de lecciones del curso
         const { count: totalLessons } = await supabase
           .from("lessons")
           .select("*", { count: "exact", head: true })
-          .eq("course_id", enrollment.course_id)
-          .eq("archived", false)
+          .eq("course_id", courseId)
 
         // Contar lecciones completadas por el usuario
         const { count: completedLessons } = await supabase
           .from("lesson_progress")
           .select("*", { count: "exact", head: true })
           .eq("user_id", userData.id)
-          .eq("course_id", enrollment.course_id)
-          .eq("is_completed", true)
+          .eq("course_id", courseId)
+          .eq("completed", true)
+
+        // Calcular porcentaje de progreso
+        const progressPercentage = totalLessons > 0 ? (completedLessons / totalLessons) * 100 : 0
 
         return {
           id: enrollment.courses.id,
           title: enrollment.courses.title,
           description: enrollment.courses.description,
           thumbnail_url: enrollment.courses.thumbnail_url,
-          instructor: enrollment.courses.instructor_name || "Instructor",
+          instructor: enrollment.courses.instructor || "Instructor",
           total_lessons: totalLessons || 0,
           completed_lessons: completedLessons || 0,
-          progress_percentage: enrollment.progress_percentage || 0,
+          progress_percentage: Math.round(progressPercentage * 100) / 100,
           enrolled_at: enrollment.enrolled_at,
-          status: enrollment.status,
-          is_completed: enrollment.progress_percentage >= 100 || enrollment.completed_at !== null,
+          status: enrollment.status || "active",
+          is_completed: progressPercentage >= 100,
         }
       }),
     )
@@ -90,7 +82,7 @@ export async function GET(req: NextRequest) {
       courses: coursesWithProgress,
     })
   } catch (error) {
-    console.error("Error in student courses API:", error)
+    console.error("Error in /api/student/courses:", error)
     return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 })
   }
 }

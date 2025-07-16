@@ -45,52 +45,37 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // Crear una sesión simple (sin JWT por ahora)
-    const sessionId = crypto.randomUUID()
-
-    // Log de auditoría para admins (intentar, pero no fallar si no existe la tabla)
-    if (user.role === "admin") {
-      try {
-        await supabase.from("admin_logs").insert([
-          {
-            admin_id: user.id,
-            action: "login",
-            details: `Administrador ${user.first_name} ${user.last_name} inició sesión`,
-            ip_address: req.headers.get("x-forwarded-for") || "unknown",
-          },
-        ])
-      } catch (logError) {
-        console.log("No se pudo crear log:", logError)
-      }
-    }
-
-    // Crear respuesta con cookie simple
+    // Crear respuesta con cookie de sesión
     const response = NextResponse.json({
       success: true,
       message: "Login exitoso",
       user: {
         id: user.id,
         email: user.email,
-        name: `${user.first_name} ${user.last_name}`,
+        first_name: user.first_name,
+        last_name: user.last_name,
         role: user.role,
       },
       redirectTo: user.role === "admin" ? "/admin" : "/dashboard",
     })
 
-    // Configurar cookie simple con información del usuario
+    // Configurar cookie de sesión
     response.cookies.set(
       "user-session",
       JSON.stringify({
         id: user.id,
         email: user.email,
+        first_name: user.first_name,
+        last_name: user.last_name,
         role: user.role,
-        sessionId,
+        created_at: user.created_at,
       }),
       {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
         maxAge: 7 * 24 * 60 * 60, // 7 días
+        path: "/",
       },
     )
 

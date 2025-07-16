@@ -14,18 +14,17 @@ export async function PUT(req: NextRequest) {
     }
 
     const userData = JSON.parse(userSession)
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
-
-    // Obtener datos del formulario
     const formData = await req.formData()
+
     const firstName = formData.get("first_name") as string
     const lastName = formData.get("last_name") as string
     const email = formData.get("email") as string
 
-    // Validar datos requeridos
     if (!firstName || !lastName || !email) {
       return NextResponse.json({ error: "Todos los campos son requeridos" }, { status: 400 })
     }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
     // Actualizar usuario en la base de datos
     const { data: updatedUser, error } = await supabase
@@ -42,34 +41,45 @@ export async function PUT(req: NextRequest) {
 
     if (error) {
       console.error("Error updating user:", error)
-      return NextResponse.json({ error: "Error al actualizar el perfil" }, { status: 500 })
+      return NextResponse.json({ error: "Error actualizando perfil" }, { status: 500 })
     }
 
-    // Actualizar cookie de sesión con los nuevos datos
-    const updatedUserData = {
-      ...userData,
-      first_name: firstName,
-      last_name: lastName,
-      email: email,
-    }
-
+    // Crear respuesta con cookie actualizada
     const response = NextResponse.json({
       success: true,
-      user: updatedUser,
+      user: {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        first_name: updatedUser.first_name,
+        last_name: updatedUser.last_name,
+        role: updatedUser.role,
+        created_at: updatedUser.created_at,
+      },
     })
 
-    // Actualizar cookie
-    response.cookies.set("user-session", JSON.stringify(updatedUserData), {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 30 * 24 * 60 * 60, // 30 días
-      path: "/",
-    })
+    // Actualizar cookie de sesión
+    response.cookies.set(
+      "user-session",
+      JSON.stringify({
+        id: updatedUser.id,
+        email: updatedUser.email,
+        first_name: updatedUser.first_name,
+        last_name: updatedUser.last_name,
+        role: updatedUser.role,
+        created_at: updatedUser.created_at,
+      }),
+      {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 7 * 24 * 60 * 60, // 7 días
+        path: "/",
+      },
+    )
 
     return response
   } catch (error) {
-    console.error("Error in student profile update:", error)
+    console.error("Error in /api/student/profile:", error)
     return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 })
   }
 }
