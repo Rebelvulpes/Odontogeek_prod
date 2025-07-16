@@ -7,15 +7,15 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 export async function POST(req: NextRequest) {
   try {
-    const { firstName, lastName, email, password } = await req.json()
+    const { email, password, firstName, lastName } = await req.json()
 
-    console.log("=== REGISTRATION ATTEMPT ===")
-    console.log("Name:", firstName, lastName)
+    console.log("=== REGISTER ATTEMPT ===")
     console.log("Email:", email)
-    console.log("Password length:", password?.length)
+    console.log("First Name:", firstName)
+    console.log("Last Name:", lastName)
 
     // Validaciones básicas
-    if (!firstName || !lastName || !email || !password) {
+    if (!email || !password || !firstName || !lastName) {
       return NextResponse.json({
         success: false,
         message: "Todos los campos son requeridos",
@@ -29,98 +29,84 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // Validar formato de email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
       return NextResponse.json({
         success: false,
-        message: "Formato de email inválido",
+        message: "Email inválido",
       })
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Verificar si el email ya existe
+    // Verificar si el usuario ya existe
     const { data: existingUser, error: checkError } = await supabase
       .from("users")
       .select("id")
       .eq("email", email.toLowerCase().trim())
       .single()
 
-    console.log("=== EMAIL CHECK ===")
-    console.log("Existing user:", !!existingUser)
-    console.log("Check error:", checkError)
-
     if (existingUser) {
+      console.log("❌ User already exists:", email)
       return NextResponse.json({
         success: false,
-        message: "Ya existe un usuario con este email",
+        message: "Este email ya está registrado",
       })
     }
 
-    // Hash de la contraseña
-    console.log("=== HASHING PASSWORD ===")
-    const passwordHash = await bcrypt.hash(password, 10)
-    console.log("Hash generated successfully")
+    // Generar hash de la contraseña
+    console.log("=== GENERATING PASSWORD HASH ===")
+    const saltRounds = 10
+    const passwordHash = await bcrypt.hash(password, saltRounds)
+    console.log("Hash generated, length:", passwordHash.length)
     console.log("Hash preview:", passwordHash.substring(0, 20))
 
-    // Crear usuario
-    const userData = {
-      email: email.toLowerCase().trim(),
-      password_hash: passwordHash,
-      first_name: firstName.trim(),
-      last_name: lastName.trim(),
-      role: "student",
-      is_test_user: false,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }
+    // Crear nuevo usuario
+    const { data: newUser, error: createError } = await supabase
+      .from("users")
+      .insert([
+        {
+          email: email.toLowerCase().trim(),
+          password_hash: passwordHash,
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+          role: "student",
+          avatar_url: "/placeholder-user.jpg",
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      ])
+      .select()
+      .single()
 
-    console.log("=== CREATING USER ===")
-    console.log("User data:", { ...userData, password_hash: "***" })
-
-    const { data: newUser, error: createError } = await supabase.from("users").insert([userData]).select()
-
-    console.log("=== USER CREATION RESULT ===")
-    console.log("Success:", !createError)
-    console.log("Error:", createError)
-    console.log("User created:", !!newUser?.[0])
-
-    if (createError) {
+    if (createError || !newUser) {
       console.error("❌ Error creating user:", createError)
       return NextResponse.json({
         success: false,
-        message: `Error creando usuario: ${createError.message}`,
+        message: "Error al crear la cuenta",
       })
     }
 
-    if (!newUser || newUser.length === 0) {
-      return NextResponse.json({
-        success: false,
-        message: "Error: No se pudo crear el usuario",
-      })
-    }
+    console.log("✅ User created successfully:", newUser.email)
 
-    const user = newUser[0]
-
-    // Crear respuesta con cookie de sesión automática
+    // Crear sesión automáticamente
     const userSession = {
-      id: user.id,
-      email: user.email,
-      first_name: user.first_name,
-      last_name: user.last_name,
-      role: user.role,
-      created_at: user.created_at,
+      id: newUser.id,
+      email: newUser.email,
+      first_name: newUser.first_name,
+      last_name: newUser.last_name,
+      role: newUser.role,
+      created_at: newUser.created_at,
     }
 
     const response = NextResponse.json({
       success: true,
-      message: "Usuario creado exitosamente",
+      message: "Cuenta creada exitosamente",
       user: userSession,
       redirectTo: "/dashboard",
     })
 
-    // Configurar cookie de sesión automática
+    // Configurar cookie de sesión
     response.cookies.set("user-session", JSON.stringify(userSession), {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -129,10 +115,9 @@ export async function POST(req: NextRequest) {
       path: "/",
     })
 
-    console.log("✅ Registration successful for user:", user.email)
     return response
   } catch (error) {
-    console.error("❌ Error en registro:", error)
+    console.error("❌ Error in register:", error)
     return NextResponse.json({
       success: false,
       message: "Error interno del servidor",

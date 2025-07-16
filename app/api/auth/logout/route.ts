@@ -12,10 +12,10 @@ export async function POST(req: NextRequest) {
 
     return response
   } catch (error) {
-    console.error("Error en logout:", error)
+    console.error("Error in logout:", error)
     return NextResponse.json({
       success: false,
-      message: "Error cerrando sesión",
+      message: "Error interno del servidor",
     })
   }
 }

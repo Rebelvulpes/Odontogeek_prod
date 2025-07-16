@@ -4,55 +4,111 @@ import { createClient } from "@supabase/supabase-js"
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
-export async function PUT(req: NextRequest) {
+export async function GET(req: NextRequest) {
   try {
-    // Verificar autenticación
-    const userSession = req.cookies.get("user-session")?.value
-    if (!userSession) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "No autorizado",
-        },
-        { status: 401 },
-      )
+    const sessionCookie = req.cookies.get("user-session")
+
+    if (!sessionCookie) {
+      return NextResponse.json({
+        success: false,
+        message: "No hay sesión activa",
+      })
     }
 
-    const userData = JSON.parse(userSession)
-    const { first_name, last_name, email } = await req.json()
+    const userSession = JSON.parse(sessionCookie.value)
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Validaciones básicas
-    if (!first_name || !last_name || !email) {
+    // Obtener información completa del perfil
+    const { data: user, error } = await supabase.from("users").select("*").eq("id", userSession.id).single()
+
+    if (error || !user) {
+      return NextResponse.json({
+        success: false,
+        message: "Usuario no encontrado",
+      })
+    }
+
+    // Obtener estadísticas del estudiante
+    const { data: enrollments, error: enrollError } = await supabase
+      .from("enrollments")
+      .select("id, progress, completed_at")
+      .eq("user_id", userSession.id)
+
+    const stats = {
+      totalCourses: enrollments?.length || 0,
+      completedCourses: enrollments?.filter((e) => e.completed_at).length || 0,
+      averageProgress: enrollments?.length
+        ? Math.round(enrollments.reduce((sum, e) => sum + (e.progress || 0), 0) / enrollments.length)
+        : 0,
+    }
+
+    return NextResponse.json({
+      success: true,
+      user: {
+        id: user.id,
+        email: user.email,
+        first_name: user.first_name,
+        last_name: user.last_name,
+        avatar_url: user.avatar_url,
+        created_at: user.created_at,
+        updated_at: user.updated_at,
+      },
+      stats,
+    })
+  } catch (error) {
+    console.error("Error getting profile:", error)
+    return NextResponse.json({
+      success: false,
+      message: "Error interno del servidor",
+    })
+  }
+}
+
+export async function PUT(req: NextRequest) {
+  try {
+    const sessionCookie = req.cookies.get("user-session")
+
+    if (!sessionCookie) {
+      return NextResponse.json({
+        success: false,
+        message: "No hay sesión activa",
+      })
+    }
+
+    const userSession = JSON.parse(sessionCookie.value)
+    const { firstName, lastName, email } = await req.json()
+
+    // Validaciones
+    if (!firstName || !lastName || !email) {
       return NextResponse.json({
         success: false,
         message: "Todos los campos son requeridos",
       })
     }
 
-    // Validar formato de email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
       return NextResponse.json({
         success: false,
-        message: "Formato de email inválido",
+        message: "Email inválido",
       })
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Verificar si el email ya existe (excepto para el usuario actual)
-    if (email.toLowerCase().trim() !== userData.email) {
+    // Verificar si el email ya existe (excepto el usuario actual)
+    if (email.toLowerCase() !== userSession.email.toLowerCase()) {
       const { data: existingUser } = await supabase
         .from("users")
         .select("id")
-        .eq("email", email.toLowerCase().trim())
-        .neq("id", userData.id)
+        .eq("email", email.toLowerCase())
+        .neq("id", userSession.id)
         .single()
 
       if (existingUser) {
         return NextResponse.json({
           success: false,
-          message: "Ya existe otro usuario con este email",
+          message: "Este email ya está en uso",
         })
       }
     }
@@ -61,68 +117,48 @@ export async function PUT(req: NextRequest) {
     const { data: updatedUser, error } = await supabase
       .from("users")
       .update({
-        first_name: first_name.trim(),
-        last_name: last_name.trim(),
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
         email: email.toLowerCase().trim(),
         updated_at: new Date().toISOString(),
       })
-      .eq("id", userData.id)
+      .eq("id", userSession.id)
       .select()
+      .single()
 
-    if (error) {
-      console.error("Error updating user profile:", error)
+    if (error || !updatedUser) {
+      console.error("Error updating profile:", error)
       return NextResponse.json({
         success: false,
-        message: "Error actualizando perfil",
+        message: "Error al actualizar perfil",
       })
     }
-
-    if (!updatedUser || updatedUser.length === 0) {
-      return NextResponse.json({
-        success: false,
-        message: "Usuario no encontrado",
-      })
-    }
-
-    const user = updatedUser[0]
 
     // Actualizar cookie de sesión
-    const newUserSession = {
-      id: user.id,
-      email: user.email,
-      first_name: user.first_name,
-      last_name: user.last_name,
-      role: user.role,
-      created_at: user.created_at,
+    const newSession = {
+      ...userSession,
+      email: updatedUser.email,
+      first_name: updatedUser.first_name,
+      last_name: updatedUser.last_name,
     }
 
     const response = NextResponse.json({
       success: true,
       message: "Perfil actualizado exitosamente",
-      user: {
-        id: user.id,
-        email: user.email,
-        first_name: user.first_name,
-        last_name: user.last_name,
-        role: user.role,
-        avatar_url: user.avatar_url,
-        created_at: user.created_at,
-        updated_at: user.updated_at,
-      },
+      user: updatedUser,
     })
 
-    // Actualizar cookie
-    response.cookies.set("user-session", JSON.stringify(newUserSession), {
+    response.cookies.set("user-session", JSON.stringify(newSession), {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60, // 7 días
+      maxAge: 7 * 24 * 60 * 60,
       path: "/",
     })
 
     return response
   } catch (error) {
-    console.error("Error in student profile API:", error)
+    console.error("Error updating profile:", error)
     return NextResponse.json({
       success: false,
       message: "Error interno del servidor",
