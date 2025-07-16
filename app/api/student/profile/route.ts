@@ -14,20 +14,16 @@ export async function PUT(req: NextRequest) {
     }
 
     const userData = JSON.parse(userSession)
-    const formData = await req.formData()
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
+    // Obtener datos del formulario
+    const formData = await req.formData()
     const firstName = formData.get("first_name") as string
     const lastName = formData.get("last_name") as string
     const email = formData.get("email") as string
 
-    if (!firstName || !lastName || !email) {
-      return NextResponse.json({ error: "Todos los campos son requeridos" }, { status: 400 })
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
-
-    // Actualizar usuario
-    const { data: updatedUser, error: updateError } = await supabase
+    // Actualizar usuario en la base de datos
+    const { data: updatedUser, error } = await supabase
       .from("users")
       .update({
         first_name: firstName,
@@ -39,29 +35,38 @@ export async function PUT(req: NextRequest) {
       .select()
       .single()
 
-    if (updateError) {
-      console.error("Error updating user:", updateError)
+    if (error) {
+      console.error("Error updating user:", error)
       return NextResponse.json({ error: "Error al actualizar perfil" }, { status: 500 })
     }
 
-    // Actualizar cookie con nueva información
-    const newUserData = {
+    // Actualizar cookie de sesión
+    const updatedSession = {
       ...userData,
-      email: updatedUser.email,
-      name: `${updatedUser.first_name} ${updatedUser.last_name}`,
+      first_name: firstName,
+      last_name: lastName,
+      email: email,
     }
 
     const response = NextResponse.json({
       success: true,
-      message: "Perfil actualizado exitosamente",
-      user: updatedUser,
+      user: {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        first_name: updatedUser.first_name,
+        last_name: updatedUser.last_name,
+        avatar_url: updatedUser.avatar_url,
+        role: updatedUser.role,
+        created_at: updatedUser.created_at,
+      },
     })
 
-    response.cookies.set("user-session", JSON.stringify(newUserData), {
+    // Actualizar cookie
+    response.cookies.set("user-session", JSON.stringify(updatedSession), {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60, // 7 días
+      maxAge: 30 * 24 * 60 * 60, // 30 días
     })
 
     return response
