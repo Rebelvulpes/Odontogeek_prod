@@ -1,43 +1,42 @@
--- Verificar y corregir la estructura de la tabla enrollments
--- Primero verificamos qué columnas existen
-SELECT column_name, data_type, is_nullable
+-- Agregar todas las columnas faltantes a la tabla enrollments
+ALTER TABLE enrollments ADD COLUMN IF NOT EXISTS progress_percentage DECIMAL(5,2) DEFAULT 0.0;
+ALTER TABLE enrollments ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE enrollments ADD COLUMN IF NOT EXISTS last_accessed_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE enrollments ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'active';
+
+-- Crear índices para mejor performance
+CREATE INDEX IF NOT EXISTS idx_enrollments_user_id ON enrollments(user_id);
+CREATE INDEX IF NOT EXISTS idx_enrollments_course_id ON enrollments(course_id);
+CREATE INDEX IF NOT EXISTS idx_enrollments_status ON enrollments(status);
+
+-- Crear tabla lesson_progress si no existe
+CREATE TABLE IF NOT EXISTS lesson_progress (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL,
+  lesson_id UUID NOT NULL,
+  course_id UUID NOT NULL,
+  completed_at TIMESTAMP WITH TIME ZONE,
+  watch_time_seconds INTEGER DEFAULT 0,
+  is_completed BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (lesson_id) REFERENCES lessons(id) ON DELETE CASCADE,
+  FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE,
+  UNIQUE(user_id, lesson_id)
+);
+
+-- Crear índices para lesson_progress
+CREATE INDEX IF NOT EXISTS idx_lesson_progress_user_id ON lesson_progress(user_id);
+CREATE INDEX IF NOT EXISTS idx_lesson_progress_course_id ON lesson_progress(course_id);
+CREATE INDEX IF NOT EXISTS idx_lesson_progress_completed ON lesson_progress(is_completed);
+
+-- Verificar estructura final de enrollments
+SELECT 
+  column_name, 
+  data_type, 
+  is_nullable,
+  column_default
 FROM information_schema.columns 
 WHERE table_name = 'enrollments' 
 ORDER BY ordinal_position;
-
--- Agregar columnas faltantes si no existen
-ALTER TABLE enrollments 
-ADD COLUMN IF NOT EXISTS payment_status VARCHAR(50) DEFAULT 'completed';
-
-ALTER TABLE enrollments 
-ADD COLUMN IF NOT EXISTS amount DECIMAL(10,2) DEFAULT 0;
-
-ALTER TABLE enrollments 
-ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
-
-ALTER TABLE enrollments 
-ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
-
--- Actualizar registros existentes
-UPDATE enrollments 
-SET payment_status = 'completed' 
-WHERE payment_status IS NULL;
-
--- Actualizar amounts basado en el precio del curso
-UPDATE enrollments 
-SET amount = courses.price 
-FROM courses 
-WHERE enrollments.course_id = courses.id 
-AND (enrollments.amount = 0 OR enrollments.amount IS NULL);
-
--- Verificar la estructura final
-SELECT column_name, data_type, is_nullable, column_default
-FROM information_schema.columns 
-WHERE table_name = 'enrollments' 
-ORDER BY ordinal_position;
-
--- Mostrar algunos registros de ejemplo
-SELECT e.id, e.course_id, e.payment_status, e.amount, c.title, c.price
-FROM enrollments e
-JOIN courses c ON e.course_id = c.id
-LIMIT 10;

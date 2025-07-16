@@ -22,6 +22,7 @@ export async function PUT(req: NextRequest) {
     const lastName = formData.get("last_name") as string
     const email = formData.get("email") as string
 
+    // Validar datos requeridos
     if (!firstName || !lastName || !email) {
       return NextResponse.json({ error: "Todos los campos son requeridos" }, { status: 400 })
     }
@@ -41,11 +42,11 @@ export async function PUT(req: NextRequest) {
 
     if (error) {
       console.error("Error updating user:", error)
-      return NextResponse.json({ error: "Error al actualizar perfil" }, { status: 500 })
+      return NextResponse.json({ error: "Error al actualizar el perfil" }, { status: 500 })
     }
 
-    // Actualizar cookie de sesión
-    const updatedSession = {
+    // Actualizar cookie de sesión con los nuevos datos
+    const updatedUserData = {
       ...userData,
       first_name: firstName,
       last_name: lastName,
@@ -54,29 +55,21 @@ export async function PUT(req: NextRequest) {
 
     const response = NextResponse.json({
       success: true,
-      message: "Perfil actualizado exitosamente",
-      user: {
-        id: updatedUser.id,
-        email: updatedUser.email,
-        first_name: updatedUser.first_name,
-        last_name: updatedUser.last_name,
-        avatar_url: updatedUser.avatar_url,
-        role: updatedUser.role,
-        created_at: updatedUser.created_at,
-      },
+      user: updatedUser,
     })
 
     // Actualizar cookie
-    response.cookies.set("user-session", JSON.stringify(updatedSession), {
+    response.cookies.set("user-session", JSON.stringify(updatedUserData), {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       maxAge: 30 * 24 * 60 * 60, // 30 días
+      path: "/",
     })
 
     return response
   } catch (error) {
-    console.error("Error in profile update API:", error)
+    console.error("Error in student profile update:", error)
     return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 })
   }
 }
