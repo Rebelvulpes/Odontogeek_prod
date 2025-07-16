@@ -22,6 +22,10 @@ export async function PUT(req: NextRequest) {
     const lastName = formData.get("last_name") as string
     const email = formData.get("email") as string
 
+    if (!firstName || !lastName || !email) {
+      return NextResponse.json({ error: "Todos los campos son requeridos" }, { status: 400 })
+    }
+
     // Actualizar usuario en la base de datos
     const { data: updatedUser, error } = await supabase
       .from("users")
@@ -50,6 +54,7 @@ export async function PUT(req: NextRequest) {
 
     const response = NextResponse.json({
       success: true,
+      message: "Perfil actualizado exitosamente",
       user: {
         id: updatedUser.id,
         email: updatedUser.email,

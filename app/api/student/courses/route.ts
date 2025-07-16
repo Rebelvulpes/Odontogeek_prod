@@ -44,9 +44,16 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Error al obtener cursos" }, { status: 500 })
     }
 
+    if (!enrollments || enrollments.length === 0) {
+      return NextResponse.json({
+        success: true,
+        courses: [],
+      })
+    }
+
     // Procesar cada enrollment para obtener información detallada
     const coursesWithProgress = await Promise.all(
-      (enrollments || []).map(async (enrollment) => {
+      enrollments.map(async (enrollment) => {
         // Contar lecciones totales del curso
         const { count: totalLessons } = await supabase
           .from("lessons")
