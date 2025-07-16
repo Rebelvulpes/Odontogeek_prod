@@ -11,9 +11,11 @@ export async function POST(req: NextRequest) {
 
     console.log("=== LOGIN ATTEMPT ===")
     console.log("Email:", email)
+    console.log("Password provided:", !!password)
     console.log("Password length:", password?.length)
 
     if (!email || !password) {
+      console.log("❌ Missing email or password")
       return NextResponse.json({
         success: false,
         message: "Email y contraseña son requeridos",
@@ -23,87 +25,78 @@ export async function POST(req: NextRequest) {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
     // Buscar usuario por email
+    console.log("=== SEARCHING USER ===")
     const { data: user, error: userError } = await supabase
       .from("users")
       .select("*")
       .eq("email", email.toLowerCase().trim())
       .single()
 
-    console.log("=== USER QUERY RESULT ===")
     console.log("User found:", !!user)
     console.log("User error:", userError)
 
     if (user) {
-      console.log("User ID:", user.id)
-      console.log("User email:", user.email)
-      console.log("User role:", user.role)
-      console.log("Has password hash:", !!user.password_hash)
-      console.log("Hash length:", user.password_hash?.length)
-      console.log("Hash preview:", user.password_hash?.substring(0, 20))
+      console.log("User details:")
+      console.log("- ID:", user.id)
+      console.log("- Email:", user.email)
+      console.log("- Name:", user.first_name, user.last_name)
+      console.log("- Role:", user.role)
+      console.log("- Has password hash:", !!user.password_hash)
+      console.log("- Hash length:", user.password_hash?.length)
+      console.log("- Hash starts with:", user.password_hash?.substring(0, 10))
+      console.log("- Full hash:", user.password_hash)
     }
 
     if (userError || !user) {
-      console.log("❌ User not found or error:", userError)
+      console.log("❌ User not found")
       return NextResponse.json({
         success: false,
         message: "Credenciales inválidas",
+      })
+    }
+
+    if (!user.password_hash) {
+      console.log("❌ No password hash stored")
+      return NextResponse.json({
+        success: false,
+        message: "Usuario sin contraseña configurada",
       })
     }
 
     // Verificar contraseña
-    if (!user.password_hash) {
-      console.log("❌ No password hash found for user")
-      return NextResponse.json({
-        success: false,
-        message: "Usuario no tiene contraseña configurada",
-      })
-    }
-
-    console.log("=== PASSWORD COMPARISON ===")
+    console.log("=== PASSWORD VERIFICATION ===")
     console.log("Input password:", password)
     console.log("Stored hash:", user.password_hash)
+    console.log("Hash algorithm:", user.password_hash.substring(0, 4))
 
-    // Verificar contraseña con bcrypt
-    const passwordMatch = await bcrypt.compare(password, user.password_hash)
-    console.log("Password match result:", passwordMatch)
+    try {
+      const passwordMatch = await bcrypt.compare(password, user.password_hash)
+      console.log("bcrypt.compare result:", passwordMatch)
 
-    // Si no coincide, intentar generar un nuevo hash para debug
-    if (!passwordMatch) {
-      console.log("=== DEBUG: GENERATING NEW HASH ===")
-      const newHash = await bcrypt.hash(password, 10)
-      console.log("New hash for comparison:", newHash)
+      if (!passwordMatch) {
+        console.log("❌ Password does not match")
 
-      // Probar con hash conocido que funciona
-      const testHash = "$2a$10$N9qo8uLOickgx2ZMRZoMye.IjdBJGGqQCQvpJIXOZQeP6.Uq6rOvC"
-      const testMatch = await bcrypt.compare(password, testHash)
-      console.log("Test with known good hash:", testMatch)
+        // Debug: Generar nuevo hash para comparar
+        console.log("=== DEBUG: Generating new hash ===")
+        const newHash = await bcrypt.hash(password, 10)
+        console.log("New hash for input password:", newHash)
 
-      console.log("❌ Password does not match")
+        return NextResponse.json({
+          success: false,
+          message: "Credenciales inválidas",
+        })
+      }
+
+      console.log("✅ Password match successful!")
+    } catch (compareError) {
+      console.error("❌ Error comparing passwords:", compareError)
       return NextResponse.json({
         success: false,
-        message: "Credenciales inválidas",
+        message: "Error verificando credenciales",
       })
     }
 
-    console.log("✅ Password match successful!")
-
-    // Log de auditoría para admins
-    if (user.role === "admin") {
-      try {
-        await supabase.from("admin_logs").insert([
-          {
-            admin_id: user.id,
-            action: "login",
-            details: `Administrador ${user.first_name} ${user.last_name} inició sesión`,
-            ip_address: req.headers.get("x-forwarded-for") || "unknown",
-          },
-        ])
-      } catch (logError) {
-        console.log("Could not create admin log:", logError)
-      }
-    }
-
-    // Crear respuesta con cookie de sesión
+    // Crear sesión
     const userSession = {
       id: user.id,
       email: user.email,
@@ -112,6 +105,9 @@ export async function POST(req: NextRequest) {
       role: user.role,
       created_at: user.created_at,
     }
+
+    console.log("=== CREATING SESSION ===")
+    console.log("Session data:", userSession)
 
     const response = NextResponse.json({
       success: true,
@@ -129,10 +125,10 @@ export async function POST(req: NextRequest) {
       path: "/",
     })
 
-    console.log("✅ Login successful for user:", user.email)
+    console.log("✅ Login successful for:", user.email)
     return response
   } catch (error) {
-    console.error("❌ Error en login:", error)
+    console.error("❌ Login error:", error)
     return NextResponse.json({
       success: false,
       message: "Error interno del servidor",

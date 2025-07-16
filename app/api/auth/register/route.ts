@@ -9,13 +9,15 @@ export async function POST(req: NextRequest) {
   try {
     const { email, password, firstName, lastName } = await req.json()
 
-    console.log("=== REGISTER ATTEMPT ===")
+    console.log("=== REGISTRATION ATTEMPT ===")
     console.log("Email:", email)
     console.log("First Name:", firstName)
     console.log("Last Name:", lastName)
+    console.log("Password length:", password?.length)
 
     // Validaciones básicas
     if (!email || !password || !firstName || !lastName) {
+      console.log("❌ Missing required fields")
       return NextResponse.json({
         success: false,
         message: "Todos los campos son requeridos",
@@ -23,6 +25,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (password.length < 6) {
+      console.log("❌ Password too short")
       return NextResponse.json({
         success: false,
         message: "La contraseña debe tener al menos 6 caracteres",
@@ -31,26 +34,31 @@ export async function POST(req: NextRequest) {
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
+      console.log("❌ Invalid email format")
       return NextResponse.json({
         success: false,
-        message: "Email inválido",
+        message: "Formato de email inválido",
       })
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
     // Verificar si el usuario ya existe
+    console.log("=== CHECKING EXISTING USER ===")
     const { data: existingUser, error: checkError } = await supabase
       .from("users")
-      .select("id")
+      .select("id, email")
       .eq("email", email.toLowerCase().trim())
       .single()
 
+    console.log("Existing user found:", !!existingUser)
+    console.log("Check error:", checkError)
+
     if (existingUser) {
-      console.log("❌ User already exists:", email)
+      console.log("❌ User already exists")
       return NextResponse.json({
         success: false,
-        message: "Este email ya está registrado",
+        message: "Ya existe un usuario con este email",
       })
     }
 
@@ -58,36 +66,54 @@ export async function POST(req: NextRequest) {
     console.log("=== GENERATING PASSWORD HASH ===")
     const saltRounds = 10
     const passwordHash = await bcrypt.hash(password, saltRounds)
-    console.log("Hash generated, length:", passwordHash.length)
+    console.log("Hash generated successfully")
+    console.log("Hash length:", passwordHash.length)
     console.log("Hash preview:", passwordHash.substring(0, 20))
+    console.log("Full hash:", passwordHash)
 
     // Crear nuevo usuario
-    const { data: newUser, error: createError } = await supabase
-      .from("users")
-      .insert([
-        {
-          email: email.toLowerCase().trim(),
-          password_hash: passwordHash,
-          first_name: firstName.trim(),
-          last_name: lastName.trim(),
-          role: "student",
-          avatar_url: "/placeholder-user.jpg",
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-      ])
-      .select()
-      .single()
+    console.log("=== CREATING USER ===")
+    const userData = {
+      email: email.toLowerCase().trim(),
+      password_hash: passwordHash,
+      first_name: firstName.trim(),
+      last_name: lastName.trim(),
+      role: "student",
+      is_test_user: false,
+      avatar_url: "/placeholder-user.jpg",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
 
-    if (createError || !newUser) {
+    console.log("User data to insert:", { ...userData, password_hash: "***" })
+
+    const { data: newUser, error: createError } = await supabase.from("users").insert([userData]).select().single()
+
+    console.log("User creation result:")
+    console.log("- Success:", !createError)
+    console.log("- Error:", createError)
+    console.log("- User created:", !!newUser)
+
+    if (createError) {
       console.error("❌ Error creating user:", createError)
       return NextResponse.json({
         success: false,
-        message: "Error al crear la cuenta",
+        message: `Error creando usuario: ${createError.message}`,
       })
     }
 
-    console.log("✅ User created successfully:", newUser.email)
+    if (!newUser) {
+      console.log("❌ No user returned after creation")
+      return NextResponse.json({
+        success: false,
+        message: "Error: No se pudo crear el usuario",
+      })
+    }
+
+    console.log("✅ User created successfully:")
+    console.log("- ID:", newUser.id)
+    console.log("- Email:", newUser.email)
+    console.log("- Name:", newUser.first_name, newUser.last_name)
 
     // Crear sesión automáticamente
     const userSession = {
@@ -99,9 +125,12 @@ export async function POST(req: NextRequest) {
       created_at: newUser.created_at,
     }
 
+    console.log("=== CREATING SESSION ===")
+    console.log("Session data:", userSession)
+
     const response = NextResponse.json({
       success: true,
-      message: "Cuenta creada exitosamente",
+      message: "Usuario creado exitosamente",
       user: userSession,
       redirectTo: "/dashboard",
     })
@@ -115,9 +144,10 @@ export async function POST(req: NextRequest) {
       path: "/",
     })
 
+    console.log("✅ Registration successful")
     return response
   } catch (error) {
-    console.error("❌ Error in register:", error)
+    console.error("❌ Registration error:", error)
     return NextResponse.json({
       success: false,
       message: "Error interno del servidor",

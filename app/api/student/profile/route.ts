@@ -6,6 +6,8 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 export async function GET(req: NextRequest) {
   try {
+    console.log("=== GET STUDENT PROFILE ===")
+
     const sessionCookie = req.cookies.get("user-session")
 
     if (!sessionCookie) {
@@ -15,48 +17,39 @@ export async function GET(req: NextRequest) {
       })
     }
 
-    const userSession = JSON.parse(sessionCookie.value)
+    const sessionData = JSON.parse(sessionCookie.value)
+
+    if (!sessionData.id) {
+      return NextResponse.json({
+        success: false,
+        message: "Sesión inválida",
+      })
+    }
+
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Obtener información completa del perfil
-    const { data: user, error } = await supabase.from("users").select("*").eq("id", userSession.id).single()
+    const { data: user, error: userError } = await supabase
+      .from("users")
+      .select("id, email, first_name, last_name, avatar_url, created_at")
+      .eq("id", sessionData.id)
+      .single()
 
-    if (error || !user) {
+    if (userError || !user) {
+      console.error("❌ Error fetching user:", userError)
       return NextResponse.json({
         success: false,
         message: "Usuario no encontrado",
       })
     }
 
-    // Obtener estadísticas del estudiante
-    const { data: enrollments, error: enrollError } = await supabase
-      .from("enrollments")
-      .select("id, progress, completed_at")
-      .eq("user_id", userSession.id)
-
-    const stats = {
-      totalCourses: enrollments?.length || 0,
-      completedCourses: enrollments?.filter((e) => e.completed_at).length || 0,
-      averageProgress: enrollments?.length
-        ? Math.round(enrollments.reduce((sum, e) => sum + (e.progress || 0), 0) / enrollments.length)
-        : 0,
-    }
+    console.log("✅ Profile retrieved for:", user.email)
 
     return NextResponse.json({
       success: true,
-      user: {
-        id: user.id,
-        email: user.email,
-        first_name: user.first_name,
-        last_name: user.last_name,
-        avatar_url: user.avatar_url,
-        created_at: user.created_at,
-        updated_at: user.updated_at,
-      },
-      stats,
+      user,
     })
   } catch (error) {
-    console.error("Error getting profile:", error)
+    console.error("❌ Error getting profile:", error)
     return NextResponse.json({
       success: false,
       message: "Error interno del servidor",
@@ -66,6 +59,8 @@ export async function GET(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
+    console.log("=== UPDATE STUDENT PROFILE ===")
+
     const sessionCookie = req.cookies.get("user-session")
 
     if (!sessionCookie) {
@@ -75,11 +70,21 @@ export async function PUT(req: NextRequest) {
       })
     }
 
-    const userSession = JSON.parse(sessionCookie.value)
-    const { firstName, lastName, email } = await req.json()
+    const sessionData = JSON.parse(sessionCookie.value)
 
-    // Validaciones
-    if (!firstName || !lastName || !email) {
+    if (!sessionData.id) {
+      return NextResponse.json({
+        success: false,
+        message: "Sesión inválida",
+      })
+    }
+
+    const { first_name, last_name, email } = await req.json()
+
+    console.log("Updating profile for user:", sessionData.id)
+    console.log("New data:", { first_name, last_name, email })
+
+    if (!first_name || !last_name || !email) {
       return NextResponse.json({
         success: false,
         message: "Todos los campos son requeridos",
@@ -90,53 +95,53 @@ export async function PUT(req: NextRequest) {
     if (!emailRegex.test(email)) {
       return NextResponse.json({
         success: false,
-        message: "Email inválido",
+        message: "Formato de email inválido",
       })
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
     // Verificar si el email ya existe (excepto el usuario actual)
-    if (email.toLowerCase() !== userSession.email.toLowerCase()) {
-      const { data: existingUser } = await supabase
-        .from("users")
-        .select("id")
-        .eq("email", email.toLowerCase())
-        .neq("id", userSession.id)
-        .single()
+    const { data: existingUser, error: checkError } = await supabase
+      .from("users")
+      .select("id")
+      .eq("email", email.toLowerCase().trim())
+      .neq("id", sessionData.id)
+      .single()
 
-      if (existingUser) {
-        return NextResponse.json({
-          success: false,
-          message: "Este email ya está en uso",
-        })
-      }
+    if (existingUser) {
+      return NextResponse.json({
+        success: false,
+        message: "Este email ya está en uso",
+      })
     }
 
     // Actualizar usuario
-    const { data: updatedUser, error } = await supabase
+    const { data: updatedUser, error: updateError } = await supabase
       .from("users")
       .update({
-        first_name: firstName.trim(),
-        last_name: lastName.trim(),
+        first_name: first_name.trim(),
+        last_name: last_name.trim(),
         email: email.toLowerCase().trim(),
         updated_at: new Date().toISOString(),
       })
-      .eq("id", userSession.id)
+      .eq("id", sessionData.id)
       .select()
       .single()
 
-    if (error || !updatedUser) {
-      console.error("Error updating profile:", error)
+    if (updateError) {
+      console.error("❌ Error updating user:", updateError)
       return NextResponse.json({
         success: false,
-        message: "Error al actualizar perfil",
+        message: "Error actualizando perfil",
       })
     }
 
-    // Actualizar cookie de sesión
-    const newSession = {
-      ...userSession,
+    console.log("✅ Profile updated successfully")
+
+    // Actualizar cookie de sesión si cambió el email
+    const newSessionData = {
+      ...sessionData,
       email: updatedUser.email,
       first_name: updatedUser.first_name,
       last_name: updatedUser.last_name,
@@ -148,7 +153,7 @@ export async function PUT(req: NextRequest) {
       user: updatedUser,
     })
 
-    response.cookies.set("user-session", JSON.stringify(newSession), {
+    response.cookies.set("user-session", JSON.stringify(newSessionData), {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
@@ -158,7 +163,7 @@ export async function PUT(req: NextRequest) {
 
     return response
   } catch (error) {
-    console.error("Error updating profile:", error)
+    console.error("❌ Error updating profile:", error)
     return NextResponse.json({
       success: false,
       message: "Error interno del servidor",
