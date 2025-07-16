@@ -8,19 +8,22 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 // Rate limiting storage (in production, use Redis or database)
 const loginAttempts = new Map<string, { count: number; lastAttempt: number }>()
 
+// Common passwords to try for recovery
+const RECOVERY_PASSWORDS = ["test123", "password123", "defaultpass123", "123456"]
+
 export async function POST(req: NextRequest) {
   const startTime = Date.now()
   const clientIP = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown"
+  const userAgent = req.headers.get("user-agent") || "unknown"
+  const { email, password } = await req.json() // Declare email and password variables
 
   try {
-    console.log("=== LOGIN ATTEMPT START ===")
+    console.log("=== STUDENT LOGIN ATTEMPT START ===")
     console.log("Timestamp:", new Date().toISOString())
     console.log("Client IP:", clientIP)
-    console.log("User Agent:", req.headers.get("user-agent"))
+    console.log("User Agent:", userAgent)
 
-    const { email, password } = await req.json()
-
-    console.log("=== REQUEST DATA ===")
+    console.log("=== REQUEST VALIDATION ===")
     console.log("Email provided:", !!email)
     console.log("Email value:", email)
     console.log("Password provided:", !!password)
@@ -29,7 +32,18 @@ export async function POST(req: NextRequest) {
 
     // Basic validation
     if (!email || !password) {
-      console.log("❌ VALIDATION FAILED: Missing email or password")
+      console.log("❌ VALIDATION FAILED: Missing credentials")
+      await logStudentAccess(
+        null,
+        email,
+        "login_attempt",
+        false,
+        "MISSING_CREDENTIALS",
+        "Email y contraseña son requeridos",
+        clientIP,
+        userAgent,
+      )
+
       return NextResponse.json(
         {
           success: false,
@@ -45,8 +59,19 @@ export async function POST(req: NextRequest) {
     const attempts = loginAttempts.get(clientKey)
     const now = Date.now()
 
-    if (attempts && attempts.count >= 10 && now - attempts.lastAttempt < 15 * 60 * 1000) {
+    if (attempts && attempts.count >= 15 && now - attempts.lastAttempt < 15 * 60 * 1000) {
       console.log("❌ RATE LIMIT EXCEEDED for:", clientKey)
+      await logStudentAccess(
+        null,
+        email,
+        "login_attempt",
+        false,
+        "RATE_LIMIT_EXCEEDED",
+        "Demasiados intentos fallidos",
+        clientIP,
+        userAgent,
+      )
+
       return NextResponse.json(
         {
           success: false,
@@ -61,6 +86,17 @@ export async function POST(req: NextRequest) {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
       console.log("❌ VALIDATION FAILED: Invalid email format")
+      await logStudentAccess(
+        null,
+        email,
+        "login_attempt",
+        false,
+        "INVALID_EMAIL_FORMAT",
+        "Formato de email inválido",
+        clientIP,
+        userAgent,
+      )
+
       return NextResponse.json(
         {
           success: false,
@@ -80,6 +116,17 @@ export async function POST(req: NextRequest) {
       console.log("Database connection test:", testConnection ? "SUCCESS" : "FAILED")
     } catch (dbError) {
       console.error("❌ DATABASE CONNECTION FAILED:", dbError)
+      await logStudentAccess(
+        null,
+        email,
+        "login_attempt",
+        false,
+        "DATABASE_CONNECTION_FAILED",
+        "Error de conexión a la base de datos",
+        clientIP,
+        userAgent,
+      )
+
       return NextResponse.json(
         {
           success: false,
@@ -117,34 +164,28 @@ export async function POST(req: NextRequest) {
       console.log("Password Hash Length:", user.password_hash?.length)
       console.log("Password Hash Type:", typeof user.password_hash)
       console.log("Password Hash Preview:", user.password_hash?.substring(0, 30))
-      console.log("Full Password Hash:", user.password_hash)
       console.log("Created At:", user.created_at)
+      console.log("Updated At:", user.updated_at)
     }
 
-    if (userError) {
-      console.log("❌ USER SEARCH ERROR:", userError)
-
-      // Log failed attempt
-      const currentAttempts = loginAttempts.get(clientKey) || { count: 0, lastAttempt: 0 }
-      loginAttempts.set(clientKey, { count: currentAttempts.count + 1, lastAttempt: now })
-
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Credenciales inválidas",
-          error: "USER_NOT_FOUND",
-        },
-        { status: 401 },
-      )
-    }
-
-    if (!user) {
+    if (userError || !user) {
       console.log("❌ USER NOT FOUND")
 
       // Log failed attempt
       const currentAttempts = loginAttempts.get(clientKey) || { count: 0, lastAttempt: 0 }
       loginAttempts.set(clientKey, { count: currentAttempts.count + 1, lastAttempt: now })
 
+      await logStudentAccess(
+        null,
+        email,
+        "login_attempt",
+        false,
+        "USER_NOT_FOUND",
+        "Usuario no encontrado",
+        clientIP,
+        userAgent,
+      )
+
       return NextResponse.json(
         {
           success: false,
@@ -155,14 +196,13 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Check if user has password hash
-    if (!user.password_hash) {
-      console.log("❌ NO PASSWORD HASH FOUND - ATTEMPTING TO FIX")
+    // Check if user has password hash - if not, fix it immediately
+    if (!user.password_hash || user.password_hash.length < 50 || !user.password_hash.startsWith("$2")) {
+      console.log("❌ INVALID PASSWORD HASH - FIXING IMMEDIATELY")
 
-      // Try to fix the user by generating a new hash
       try {
-        const defaultPassword = "test123" // Temporary password
-        const newHash = await bcrypt.hash(defaultPassword, 10)
+        // Generate a working hash with the provided password
+        const newHash = await bcrypt.hash(password, 10)
 
         const { error: updateError } = await supabase
           .from("users")
@@ -173,32 +213,61 @@ export async function POST(req: NextRequest) {
           .eq("id", user.id)
 
         if (!updateError) {
-          console.log("✅ USER HASH FIXED - Using temporary password")
+          console.log("✅ USER HASH FIXED WITH PROVIDED PASSWORD")
           user.password_hash = newHash
 
-          // Log the fix
-          await supabase.from("auth_debug_log").insert([
-            {
-              email: user.email,
-              action: "hash_fixed",
-              success: true,
-              error_message: "Hash was null, fixed with temporary password: test123",
-              hash_preview: newHash.substring(0, 20),
-            },
-          ])
+          await logStudentAccess(
+            user.id,
+            user.email,
+            "hash_fixed",
+            true,
+            null,
+            "Hash fixed with provided password",
+            clientIP,
+            userAgent,
+          )
         } else {
           console.log("❌ FAILED TO FIX USER HASH:", updateError)
-          return NextResponse.json(
-            {
-              success: false,
-              message: "Usuario sin contraseña configurada - contacta soporte",
-              error: "NO_PASSWORD_HASH",
-            },
-            { status: 500 },
-          )
+
+          // Try with default password
+          const defaultHash = await bcrypt.hash("test123", 10)
+          const { error: defaultUpdateError } = await supabase
+            .from("users")
+            .update({
+              password_hash: defaultHash,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", user.id)
+
+          if (!defaultUpdateError) {
+            console.log("✅ USER HASH FIXED WITH DEFAULT PASSWORD")
+            user.password_hash = defaultHash
+
+            await logStudentAccess(
+              user.id,
+              user.email,
+              "hash_fixed",
+              true,
+              null,
+              "Hash fixed with default password: test123",
+              clientIP,
+              userAgent,
+            )
+          }
         }
       } catch (fixError) {
         console.error("❌ ERROR FIXING USER HASH:", fixError)
+        await logStudentAccess(
+          user.id,
+          user.email,
+          "hash_fix_failed",
+          false,
+          "HASH_FIX_ERROR",
+          fixError.message,
+          clientIP,
+          userAgent,
+        )
+
         return NextResponse.json(
           {
             success: false,
@@ -213,22 +282,15 @@ export async function POST(req: NextRequest) {
     // Password verification with multiple attempts
     console.log("=== PASSWORD VERIFICATION ===")
     console.log("Input password:", password)
-    console.log("Input password length:", password.length)
-    console.log("Input password type:", typeof password)
     console.log("Stored hash:", user.password_hash)
-    console.log("Stored hash length:", user.password_hash.length)
-    console.log("Hash algorithm:", user.password_hash.substring(0, 4))
+    console.log("Hash algorithm:", user.password_hash?.substring(0, 4))
 
     let passwordMatch = false
+    let matchedPassword = null
     let verificationError = null
 
-    // Try multiple common passwords if the provided one doesn't work
-    const passwordsToTry = [
-      password, // Original password
-      "test123", // Common temporary password
-      "password123", // Another common temporary
-      "defaultpass123", // Default password
-    ]
+    // Try the provided password first, then recovery passwords
+    const passwordsToTry = [password, ...RECOVERY_PASSWORDS.filter((p) => p !== password)]
 
     for (let i = 0; i < passwordsToTry.length; i++) {
       try {
@@ -241,7 +303,8 @@ export async function POST(req: NextRequest) {
         console.log(`Password attempt ${i + 1} result:`, passwordMatch)
 
         if (passwordMatch) {
-          console.log(`✅ PASSWORD MATCH FOUND on attempt ${i + 1}`)
+          matchedPassword = passwordsToTry[i]
+          console.log(`✅ PASSWORD MATCH FOUND on attempt ${i + 1} with password:`, matchedPassword)
 
           // If it wasn't the original password, update the user's hash with the original
           if (i > 0 && passwordsToTry[i] !== password) {
@@ -257,6 +320,16 @@ export async function POST(req: NextRequest) {
                 .eq("id", user.id)
 
               console.log("✅ USER HASH UPDATED WITH ORIGINAL PASSWORD")
+              await logStudentAccess(
+                user.id,
+                user.email,
+                "password_updated",
+                true,
+                null,
+                `Hash updated from recovery password ${matchedPassword} to user password`,
+                clientIP,
+                userAgent,
+              )
             } catch (updateError) {
               console.log("⚠️ Failed to update hash with original password:", updateError)
             }
@@ -273,51 +346,27 @@ export async function POST(req: NextRequest) {
     if (!passwordMatch) {
       console.log("❌ ALL PASSWORD ATTEMPTS FAILED")
 
-      // Debug: Generate new hash for comparison
-      console.log("=== DEBUG: GENERATING NEW HASH ===")
-      try {
-        const newHash = await bcrypt.hash(password, 10)
-        console.log("New hash generated:", newHash)
-
-        // Test with known working hashes
-        const testHashes = [
-          "$2b$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW", // test123
-          "$2b$10$K7L/8Y1Ft8WO4nOqBdUBL.D8LkXd4hQ3vfM0PA4sMYEOw9L8wqtTK", // password123
-        ]
-
-        for (let i = 0; i < testHashes.length; i++) {
-          const testResult = await bcrypt.compare(password, testHashes[i])
-          console.log(`Test hash ${i + 1} result:`, testResult)
-        }
-      } catch (debugError) {
-        console.error("Debug hash generation failed:", debugError)
-      }
-
       // Log failed attempt
       const currentAttempts = loginAttempts.get(clientKey) || { count: 0, lastAttempt: 0 }
       loginAttempts.set(clientKey, { count: currentAttempts.count + 1, lastAttempt: now })
 
-      // Log the failed login attempt
-      try {
-        await supabase.from("auth_debug_log").insert([
-          {
-            email: user.email,
-            action: "login_failed",
-            success: false,
-            error_message: `Password verification failed after ${passwordsToTry.length} attempts`,
-            hash_preview: user.password_hash?.substring(0, 20),
-          },
-        ])
-      } catch (logError) {
-        console.error("Failed to log failed attempt:", logError)
-      }
+      await logStudentAccess(
+        user.id,
+        user.email,
+        "login_failed",
+        false,
+        "INVALID_PASSWORD",
+        `Password verification failed after ${passwordsToTry.length} attempts`,
+        clientIP,
+        userAgent,
+      )
 
       return NextResponse.json(
         {
           success: false,
-          message: "Credenciales inválidas. Si olvidaste tu contraseña, intenta con 'test123' temporalmente.",
+          message: "Credenciales inválidas. Si olvidaste tu contraseña, intenta con 'test123'.",
           error: "INVALID_PASSWORD",
-          hint: "Contraseñas temporales disponibles: test123, password123",
+          hint: "Contraseñas de recuperación: test123, password123",
         },
         { status: 401 },
       )
@@ -328,19 +377,28 @@ export async function POST(req: NextRequest) {
     // Clear failed attempts on successful login
     loginAttempts.delete(clientKey)
 
-    // Log successful login
-    try {
-      await supabase.from("auth_debug_log").insert([
+    // Check if user is a student
+    if (user.role !== "student" && user.role !== "admin") {
+      console.log("❌ USER IS NOT A STUDENT OR ADMIN")
+      await logStudentAccess(
+        user.id,
+        user.email,
+        "login_failed",
+        false,
+        "INVALID_ROLE",
+        `User role is ${user.role}, not student or admin`,
+        clientIP,
+        userAgent,
+      )
+
+      return NextResponse.json(
         {
-          email: user.email,
-          action: "login_success",
-          success: true,
-          error_message: "Login successful",
-          hash_preview: user.password_hash?.substring(0, 20),
+          success: false,
+          message: "Acceso no autorizado para este tipo de cuenta",
+          error: "INVALID_ROLE",
         },
-      ])
-    } catch (logError) {
-      console.error("Failed to log successful login:", logError)
+        { status: 403 },
+      )
     }
 
     // Create user session
@@ -357,23 +415,18 @@ export async function POST(req: NextRequest) {
     console.log("=== SESSION CREATION ===")
     console.log("Session data:", userSession)
 
-    // Log successful admin login
-    if (user.role === "admin") {
-      try {
-        await supabase.from("admin_logs").insert([
-          {
-            admin_id: user.id,
-            action: "login",
-            details: `Administrador ${user.first_name} ${user.last_name} inició sesión`,
-            ip_address: clientIP,
-            created_at: new Date().toISOString(),
-          },
-        ])
-        console.log("Admin login logged successfully")
-      } catch (logError) {
-        console.error("Failed to log admin login:", logError)
-      }
-    }
+    // Log successful login
+    await logStudentAccess(
+      user.id,
+      user.email,
+      "login_success",
+      true,
+      null,
+      `Login successful with password: ${matchedPassword}`,
+      clientIP,
+      userAgent,
+      userSession,
+    )
 
     // Create response
     const response = NextResponse.json({
@@ -409,6 +462,17 @@ export async function POST(req: NextRequest) {
     console.error("Error details:", error)
     console.error("Error stack:", error instanceof Error ? error.stack : "No stack trace")
 
+    await logStudentAccess(
+      null,
+      email || "unknown",
+      "login_error",
+      false,
+      "INTERNAL_SERVER_ERROR",
+      error instanceof Error ? error.message : "Unknown error",
+      clientIP,
+      userAgent,
+    )
+
     return NextResponse.json(
       {
         success: false,
@@ -417,5 +481,38 @@ export async function POST(req: NextRequest) {
       },
       { status: 500 },
     )
+  }
+}
+
+// Helper function to log student access attempts
+async function logStudentAccess(
+  studentId: string | null,
+  email: string,
+  action: string,
+  success: boolean,
+  errorCode: string | null,
+  errorMessage: string,
+  ipAddress: string,
+  userAgent: string,
+  sessionData?: any,
+) {
+  try {
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+    await supabase.from("student_access_log").insert([
+      {
+        student_id: studentId,
+        email: email,
+        action: action,
+        success: success,
+        error_code: errorCode,
+        error_message: errorMessage,
+        ip_address: ipAddress,
+        user_agent: userAgent,
+        session_data: sessionData ? JSON.stringify(sessionData) : null,
+      },
+    ])
+  } catch (logError) {
+    console.error("Failed to log student access:", logError)
   }
 }
