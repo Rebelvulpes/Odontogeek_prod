@@ -9,6 +9,8 @@ export async function POST(req: NextRequest) {
   try {
     const { email, password } = await req.json()
 
+    console.log("Login attempt:", { email, password: "***" })
+
     if (!email || !password) {
       return NextResponse.json({
         success: false,
@@ -19,9 +21,16 @@ export async function POST(req: NextRequest) {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
     // Buscar usuario por email
-    const { data: user, error: userError } = await supabase.from("users").select("*").eq("email", email).single()
+    const { data: user, error: userError } = await supabase
+      .from("users")
+      .select("*")
+      .eq("email", email.toLowerCase().trim())
+      .single()
+
+    console.log("User query result:", { user: user ? "found" : "not found", error: userError })
 
     if (userError || !user) {
+      console.log("User not found or error:", userError)
       return NextResponse.json({
         success: false,
         message: "Credenciales inválidas",
@@ -30,19 +39,38 @@ export async function POST(req: NextRequest) {
 
     // Verificar contraseña
     if (!user.password_hash) {
+      console.log("No password hash found for user")
       return NextResponse.json({
         success: false,
         message: "Usuario no tiene contraseña configurada",
       })
     }
 
+    console.log("Comparing passwords...")
     const passwordMatch = await bcrypt.compare(password, user.password_hash)
+    console.log("Password match:", passwordMatch)
 
     if (!passwordMatch) {
       return NextResponse.json({
         success: false,
         message: "Credenciales inválidas",
       })
+    }
+
+    // Log de auditoría para admins
+    if (user.role === "admin") {
+      try {
+        await supabase.from("admin_logs").insert([
+          {
+            admin_id: user.id,
+            action: "login",
+            details: `Administrador ${user.first_name} ${user.last_name} inició sesión`,
+            ip_address: req.headers.get("x-forwarded-for") || "unknown",
+          },
+        ])
+      } catch (logError) {
+        console.log("No se pudo crear log:", logError)
+      }
     }
 
     // Crear respuesta con cookie de sesión
@@ -79,6 +107,7 @@ export async function POST(req: NextRequest) {
       },
     )
 
+    console.log("Login successful for user:", user.email)
     return response
   } catch (error) {
     console.error("Error en login:", error)
