@@ -16,22 +16,24 @@ export async function GET(req: NextRequest) {
     const userData = JSON.parse(userSession)
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Obtener cursos del estudiante con información completa
+    // Obtener enrollments del usuario con información del curso
     const { data: enrollments, error: enrollmentsError } = await supabase
       .from("enrollments")
       .select(`
-        *,
+        id,
+        course_id,
+        progress_percentage,
+        enrolled_at,
+        status,
+        completed_at,
         courses (
           id,
           title,
           description,
           thumbnail_url,
-          instructor,
-          lessons (
-            id,
-            title,
-            duration_minutes
-          )
+          duration_hours,
+          instructor_name,
+          status
         )
       `)
       .eq("user_id", userData.id)
@@ -42,49 +44,43 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Error al obtener cursos" }, { status: 500 })
     }
 
-    // Procesar datos para incluir progreso
+    // Procesar cada enrollment para obtener información detallada
     const coursesWithProgress = await Promise.all(
-      (enrollments || []).map(async (enrollment: any) => {
-        const course = enrollment.courses
+      (enrollments || []).map(async (enrollment) => {
+        // Contar lecciones totales del curso
+        const { count: totalLessons } = await supabase
+          .from("lessons")
+          .select("*", { count: "exact", head: true })
+          .eq("course_id", enrollment.course_id)
+          .eq("archived", false)
 
-        if (!course) return null
-
-        // Contar lecciones totales
-        const totalLessons = course.lessons?.length || 0
-
-        // Contar lecciones completadas
-        const { data: completedLessons } = await supabase
+        // Contar lecciones completadas por el usuario
+        const { count: completedLessons } = await supabase
           .from("lesson_progress")
-          .select("id")
+          .select("*", { count: "exact", head: true })
           .eq("user_id", userData.id)
-          .eq("course_id", course.id)
+          .eq("course_id", enrollment.course_id)
           .eq("is_completed", true)
 
-        const completedCount = completedLessons?.length || 0
-        const progressPercentage = totalLessons > 0 ? (completedCount / totalLessons) * 100 : 0
-
         return {
-          id: course.id,
-          title: course.title,
-          description: course.description,
-          thumbnail_url: course.thumbnail_url,
-          instructor: course.instructor || "Instructor",
-          total_lessons: totalLessons,
-          completed_lessons: completedCount,
-          progress_percentage: Math.round(progressPercentage * 100) / 100,
+          id: enrollment.courses.id,
+          title: enrollment.courses.title,
+          description: enrollment.courses.description,
+          thumbnail_url: enrollment.courses.thumbnail_url,
+          instructor: enrollment.courses.instructor_name || "Instructor",
+          total_lessons: totalLessons || 0,
+          completed_lessons: completedLessons || 0,
+          progress_percentage: enrollment.progress_percentage || 0,
           enrolled_at: enrollment.enrolled_at,
           status: enrollment.status,
-          is_completed: progressPercentage >= 100,
+          is_completed: enrollment.progress_percentage >= 100 || enrollment.completed_at !== null,
         }
       }),
     )
 
-    // Filtrar cursos nulos
-    const validCourses = coursesWithProgress.filter((course) => course !== null)
-
     return NextResponse.json({
       success: true,
-      courses: validCourses,
+      courses: coursesWithProgress,
     })
   } catch (error) {
     console.error("Error in student courses API:", error)

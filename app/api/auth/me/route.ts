@@ -1,44 +1,30 @@
-import { NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
+import { type NextRequest, NextResponse } from "next/server"
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
-
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    // Obtener usuario de la cookie
+    const userSession = req.cookies.get("user-session")?.value
 
-    // Por ahora retornamos el usuario de prueba
-    // En producción esto vendría del token de autenticación
-    const { data: user, error } = await supabase.from("users").select("*").eq("id", "test-student-001").single()
-
-    if (error) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Usuario no encontrado",
-        },
-        { status: 404 },
-      )
+    if (!userSession) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 })
     }
+
+    const userData = JSON.parse(userSession)
 
     return NextResponse.json({
       success: true,
-      data: {
-        id: user.id,
-        email: user.email,
-        name: `${user.first_name} ${user.last_name}`,
-        role: user.role,
+      user: {
+        id: userData.id,
+        email: userData.email,
+        first_name: userData.first_name || userData.name?.split(" ")[0] || "Usuario",
+        last_name: userData.last_name || userData.name?.split(" ")[1] || "",
+        avatar_url: userData.avatar_url || null,
+        role: userData.role,
+        created_at: userData.created_at || new Date().toISOString(),
       },
     })
   } catch (error) {
-    console.error("Error getting user:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Error interno del servidor",
-      },
-      { status: 500 },
-    )
+    console.error("Error in auth/me API:", error)
+    return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 })
   }
 }
