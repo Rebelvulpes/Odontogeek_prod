@@ -1,20 +1,46 @@
+"use client"
+
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { CheckCircle, Play, Users, Star } from "lucide-react"
+import { Clock, Users, BookOpen, Play, Award, TrendingUp } from "lucide-react"
+import { Navigation } from "@/components/navigation"
 import { HeroCarousel } from "@/components/hero-carousel"
 import { NewsTicker } from "@/components/news-ticker"
 import { createClient } from "@supabase/supabase-js"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
-async function getFeaturedCourses() {
+interface Course {
+  id: string
+  title: string
+  description: string
+  price: number
+  duration_hours: number
+  thumbnail_url: string
+  instructor_name: string
+  students_count: number
+  tags: Array<{
+    id: string
+    name: string
+    slug: string
+    color: string
+  }>
+  lessons: Array<{
+    id: string
+    title: string
+    duration_minutes: number
+    is_free: boolean
+  }>
+}
+
+async function getFeaturedCourses(): Promise<Course[]> {
   try {
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
-
-    // Obtener los primeros 3 cursos publicados
+    // Obtener cursos publicados y no archivados
     const { data: courses, error: coursesError } = await supabase
       .from("courses")
       .select(`
@@ -24,9 +50,9 @@ async function getFeaturedCourses() {
         price,
         duration_hours,
         thumbnail_url,
+        instructor_name,
         created_at,
-        status,
-        instructor_name
+        status
       `)
       .eq("status", "published")
       .neq("archived", true)
@@ -93,236 +119,271 @@ async function getFeaturedCourses() {
   }
 }
 
-export default async function HomePage() {
-  const featuredCourses = await getFeaturedCourses()
+export default function HomePage() {
+  const [featuredCourses, setFeaturedCourses] = useState<Course[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const loadFeaturedCourses = async () => {
+      const courses = await getFeaturedCourses()
+      setFeaturedCourses(courses)
+      setLoading(false)
+    }
+
+    loadFeaturedCourses()
+  }, [])
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
-      {/* Header - Mobile optimized */}
-      <header className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-3 sm:py-4">
-          <div className="flex items-center justify-between">
-            {/* Logo - Mobile optimized */}
-            <div className="flex-shrink-0">
-              <img
-                src="/images/odontogeek-logo-new.png"
-                alt="OdontoGeek"
-                className="h-8 sm:h-10 md:h-12 w-auto max-w-[120px] sm:max-w-[150px] md:max-w-[200px]"
-              />
-            </div>
+    <div className="min-h-screen bg-gray-50">
+      <Navigation user={null} />
 
-            {/* Desktop Navigation */}
-            <nav className="hidden lg:flex items-center space-x-6">
-              <Link href="/courses" className="text-gray-600 hover:text-blue-600 transition-colors">
-                Cursos
-              </Link>
-              <Link href="/about" className="text-gray-600 hover:text-blue-600 transition-colors">
-                Nosotros
-              </Link>
-              <Link href="/contact" className="text-gray-600 hover:text-blue-600 transition-colors">
-                Contacto
-              </Link>
-            </nav>
-
-            {/* Auth Buttons - Mobile optimized */}
-            <div className="flex items-center space-x-2 sm:space-x-3">
-              <Link href="/auth/login">
-                <Button variant="ghost" size="sm" className="text-xs sm:text-sm px-2 sm:px-3">
-                  Iniciar Sesión
-                </Button>
-              </Link>
-              <Link href="/auth/register">
-                <Button size="sm" className="text-xs sm:text-sm px-2 sm:px-3">
-                  Registrarse
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </header>
+      {/* Hero Section with Carousel */}
+      <section className="relative">
+        <HeroCarousel />
+      </section>
 
       {/* News Ticker */}
       <NewsTicker />
 
-      {/* Hero Carousel Section */}
-      <section className="relative overflow-hidden">
-        <HeroCarousel />
-      </section>
-
-      {/* Features - Mobile optimized */}
-      <section className="py-12 sm:py-16 px-4 bg-white">
-        <div className="container mx-auto">
-          <h2 className="text-2xl sm:text-3xl font-bold text-center mb-8 sm:mb-12">¿Por qué elegir OdontoGeek?</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
-            <div className="text-center">
-              <div className="w-12 h-12 sm:w-16 sm:h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Users className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600" />
-              </div>
-              <h3 className="text-lg sm:text-xl font-semibold mb-2">Expertos Reconocidos</h3>
-              <p className="text-sm sm:text-base text-gray-600">
-                Aprende de los mejores especialistas en odontología con años de experiencia clínica
-              </p>
-            </div>
-            <div className="text-center">
-              <div className="w-12 h-12 sm:w-16 sm:h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <CheckCircle className="w-6 h-6 sm:w-8 sm:h-8 text-green-600" />
-              </div>
-              <h3 className="text-lg sm:text-xl font-semibold mb-2">Certificación Oficial</h3>
-              <p className="text-sm sm:text-base text-gray-600">
-                Obtén certificados reconocidos que avalen tu formación continua profesional
-              </p>
-            </div>
-            <div className="text-center">
-              <div className="w-12 h-12 sm:w-16 sm:h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Play className="w-6 h-6 sm:w-8 sm:h-8 text-purple-600" />
-              </div>
-              <h3 className="text-lg sm:text-xl font-semibold mb-2">Acceso 24/7</h3>
-              <p className="text-sm sm:text-base text-gray-600">
-                Estudia a tu ritmo con acceso ilimitado a todos los contenidos desde cualquier dispositivo
-              </p>
-            </div>
+      {/* Featured Courses Section */}
+      <section className="py-16 bg-white">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">Cursos Destacados</h2>
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+              Descubre nuestros cursos más populares y comienza tu journey de aprendizaje hoy mismo
+            </p>
           </div>
-        </div>
-      </section>
 
-      {/* Featured Courses - Mobile optimized */}
-      <section className="py-12 sm:py-16 px-4 bg-gray-50">
-        <div className="container mx-auto">
-          <h2 className="text-2xl sm:text-3xl font-bold text-center mb-8 sm:mb-12">Cursos Destacados</h2>
-
-          {featuredCourses.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+          {loading ? (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {[1, 2, 3].map((i) => (
+                <Card key={i} className="animate-pulse">
+                  <div className="h-48 bg-gray-200 rounded-t-lg"></div>
+                  <CardContent className="p-6">
+                    <div className="h-4 bg-gray-200 rounded mb-2"></div>
+                    <div className="h-4 bg-gray-200 rounded w-3/4 mb-4"></div>
+                    <div className="flex justify-between items-center">
+                      <div className="h-6 bg-gray-200 rounded w-16"></div>
+                      <div className="h-8 bg-gray-200 rounded w-20"></div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : featuredCourses.length > 0 ? (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
               {featuredCourses.map((course) => (
-                <Card key={course.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-                  <div className="aspect-video bg-gray-200 relative">
+                <Card key={course.id} className="group hover:shadow-lg transition-shadow duration-300">
+                  <div className="relative overflow-hidden rounded-t-lg">
                     <img
-                      src={course.thumbnail_url || "/placeholder.svg?height=200&width=300"}
+                      src={course.thumbnail_url || "/placeholder.jpg"}
                       alt={course.title}
-                      className="w-full h-full object-cover"
+                      className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
                       onError={(e) => {
                         const target = e.target as HTMLImageElement
-                        target.src = "/placeholder.svg?height=200&width=300&text=Imagen+no+disponible"
+                        target.src = "/placeholder.jpg"
                       }}
                     />
-                    <Badge className="absolute top-3 right-3 bg-blue-600 text-xs sm:text-sm">${course.price}</Badge>
+                    <div className="absolute top-4 right-4">
+                      <Badge variant="secondary" className="bg-white/90 text-gray-900">
+                        ${course.price}
+                      </Badge>
+                    </div>
                   </div>
-                  <CardHeader className="p-4 sm:p-6">
-                    <CardTitle className="text-base sm:text-lg">{course.title}</CardTitle>
-                    <CardDescription className="text-sm">{course.description}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="p-4 sm:p-6 pt-0">
-                    <div className="flex items-center justify-between text-xs sm:text-sm text-gray-600 mb-4">
-                      <span>{course.duration_hours} horas</span>
-                      <div className="flex items-center">
-                        <Star className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-400 fill-current mr-1" />
-                        <span>4.9</span>
+
+                  <CardContent className="p-6">
+                    <div className="mb-4">
+                      <h3 className="text-xl font-semibold text-gray-900 mb-2 line-clamp-2">{course.title}</h3>
+                      <p className="text-gray-600 text-sm line-clamp-3">{course.description}</p>
+                    </div>
+
+                    {/* Tags */}
+                    {course.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mb-4">
+                        {course.tags.slice(0, 2).map((tag) => (
+                          <Badge key={tag.id} variant="outline" className="text-xs">
+                            {tag.name}
+                          </Badge>
+                        ))}
+                        {course.tags.length > 2 && (
+                          <Badge variant="outline" className="text-xs">
+                            +{course.tags.length - 2}
+                          </Badge>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Course Stats */}
+                    <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
+                      <div className="flex items-center space-x-4">
+                        <div className="flex items-center">
+                          <Clock className="w-4 h-4 mr-1" />
+                          <span>{course.duration_hours}h</span>
+                        </div>
+                        <div className="flex items-center">
+                          <Users className="w-4 h-4 mr-1" />
+                          <span>{course.students_count}</span>
+                        </div>
+                        <div className="flex items-center">
+                          <BookOpen className="w-4 h-4 mr-1" />
+                          <span>{course.lessons.length} lecciones</span>
+                        </div>
                       </div>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs sm:text-sm text-gray-600">{course.students_count} estudiantes</span>
-                      <Link href={`/courses/${course.id}`}>
-                        <Button size="sm" className="text-xs sm:text-sm">
-                          Ver Curso
-                        </Button>
-                      </Link>
-                    </div>
+
+                    {/* Instructor */}
                     {course.instructor_name && (
-                      <div className="mt-2 text-xs text-gray-500">Instructor: {course.instructor_name}</div>
+                      <p className="text-sm text-gray-600 mb-4">
+                        Por <span className="font-medium">{course.instructor_name}</span>
+                      </p>
                     )}
+
+                    {/* Action Button */}
+                    <Link href={`/courses/${course.id}`}>
+                      <Button className="w-full group-hover:bg-blue-700 transition-colors">
+                        <Play className="w-4 h-4 mr-2" />
+                        Ver Curso
+                      </Button>
+                    </Link>
                   </CardContent>
                 </Card>
               ))}
             </div>
           ) : (
             <div className="text-center py-12">
-              <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Play className="w-8 h-8 text-gray-400" />
-              </div>
-              <h3 className="text-lg font-semibold mb-2 text-gray-600">Próximamente</h3>
-              <p className="text-gray-500 mb-6">Estamos preparando cursos increíbles para ti. ¡Mantente atento!</p>
+              <BookOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Próximamente</h3>
+              <p className="text-gray-600 mb-6">Estamos preparando cursos increíbles para ti. ¡Mantente atento!</p>
               <Link href="/courses">
-                <Button>Explorar Todos los Cursos</Button>
+                <Button>Explorar Catálogo</Button>
+              </Link>
+            </div>
+          )}
+
+          {featuredCourses.length > 0 && (
+            <div className="text-center mt-12">
+              <Link href="/courses">
+                <Button variant="outline" size="lg">
+                  Ver Todos los Cursos
+                  <BookOpen className="w-4 h-4 ml-2" />
+                </Button>
               </Link>
             </div>
           )}
         </div>
       </section>
 
-      {/* CTA Section - Mobile optimized */}
-      <section className="py-16 sm:py-20 px-4 bg-blue-600 text-white">
-        <div className="container mx-auto text-center">
-          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-4 sm:mb-6">
-            Comienza tu Actualización Continua Hoy
-          </h2>
-          <p className="text-base sm:text-lg lg:text-xl mb-6 sm:mb-8 opacity-90 max-w-2xl mx-auto">
-            Únete a más de 10,000 profesionales que ya han mejorado sus habilidades con OdontoGeek
-          </p>
-          <Link href="/auth/register">
-            <Button size="lg" variant="secondary" className="text-sm sm:text-base lg:text-lg px-6 sm:px-8 py-3">
-              Registrarse Gratis
-            </Button>
-          </Link>
+      {/* Features Section */}
+      <section className="py-16 bg-gray-50">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">¿Por qué elegir OdontoGeek?</h2>
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+              La plataforma líder en educación odontológica con las mejores herramientas y contenido
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="text-center">
+              <div className="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                <BookOpen className="w-8 h-8 text-blue-600" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Contenido Actualizado</h3>
+              <p className="text-gray-600">Cursos actualizados con las últimas técnicas y tecnologías odontológicas</p>
+            </div>
+
+            <div className="text-center">
+              <div className="bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Award className="w-8 h-8 text-green-600" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Certificación Oficial</h3>
+              <p className="text-gray-600">
+                Obtén certificados reconocidos que validen tus conocimientos profesionales
+              </p>
+            </div>
+
+            <div className="text-center">
+              <div className="bg-purple-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                <TrendingUp className="w-8 h-8 text-purple-600" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Progreso Personalizado</h3>
+              <p className="text-gray-600">Sigue tu progreso y recibe recomendaciones personalizadas de aprendizaje</p>
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* Footer - Mobile optimized */}
-      <footer className="bg-gray-900 text-white py-8 sm:py-12 px-4">
-        <div className="container mx-auto">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8">
-            <div className="col-span-2 md:col-span-1">
-              <div className="flex items-center space-x-2 mb-4">
-                <img
-                  src="/images/odontogeek-logo-new.png"
-                  alt="OdontoGeek"
-                  className="h-8 sm:h-10 w-auto brightness-0 invert"
-                />
-              </div>
-              <p className="text-sm sm:text-base text-gray-400 mb-2">
-                La plataforma líder en actualización continua odontológica
-              </p>
-              <p className="text-xs sm:text-sm text-gray-500">Actualización continua.</p>
+      {/* CTA Section */}
+      <section className="py-16 bg-blue-600">
+        <div className="container mx-auto px-4 text-center">
+          <h2 className="text-3xl font-bold text-white mb-4">¿Listo para impulsar tu carrera odontológica?</h2>
+          <p className="text-xl text-blue-100 mb-8 max-w-2xl mx-auto">
+            Únete a miles de profesionales que ya están transformando su práctica con nuestros cursos
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link href="/courses">
+              <Button size="lg" variant="secondary">
+                Explorar Cursos
+              </Button>
+            </Link>
+            <Link href="/auth/register">
+              <Button
+                size="lg"
+                variant="outline"
+                className="text-white border-white hover:bg-white hover:text-blue-600 bg-transparent"
+              >
+                Crear Cuenta Gratis
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="bg-gray-900 text-white py-12">
+        <div className="container mx-auto px-4">
+          <div className="grid md:grid-cols-4 gap-8">
+            <div>
+              <img src="/images/odontogeek-logo-new.png" alt="OdontoGeek" className="h-8 w-auto mb-4" />
+              <p className="text-gray-400">La plataforma líder en educación odontológica continua</p>
             </div>
             <div>
-              <h3 className="font-semibold mb-3 sm:mb-4 text-sm sm:text-base">Cursos</h3>
-              <ul className="space-y-2 text-gray-400 text-xs sm:text-sm">
+              <h4 className="font-semibold mb-4">Cursos</h4>
+              <ul className="space-y-2 text-gray-400">
                 <li>
                   <Link href="/courses" className="hover:text-white">
-                    Implantología
+                    Todos los Cursos
                   </Link>
                 </li>
                 <li>
-                  <Link href="/courses" className="hover:text-white">
+                  <Link href="/courses?tags=endodoncia" className="hover:text-white">
                     Endodoncia
                   </Link>
                 </li>
                 <li>
-                  <Link href="/courses" className="hover:text-white">
+                  <Link href="/courses?tags=ortodoncia" className="hover:text-white">
                     Ortodoncia
                   </Link>
                 </li>
                 <li>
-                  <Link href="/courses" className="hover:text-white">
-                    Periodoncia
+                  <Link href="/courses?tags=cirugia" className="hover:text-white">
+                    Cirugía
                   </Link>
                 </li>
               </ul>
             </div>
             <div>
-              <h3 className="font-semibold mb-3 sm:mb-4 text-sm sm:text-base">Empresa</h3>
-              <ul className="space-y-2 text-gray-400 text-xs sm:text-sm">
-                <li>
-                  <Link href="/about" className="hover:text-white">
-                    Nosotros
-                  </Link>
-                </li>
+              <h4 className="font-semibold mb-4">Soporte</h4>
+              <ul className="space-y-2 text-gray-400">
                 <li>
                   <Link href="/contact" className="hover:text-white">
                     Contacto
                   </Link>
                 </li>
                 <li>
-                  <Link href="/privacy" className="hover:text-white">
-                    Privacidad
+                  <Link href="/help" className="hover:text-white">
+                    Centro de Ayuda
                   </Link>
                 </li>
                 <li>
@@ -330,31 +391,41 @@ export default async function HomePage() {
                     Términos
                   </Link>
                 </li>
+                <li>
+                  <Link href="/privacy" className="hover:text-white">
+                    Privacidad
+                  </Link>
+                </li>
               </ul>
             </div>
             <div>
-              <h3 className="font-semibold mb-3 sm:mb-4 text-sm sm:text-base">Soporte</h3>
-              <ul className="space-y-2 text-gray-400 text-xs sm:text-sm">
+              <h4 className="font-semibold mb-4">Síguenos</h4>
+              <ul className="space-y-2 text-gray-400">
                 <li>
-                  <Link href="/help" className="hover:text-white">
-                    Centro de Ayuda
-                  </Link>
+                  <a href="#" className="hover:text-white">
+                    Facebook
+                  </a>
                 </li>
                 <li>
-                  <Link href="/faq" className="hover:text-white">
-                    FAQ
-                  </Link>
+                  <a href="#" className="hover:text-white">
+                    Instagram
+                  </a>
                 </li>
                 <li>
-                  <Link href="/contact" className="hover:text-white">
-                    Contactar
-                  </Link>
+                  <a href="#" className="hover:text-white">
+                    LinkedIn
+                  </a>
+                </li>
+                <li>
+                  <a href="#" className="hover:text-white">
+                    YouTube
+                  </a>
                 </li>
               </ul>
             </div>
           </div>
-          <div className="border-t border-gray-800 mt-6 sm:mt-8 pt-6 sm:pt-8 text-center text-gray-400">
-            <p className="text-xs sm:text-sm">&copy; 2024 OdontoGeek. Todos los derechos reservados.</p>
+          <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
+            <p>&copy; 2024 OdontoGeek. Todos los derechos reservados.</p>
           </div>
         </div>
       </footer>
