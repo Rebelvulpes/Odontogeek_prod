@@ -9,22 +9,30 @@ export async function GET(req: NextRequest) {
     // Verificar autenticación
     const userSession = req.cookies.get("user-session")?.value
     if (!userSession) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 })
+      return NextResponse.json(
+        {
+          success: false,
+          message: "No autorizado",
+        },
+        { status: 401 },
+      )
     }
 
     const userData = JSON.parse(userSession)
-    const userId = userData.id
-
-    console.log("Fetching courses for user:", userId)
-
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Obtener enrollments del usuario con información del curso
-    const { data: enrollments, error: enrollmentsError } = await supabase
+    // Obtener cursos del estudiante con información de progreso
+    const { data: enrollments, error } = await supabase
       .from("enrollments")
       .select(`
-        *,
-        courses:course_id (
+        id,
+        status,
+        progress_percentage,
+        completed_at,
+        last_accessed_at,
+        created_at,
+        updated_at,
+        courses (
           id,
           title,
           description,
@@ -32,55 +40,41 @@ export async function GET(req: NextRequest) {
           duration_hours,
           instructor,
           price,
-          lessons:lessons (
+          status,
+          lessons (
             id,
             title,
-            order_index
+            duration_minutes
           )
         )
       `)
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false })
+      .eq("user_id", userData.id)
+      .eq("courses.status", "published")
 
-    console.log("Enrollments query result:", {
-      success: !enrollmentsError,
-      error: enrollmentsError,
-      count: enrollments?.length || 0,
-    })
-
-    if (enrollmentsError) {
-      console.error("Error fetching enrollments:", enrollmentsError)
-      return NextResponse.json({ error: "Error obteniendo cursos" }, { status: 500 })
-    }
-
-    if (!enrollments || enrollments.length === 0) {
+    if (error) {
+      console.error("Error fetching student courses:", error)
       return NextResponse.json({
-        success: true,
-        data: [],
-        message: "No tienes cursos inscritos",
+        success: false,
+        message: "Error obteniendo cursos",
       })
     }
 
-    // Obtener progreso de lecciones para cada curso
+    // Procesar datos para incluir información de progreso de lecciones
     const coursesWithProgress = await Promise.all(
-      enrollments.map(async (enrollment) => {
+      (enrollments || []).map(async (enrollment) => {
         const course = enrollment.courses
-        if (!course) return null
 
-        // Obtener progreso de lecciones para este curso
-        const { data: lessonProgress, error: progressError } = await supabase
+        // Obtener progreso de lecciones
+        const { data: lessonProgress } = await supabase
           .from("lesson_progress")
           .select("lesson_id, completed")
-          .eq("user_id", userId)
-          .in("lesson_id", course.lessons?.map((l: any) => l.id) || [])
+          .eq("user_id", userData.id)
+          .in(
+            "lesson_id",
+            course.lessons.map((l: any) => l.id),
+          )
 
-        if (progressError) {
-          console.error("Error fetching lesson progress:", progressError)
-        }
-
-        const totalLessons = course.lessons?.length || 0
         const completedLessons = lessonProgress?.filter((lp) => lp.completed).length || 0
-        const calculatedProgress = totalLessons > 0 ? (completedLessons / totalLessons) * 100 : 0
 
         return {
           id: course.id,
@@ -93,31 +87,30 @@ export async function GET(req: NextRequest) {
           enrollment: {
             id: enrollment.id,
             status: enrollment.status,
-            progress_percentage: enrollment.progress_percentage || calculatedProgress,
+            progress_percentage: enrollment.progress_percentage,
             completed_at: enrollment.completed_at,
             last_accessed_at: enrollment.last_accessed_at,
             created_at: enrollment.created_at,
           },
           lessons: {
-            total: totalLessons,
+            total: course.lessons.length,
             completed: completedLessons,
-            list: course.lessons || [],
+            list: course.lessons,
           },
-          is_completed: calculatedProgress >= 100,
+          is_completed: enrollment.status === "completed" || enrollment.progress_percentage >= 100,
         }
       }),
     )
 
-    const validCourses = coursesWithProgress.filter((course) => course !== null)
-
-    console.log("Processed courses:", validCourses.length)
-
     return NextResponse.json({
       success: true,
-      data: validCourses,
+      data: coursesWithProgress,
     })
   } catch (error) {
     console.error("Error in student courses API:", error)
-    return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 })
+    return NextResponse.json({
+      success: false,
+      message: "Error interno del servidor",
+    })
   }
 }
