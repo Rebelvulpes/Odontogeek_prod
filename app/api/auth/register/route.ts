@@ -107,47 +107,83 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Generate password hash
+    // Generate password hash with multiple verification steps
     console.log("=== GENERATING PASSWORD HASH ===")
     const saltRounds = 10
     console.log("Salt rounds:", saltRounds)
     console.log("Password to hash length:", password.length)
 
     let passwordHash: string
-    try {
-      const hashStart = Date.now()
-      passwordHash = await bcrypt.hash(password, saltRounds)
-      const hashEnd = Date.now()
+    let hashVerified = false
+    let attempts = 0
+    const maxAttempts = 3
 
-      console.log("Hash generation completed in:", hashEnd - hashStart, "ms")
-      console.log("Hash generated successfully")
-      console.log("Hash length:", passwordHash.length)
-      console.log("Hash algorithm:", passwordHash.substring(0, 4))
-      console.log("Hash preview:", passwordHash.substring(0, 30))
-      console.log("Full hash:", passwordHash)
+    while (!hashVerified && attempts < maxAttempts) {
+      attempts++
+      console.log(`Hash generation attempt ${attempts}/${maxAttempts}`)
 
-      // Verify the hash immediately
-      const verifyResult = await bcrypt.compare(password, passwordHash)
-      console.log("Hash verification test:", verifyResult)
+      try {
+        const hashStart = Date.now()
+        passwordHash = await bcrypt.hash(password, saltRounds)
+        const hashEnd = Date.now()
 
-      if (!verifyResult) {
-        console.error("❌ HASH VERIFICATION FAILED IMMEDIATELY")
-        return NextResponse.json(
-          {
-            success: false,
-            message: "Error generando hash de contraseña",
-            error: "HASH_GENERATION_FAILED",
-          },
-          { status: 500 },
-        )
+        console.log("Hash generation completed in:", hashEnd - hashStart, "ms")
+        console.log("Hash generated successfully")
+        console.log("Hash length:", passwordHash.length)
+        console.log("Hash algorithm:", passwordHash.substring(0, 4))
+        console.log("Hash preview:", passwordHash.substring(0, 30))
+        console.log("Full hash:", passwordHash)
+
+        // Verify the hash immediately with multiple verification attempts
+        let verifyAttempts = 0
+        let verifySuccess = false
+
+        while (!verifySuccess && verifyAttempts < 3) {
+          verifyAttempts++
+          console.log(`Hash verification attempt ${verifyAttempts}/3`)
+
+          try {
+            const verifyResult = await bcrypt.compare(password, passwordHash)
+            console.log(`Hash verification attempt ${verifyAttempts} result:`, verifyResult)
+
+            if (verifyResult) {
+              hashVerified = true
+              verifySuccess = true
+              console.log("✅ HASH VERIFICATION SUCCESSFUL")
+            } else {
+              console.log(`❌ Hash verification failed on attempt ${verifyAttempts}`)
+            }
+          } catch (verifyError) {
+            console.error(`❌ Hash verification error on attempt ${verifyAttempts}:`, verifyError)
+          }
+        }
+
+        if (!hashVerified) {
+          console.log(`❌ Hash verification failed after ${verifyAttempts} attempts, retrying hash generation`)
+          continue
+        }
+      } catch (hashError) {
+        console.error(`❌ HASH GENERATION ERROR on attempt ${attempts}:`, hashError)
+        if (attempts === maxAttempts) {
+          return NextResponse.json(
+            {
+              success: false,
+              message: "Error procesando contraseña",
+              error: "HASH_GENERATION_ERROR",
+            },
+            { status: 500 },
+          )
+        }
       }
-    } catch (hashError) {
-      console.error("❌ HASH GENERATION ERROR:", hashError)
+    }
+
+    if (!hashVerified) {
+      console.error("❌ FAILED TO GENERATE VERIFIED HASH AFTER ALL ATTEMPTS")
       return NextResponse.json(
         {
           success: false,
-          message: "Error procesando contraseña",
-          error: "HASH_GENERATION_ERROR",
+          message: "Error generando hash de contraseña seguro",
+          error: "HASH_VERIFICATION_FAILED",
         },
         { status: 500 },
       )
@@ -156,7 +192,7 @@ export async function POST(req: NextRequest) {
     // Create user data
     const userData = {
       email: normalizedEmail,
-      password_hash: passwordHash,
+      password_hash: passwordHash!,
       first_name: firstName.trim(),
       last_name: lastName.trim(),
       role: "student",
@@ -169,7 +205,7 @@ export async function POST(req: NextRequest) {
     console.log("=== CREATING USER ===")
     console.log("User data to insert:", {
       ...userData,
-      password_hash: `${passwordHash.substring(0, 20)}...`,
+      password_hash: `${passwordHash!.substring(0, 20)}...`,
     })
 
     const { data: newUser, error: createError } = await supabase.from("users").insert([userData]).select().single()
@@ -209,6 +245,38 @@ export async function POST(req: NextRequest) {
     console.log("- Email:", newUser.email)
     console.log("- Name:", newUser.first_name, newUser.last_name)
     console.log("- Role:", newUser.role)
+
+    // Verify the user can login immediately after creation
+    console.log("=== POST-CREATION LOGIN VERIFICATION ===")
+    try {
+      const loginVerification = await bcrypt.compare(password, newUser.password_hash)
+      console.log("Post-creation login verification:", loginVerification)
+
+      if (!loginVerification) {
+        console.error("❌ POST-CREATION LOGIN VERIFICATION FAILED")
+        // Try to fix the user immediately
+        const fixHash = await bcrypt.hash(password, 10)
+        await supabase.from("users").update({ password_hash: fixHash }).eq("id", newUser.id)
+        console.log("🔄 User hash fixed immediately after creation")
+      }
+    } catch (verifyError) {
+      console.error("❌ POST-CREATION VERIFICATION ERROR:", verifyError)
+    }
+
+    // Log successful registration
+    try {
+      await supabase.from("auth_debug_log").insert([
+        {
+          email: newUser.email,
+          action: "registration_success",
+          success: true,
+          error_message: "User registered successfully",
+          hash_preview: newUser.password_hash?.substring(0, 20),
+        },
+      ])
+    } catch (logError) {
+      console.error("Failed to log registration:", logError)
+    }
 
     // Create session automatically
     const userSession = {
