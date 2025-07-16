@@ -6,57 +6,71 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 export async function GET(req: NextRequest) {
   try {
-    console.log("=== GET USER INFO ===")
+    console.log("=== GET USER SESSION ===")
+    console.log("Timestamp:", new Date().toISOString())
 
-    // Obtener cookie de sesión
+    // Get session from cookie
     const sessionCookie = req.cookies.get("user-session")
+    console.log("Session cookie exists:", !!sessionCookie)
 
     if (!sessionCookie) {
-      console.log("❌ No session cookie found")
-      return NextResponse.json({
-        success: false,
-        message: "No hay sesión activa",
-      })
+      console.log("❌ NO SESSION COOKIE FOUND")
+      return NextResponse.json(
+        {
+          success: false,
+          message: "No hay sesión activa",
+          error: "NO_SESSION",
+        },
+        { status: 401 },
+      )
     }
 
-    let sessionData
+    let userSession
     try {
-      sessionData = JSON.parse(sessionCookie.value)
-      console.log("Session data from cookie:", sessionData)
+      userSession = JSON.parse(sessionCookie.value)
+      console.log("Session parsed successfully")
+      console.log("Session user ID:", userSession.id)
+      console.log("Session email:", userSession.email)
     } catch (parseError) {
-      console.log("❌ Error parsing session cookie:", parseError)
-      return NextResponse.json({
-        success: false,
-        message: "Sesión inválida",
-      })
+      console.error("❌ SESSION PARSE ERROR:", parseError)
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Sesión inválida",
+          error: "INVALID_SESSION",
+        },
+        { status: 401 },
+      )
     }
 
-    if (!sessionData.id) {
-      console.log("❌ No user ID in session")
-      return NextResponse.json({
-        success: false,
-        message: "Sesión inválida",
-      })
-    }
-
-    // Verificar que el usuario aún existe en la base de datos
+    // Verify user still exists in database
+    console.log("=== VERIFYING USER IN DATABASE ===")
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    const { data: user, error: userError } = await supabase
-      .from("users")
-      .select("id, email, first_name, last_name, role, avatar_url, created_at")
-      .eq("id", sessionData.id)
-      .single()
+    const { data: user, error: userError } = await supabase.from("users").select("*").eq("id", userSession.id).single()
+
+    console.log("User verification result:")
+    console.log("- User found:", !!user)
+    console.log("- Error:", userError)
 
     if (userError || !user) {
-      console.log("❌ User not found in database:", userError)
-      return NextResponse.json({
-        success: false,
-        message: "Usuario no encontrado",
-      })
+      console.log("❌ USER NOT FOUND IN DATABASE")
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Usuario no encontrado",
+          error: "USER_NOT_FOUND",
+        },
+        { status: 401 },
+      )
     }
 
-    console.log("✅ User info retrieved:", user.email)
+    console.log("✅ USER SESSION VALID")
+    console.log("User details:")
+    console.log("- ID:", user.id)
+    console.log("- Email:", user.email)
+    console.log("- Name:", user.first_name, user.last_name)
+    console.log("- Role:", user.role)
 
     return NextResponse.json({
       success: true,
@@ -71,10 +85,17 @@ export async function GET(req: NextRequest) {
       },
     })
   } catch (error) {
-    console.error("❌ Error getting user info:", error)
-    return NextResponse.json({
-      success: false,
-      message: "Error interno del servidor",
-    })
+    console.error("=== GET SESSION ERROR ===")
+    console.error("Error details:", error)
+    console.error("Error stack:", error instanceof Error ? error.stack : "No stack trace")
+
+    return NextResponse.json(
+      {
+        success: false,
+        message: "Error interno del servidor",
+        error: "INTERNAL_SERVER_ERROR",
+      },
+      { status: 500 },
+    )
   }
 }

@@ -12,7 +12,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { BookOpen, Clock, Award, Mail, Calendar, Play, CheckCircle } from "lucide-react"
+import { Skeleton } from "@/components/ui/skeleton"
+import { BookOpen, Clock, Award, Mail, Calendar, Play, CheckCircle, LogOut } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
 
 interface Course {
@@ -30,8 +31,18 @@ interface Course {
   enrollment_id: string
 }
 
+interface User {
+  id: string
+  email: string
+  first_name: string
+  last_name: string
+  role: string
+  avatar_url?: string
+  created_at: string
+}
+
 export default function DashboardPage() {
-  const [user, setUser] = useState<any | null>(null)
+  const [user, setUser] = useState<User | null>(null)
   const [courses, setCourses] = useState<Course[]>([])
   const [loading, setLoading] = useState(true)
   const [profileLoading, setProfileLoading] = useState(false)
@@ -43,6 +54,7 @@ export default function DashboardPage() {
   const router = useRouter()
 
   useEffect(() => {
+    console.log("Dashboard component mounted")
     fetchUserData()
     fetchCourses()
   }, [])
@@ -55,7 +67,8 @@ export default function DashboardPage() {
 
       console.log("User data response:", data)
 
-      if (data.success) {
+      if (data.success && data.user) {
+        console.log("Setting user data:", data.user)
         setUser(data.user)
         setProfileData({
           first_name: data.user.first_name,
@@ -63,11 +76,21 @@ export default function DashboardPage() {
           email: data.user.email,
         })
       } else {
-        console.log("No user session, redirecting to login")
+        console.log("No valid user session, redirecting to login")
+        toast({
+          title: "Sesión expirada",
+          description: "Por favor inicia sesión nuevamente",
+          variant: "destructive",
+        })
         router.push("/auth/login")
       }
     } catch (error) {
       console.error("Error fetching user data:", error)
+      toast({
+        title: "Error",
+        description: "Error cargando datos del usuario",
+        variant: "destructive",
+      })
       router.push("/auth/login")
     }
   }
@@ -81,12 +104,21 @@ export default function DashboardPage() {
       console.log("Courses response:", data)
 
       if (data.success) {
+        console.log("Setting courses data:", data.courses)
         setCourses(data.courses || [])
       } else {
         console.log("Error fetching courses:", data.message)
+        if (data.error === "NO_SESSION" || data.error === "INVALID_SESSION") {
+          router.push("/auth/login")
+        }
       }
     } catch (error) {
       console.error("Error fetching courses:", error)
+      toast({
+        title: "Error",
+        description: "Error cargando cursos",
+        variant: "destructive",
+      })
     } finally {
       setLoading(false)
     }
@@ -137,20 +169,37 @@ export default function DashboardPage() {
   const handleLogout = async () => {
     try {
       console.log("Logging out...")
-      await fetch("/api/auth/logout", { method: "POST" })
+      const response = await fetch("/api/auth/logout", { method: "POST" })
+      const data = await response.json()
+
+      if (data.success) {
+        toast({
+          title: "Sesión cerrada",
+          description: "Has cerrado sesión exitosamente",
+        })
+      }
+
       router.push("/auth/login")
     } catch (error) {
       console.error("Error logging out:", error)
+      // Still redirect even if logout fails
       router.push("/auth/login")
     }
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Cargando dashboard...</p>
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="space-y-6">
+            <Skeleton className="h-8 w-64" />
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              {[...Array(4)].map((_, i) => (
+                <Skeleton key={i} className="h-32" />
+              ))}
+            </div>
+            <Skeleton className="h-96" />
+          </div>
         </div>
       </div>
     )
@@ -160,13 +209,14 @@ export default function DashboardPage() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <p className="text-gray-600">Redirigiendo...</p>
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Verificando sesión...</p>
         </div>
       </div>
     )
   }
 
-  // Calcular estadísticas
+  // Calculate statistics
   const totalCourses = courses.length
   const completedCourses = courses.filter((course) => course.completed_at).length
   const inProgressCourses = courses.filter((course) => !course.completed_at && course.progress > 0).length
@@ -194,6 +244,7 @@ export default function DashboardPage() {
               </div>
             </div>
             <Button onClick={handleLogout} variant="outline">
+              <LogOut className="h-4 w-4 mr-2" />
               Cerrar Sesión
             </Button>
           </div>

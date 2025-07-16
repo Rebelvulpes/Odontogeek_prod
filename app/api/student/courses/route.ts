@@ -7,43 +7,57 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 export async function GET(req: NextRequest) {
   try {
     console.log("=== GET STUDENT COURSES ===")
+    console.log("Timestamp:", new Date().toISOString())
 
-    // Obtener sesión del usuario
+    // Get user session
     const sessionCookie = req.cookies.get("user-session")
-
     if (!sessionCookie) {
-      console.log("❌ No session cookie")
-      return NextResponse.json({
-        success: false,
-        message: "No hay sesión activa",
-      })
+      console.log("❌ NO SESSION COOKIE")
+      return NextResponse.json(
+        {
+          success: false,
+          message: "No hay sesión activa",
+          error: "NO_SESSION",
+        },
+        { status: 401 },
+      )
     }
 
-    let sessionData
+    let userSession
     try {
-      sessionData = JSON.parse(sessionCookie.value)
+      userSession = JSON.parse(sessionCookie.value)
+      console.log("Session user ID:", userSession.id)
+      console.log("Session role:", userSession.role)
     } catch (parseError) {
-      console.log("❌ Error parsing session:", parseError)
-      return NextResponse.json({
-        success: false,
-        message: "Sesión inválida",
-      })
+      console.error("❌ SESSION PARSE ERROR:", parseError)
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Sesión inválida",
+          error: "INVALID_SESSION",
+        },
+        { status: 401 },
+      )
     }
 
-    if (!sessionData.id) {
-      console.log("❌ No user ID in session")
-      return NextResponse.json({
-        success: false,
-        message: "Sesión inválida",
-      })
+    // Verify user is student
+    if (userSession.role !== "student") {
+      console.log("❌ USER IS NOT STUDENT")
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Acceso denegado",
+          error: "ACCESS_DENIED",
+        },
+        { status: 403 },
+      )
     }
 
-    console.log("Getting courses for user:", sessionData.id)
-
+    console.log("=== FETCHING COURSES ===")
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Obtener cursos del estudiante con información completa
-    const { data: enrollments, error: enrollmentsError } = await supabase
+    // Get enrolled courses with progress
+    const { data: enrollments, error: enrollmentError } = await supabase
       .from("enrollments")
       .select(`
         id,
@@ -51,6 +65,7 @@ export async function GET(req: NextRequest) {
         enrolled_at,
         completed_at,
         created_at,
+        updated_at,
         courses (
           id,
           title,
@@ -59,52 +74,65 @@ export async function GET(req: NextRequest) {
           price,
           duration_hours,
           level,
-          status,
           instructor,
-          created_at
+          status
         )
       `)
-      .eq("user_id", sessionData.id)
-      .order("enrolled_at", { ascending: false })
+      .eq("user_id", userSession.id)
 
-    if (enrollmentsError) {
-      console.error("❌ Error fetching enrollments:", enrollmentsError)
-      return NextResponse.json({
-        success: false,
-        message: "Error obteniendo cursos",
-      })
+    console.log("Enrollments query result:")
+    console.log("- Success:", !enrollmentError)
+    console.log("- Error:", enrollmentError)
+    console.log("- Count:", enrollments?.length || 0)
+
+    if (enrollmentError) {
+      console.error("❌ ENROLLMENTS QUERY ERROR:", enrollmentError)
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Error obteniendo cursos",
+          error: "QUERY_ERROR",
+        },
+        { status: 500 },
+      )
     }
 
-    console.log("Found enrollments:", enrollments?.length || 0)
+    // Transform data
+    const courses = (enrollments || []).map((enrollment) => ({
+      id: enrollment.courses.id,
+      title: enrollment.courses.title,
+      description: enrollment.courses.description,
+      thumbnail_url: enrollment.courses.thumbnail_url,
+      price: enrollment.courses.price,
+      duration_hours: enrollment.courses.duration_hours,
+      level: enrollment.courses.level,
+      instructor: enrollment.courses.instructor,
+      progress: enrollment.progress || 0,
+      enrolled_at: enrollment.enrolled_at,
+      completed_at: enrollment.completed_at,
+      enrollment_id: enrollment.id,
+    }))
 
-    // Formatear datos para el frontend
-    const courses =
-      enrollments?.map((enrollment) => ({
-        id: enrollment.courses.id,
-        title: enrollment.courses.title,
-        description: enrollment.courses.description,
-        thumbnail_url: enrollment.courses.thumbnail_url || "/placeholder.jpg",
-        price: enrollment.courses.price,
-        duration_hours: enrollment.courses.duration_hours,
-        level: enrollment.courses.level,
-        instructor: enrollment.courses.instructor,
-        progress: enrollment.progress || 0,
-        enrolled_at: enrollment.enrolled_at,
-        completed_at: enrollment.completed_at,
-        enrollment_id: enrollment.id,
-      })) || []
-
-    console.log("✅ Returning courses:", courses.length)
+    console.log("✅ COURSES FETCHED SUCCESSFULLY")
+    console.log("Courses returned:", courses.length)
 
     return NextResponse.json({
       success: true,
-      courses,
+      courses: courses,
+      count: courses.length,
     })
   } catch (error) {
-    console.error("❌ Error in student courses:", error)
-    return NextResponse.json({
-      success: false,
-      message: "Error interno del servidor",
-    })
+    console.error("=== GET COURSES ERROR ===")
+    console.error("Error details:", error)
+    console.error("Error stack:", error instanceof Error ? error.stack : "No stack trace")
+
+    return NextResponse.json(
+      {
+        success: false,
+        message: "Error interno del servidor",
+        error: "INTERNAL_SERVER_ERROR",
+      },
+      { status: 500 },
+    )
   }
 }
