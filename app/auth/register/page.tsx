@@ -31,7 +31,7 @@ export default function RegisterPage() {
     setIsLoading(true)
     setError("")
 
-    // Validaciones
+    // Validaciones del frontend
     if (formData.password !== formData.confirmPassword) {
       setError("Las contraseñas no coinciden")
       setIsLoading(false)
@@ -45,17 +45,39 @@ export default function RegisterPage() {
     }
 
     try {
-      // Simular registro exitoso
-      setTimeout(() => {
-        setIsLoading(false)
+      console.log("Submitting registration form...")
+
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          email: formData.email,
+          password: formData.password,
+        }),
+      })
+
+      const result = await response.json()
+      console.log("Registration response:", result)
+
+      if (result.success) {
         toast({
           title: "Registro exitoso",
-          description: "Tu cuenta ha sido creada. Serás redirigido al login.",
+          description: "Tu cuenta ha sido creada exitosamente.",
         })
-        router.push("/auth/login")
-      }, 2000)
+
+        // Redirigir al dashboard ya que el usuario está logueado automáticamente
+        router.push(result.redirectTo || "/dashboard")
+      } else {
+        setError(result.message || "Error en el registro")
+      }
     } catch (err) {
-      setError("Error en el registro. Intenta nuevamente.")
+      console.error("Registration error:", err)
+      setError("Error de conexión. Intenta nuevamente.")
+    } finally {
       setIsLoading(false)
     }
   }

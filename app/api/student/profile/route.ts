@@ -6,67 +6,98 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 export async function PUT(req: NextRequest) {
   try {
-    // Obtener usuario de la cookie
+    // Verificar autenticación
     const userSession = req.cookies.get("user-session")?.value
-
     if (!userSession) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 })
     }
 
     const userData = JSON.parse(userSession)
-    const formData = await req.formData()
+    const userId = userData.id
 
-    const firstName = formData.get("first_name") as string
-    const lastName = formData.get("last_name") as string
-    const email = formData.get("email") as string
+    const { first_name, last_name, email } = await req.json()
 
-    if (!firstName || !lastName || !email) {
-      return NextResponse.json({ error: "Todos los campos son requeridos" }, { status: 400 })
+    console.log("Updating profile for user:", userId, { first_name, last_name, email })
+
+    if (!first_name || !last_name || !email) {
+      return NextResponse.json({
+        success: false,
+        message: "Todos los campos son requeridos",
+      })
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Actualizar usuario en la base de datos
-    const { data: updatedUser, error } = await supabase
-      .from("users")
-      .update({
-        first_name: firstName,
-        last_name: lastName,
-        email: email,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", userData.id)
-      .select()
-      .single()
+    // Verificar si el email ya existe en otro usuario
+    if (email !== userData.email) {
+      const { data: existingUser } = await supabase
+        .from("users")
+        .select("id")
+        .eq("email", email.toLowerCase().trim())
+        .neq("id", userId)
+        .single()
 
-    if (error) {
-      console.error("Error updating user:", error)
-      return NextResponse.json({ error: "Error actualizando perfil" }, { status: 500 })
+      if (existingUser) {
+        return NextResponse.json({
+          success: false,
+          message: "Ya existe otro usuario con este email",
+        })
+      }
     }
 
-    // Crear respuesta con cookie actualizada
+    // Actualizar usuario
+    const { data: updatedUser, error: updateError } = await supabase
+      .from("users")
+      .update({
+        first_name: first_name.trim(),
+        last_name: last_name.trim(),
+        email: email.toLowerCase().trim(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", userId)
+      .select()
+
+    console.log("Profile update result:", { success: !updateError, error: updateError })
+
+    if (updateError) {
+      return NextResponse.json({
+        success: false,
+        message: `Error actualizando perfil: ${updateError.message}`,
+      })
+    }
+
+    if (!updatedUser || updatedUser.length === 0) {
+      return NextResponse.json({
+        success: false,
+        message: "No se pudo actualizar el perfil",
+      })
+    }
+
+    const user = updatedUser[0]
+
+    // Crear respuesta y actualizar cookie
     const response = NextResponse.json({
       success: true,
+      message: "Perfil actualizado exitosamente",
       user: {
-        id: updatedUser.id,
-        email: updatedUser.email,
-        first_name: updatedUser.first_name,
-        last_name: updatedUser.last_name,
-        role: updatedUser.role,
-        created_at: updatedUser.created_at,
+        id: user.id,
+        email: user.email,
+        first_name: user.first_name,
+        last_name: user.last_name,
+        role: user.role,
       },
     })
 
-    // Actualizar cookie de sesión
+    // Actualizar cookie de sesión con nueva información
     response.cookies.set(
       "user-session",
       JSON.stringify({
-        id: updatedUser.id,
-        email: updatedUser.email,
-        first_name: updatedUser.first_name,
-        last_name: updatedUser.last_name,
-        role: updatedUser.role,
-        created_at: updatedUser.created_at,
+        id: user.id,
+        email: user.email,
+        first_name: user.first_name,
+        last_name: user.last_name,
+        role: user.role,
+        created_at: user.created_at,
       }),
       {
         httpOnly: true,
@@ -79,7 +110,10 @@ export async function PUT(req: NextRequest) {
 
     return response
   } catch (error) {
-    console.error("Error in /api/student/profile:", error)
-    return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 })
+    console.error("Error updating profile:", error)
+    return NextResponse.json({
+      success: false,
+      message: "Error interno del servidor",
+    })
   }
 }

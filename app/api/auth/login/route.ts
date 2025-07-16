@@ -52,29 +52,8 @@ export async function POST(req: NextRequest) {
     }
 
     console.log("Comparing passwords...")
-    console.log("Input password:", password)
-    console.log("Stored hash:", user.password_hash)
-
-    // Probar tanto bcrypt como bcryptjs
-    let passwordMatch = false
-    try {
-      passwordMatch = await bcrypt.compare(password, user.password_hash)
-      console.log("bcrypt.compare result:", passwordMatch)
-    } catch (compareError) {
-      console.error("Error comparing passwords:", compareError)
-    }
-
-    // Si no funciona, intentar generar un nuevo hash para comparar
-    if (!passwordMatch) {
-      console.log("Generating new hash for comparison...")
-      const newHash = await bcrypt.hash(password, 10)
-      console.log("New hash generated:", newHash)
-
-      // Intentar con el hash que sabemos que funciona
-      const testHash = "$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi"
-      const testMatch = await bcrypt.compare(password, testHash)
-      console.log("Test hash comparison:", testMatch)
-    }
+    const passwordMatch = await bcrypt.compare(password, user.password_hash)
+    console.log("Password match:", passwordMatch)
 
     if (!passwordMatch) {
       return NextResponse.json({
