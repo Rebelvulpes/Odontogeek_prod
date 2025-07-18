@@ -1,13 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+import { logStudentAccess, getServerSupabaseClient } from "@/lib/server-utils"
 
 export async function GET(req: NextRequest) {
   try {
     console.log("=== GET USER SESSION ===")
     console.log("Timestamp:", new Date().toISOString())
+    console.log("Environment:", process.env.NODE_ENV)
+    console.log("Host:", req.headers.get("host"))
 
     // Get session from cookie
     const sessionCookie = req.cookies.get("user-session")
@@ -46,7 +45,7 @@ export async function GET(req: NextRequest) {
 
     // Verify user still exists in database
     console.log("=== VERIFYING USER IN DATABASE ===")
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    const supabase = getServerSupabaseClient()
 
     const { data: user, error: userError } = await supabase.from("users").select("*").eq("id", userSession.id).single()
 
@@ -59,18 +58,16 @@ export async function GET(req: NextRequest) {
 
       // Log the session verification failure
       try {
-        await supabase.from("student_access_log").insert([
-          {
-            student_id: userSession.id,
-            email: userSession.email || "unknown",
-            action: "session_verification_failed",
-            success: false,
-            error_code: "USER_NOT_FOUND",
-            error_message: "User not found during session verification",
-            ip_address: req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown",
-            user_agent: req.headers.get("user-agent") || "unknown",
-          },
-        ])
+        await logStudentAccess(
+          userSession.id,
+          userSession.email || "unknown",
+          "session_verification_failed",
+          false,
+          "USER_NOT_FOUND",
+          "User not found during session verification",
+          req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown",
+          req.headers.get("user-agent") || "unknown",
+        )
       } catch (logError) {
         console.error("Failed to log session verification failure:", logError)
       }
@@ -94,17 +91,16 @@ export async function GET(req: NextRequest) {
 
     // Log successful session verification
     try {
-      await supabase.from("student_access_log").insert([
-        {
-          student_id: user.id,
-          email: user.email,
-          action: "session_verified",
-          success: true,
-          error_message: "Session verified successfully",
-          ip_address: req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown",
-          user_agent: req.headers.get("user-agent") || "unknown",
-        },
-      ])
+      await logStudentAccess(
+        user.id,
+        user.email,
+        "session_verified",
+        true,
+        null,
+        "Session verified successfully",
+        req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown",
+        req.headers.get("user-agent") || "unknown",
+      )
     } catch (logError) {
       console.error("Failed to log session verification:", logError)
     }
@@ -128,18 +124,16 @@ export async function GET(req: NextRequest) {
 
     // Log error
     try {
-      const supabase = createClient(supabaseUrl, supabaseServiceKey)
-      await supabase.from("student_access_log").insert([
-        {
-          email: "unknown",
-          action: "session_verification_error",
-          success: false,
-          error_code: "INTERNAL_SERVER_ERROR",
-          error_message: error instanceof Error ? error.message : "Unknown error",
-          ip_address: req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown",
-          user_agent: req.headers.get("user-agent") || "unknown",
-        },
-      ])
+      await logStudentAccess(
+        null,
+        "unknown",
+        "session_verification_error",
+        false,
+        "INTERNAL_SERVER_ERROR",
+        error instanceof Error ? error.message : "Unknown error",
+        req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown",
+        req.headers.get("user-agent") || "unknown",
+      )
     } catch (logError) {
       console.error("Failed to log session error:", logError)
     }

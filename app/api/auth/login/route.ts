@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import bcrypt from "bcryptjs"
-import { logStudentAccess, getServerSupabaseClient } from "@/lib/server-utils"
+import { logStudentAccess, getServerSupabaseClient, getCookieSettings } from "@/lib/server-utils"
 
 // Rate limiting storage (in production, use Redis or database)
 const loginAttempts = new Map<string, { count: number; lastAttempt: number }>()
@@ -453,13 +453,7 @@ export async function POST(req: NextRequest) {
     const cookieValue = JSON.stringify(userSession)
     console.log("Setting cookie with value length:", cookieValue.length)
 
-    response.cookies.set("user-session", cookieValue, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60, // 7 days
-      path: "/",
-    })
+    response.cookies.set("user-session", cookieValue, getCookieSettings())
 
     const endTime = Date.now()
     console.log("=== LOGIN SUCCESS ===")

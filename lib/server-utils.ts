@@ -70,3 +70,19 @@ export function getUserSessionFromCookie(cookieHeader: string | null) {
     return null
   }
 }
+
+// Enhanced cookie settings for different environments
+export function getCookieSettings(isProduction: boolean = process.env.NODE_ENV === "production") {
+  return {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: "lax" as const,
+    maxAge: 7 * 24 * 60 * 60, // 7 days
+    path: "/",
+    // Add domain setting for production if needed
+    ...(isProduction &&
+      process.env.VERCEL_URL && {
+        domain: `.${process.env.VERCEL_URL.replace("https://", "")}`,
+      }),
+  }
+}

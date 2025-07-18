@@ -1,9 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { getCookieSettings } from "@/lib/server-utils"
 
 export async function POST(req: NextRequest) {
   try {
     console.log("=== LOGOUT REQUEST ===")
     console.log("Timestamp:", new Date().toISOString())
+    console.log("Environment:", process.env.NODE_ENV)
+    console.log("Host:", req.headers.get("host"))
 
     // Get current session for logging
     const sessionCookie = req.cookies.get("user-session")
@@ -24,13 +27,11 @@ export async function POST(req: NextRequest) {
       message: "Sesión cerrada exitosamente",
     })
 
-    // Clear session cookie
+    // Clear session cookie with proper settings
+    const cookieSettings = getCookieSettings()
     response.cookies.set("user-session", "", {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      ...cookieSettings,
       maxAge: 0, // Expire immediately
-      path: "/",
     })
 
     console.log("✅ LOGOUT SUCCESSFUL")

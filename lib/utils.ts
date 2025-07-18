@@ -1,54 +1,60 @@
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
-import { createClient } from "@supabase/supabase-js"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-// Server-side logging function - ONLY for API routes
-export async function logStudentAccess(
-  studentId: string | null,
-  email: string,
-  action: string,
-  success: boolean,
-  errorCode: string | null,
-  errorMessage: string,
-  ipAddress: string,
-  userAgent: string,
-  sessionData?: any,
-) {
+// Client-side utilities only
+export function formatDate(date: string | Date) {
+  return new Intl.DateTimeFormat("es-ES", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  }).format(new Date(date))
+}
+
+export function formatCurrency(amount: number) {
+  return new Intl.NumberFormat("es-ES", {
+    style: "currency",
+    currency: "EUR",
+  }).format(amount)
+}
+
+export function truncateText(text: string, maxLength: number) {
+  if (text.length <= maxLength) return text
+  return text.substring(0, maxLength) + "..."
+}
+
+// Client-side session helpers
+export function getClientSession() {
+  if (typeof window === "undefined") return null
+
   try {
-    // This function should ONLY be called from server-side API routes
-    if (typeof window !== "undefined") {
-      console.error("❌ SECURITY ERROR: logStudentAccess called from client-side")
-      return
-    }
+    const sessionData = localStorage.getItem("user-session")
+    return sessionData ? JSON.parse(sessionData) : null
+  } catch (error) {
+    console.error("Error getting client session:", error)
+    return null
+  }
+}
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+export function setClientSession(session: any) {
+  if (typeof window === "undefined") return
 
-    if (!supabaseServiceKey) {
-      console.error("❌ SUPABASE_SERVICE_ROLE_KEY not available")
-      return
-    }
+  try {
+    localStorage.setItem("user-session", JSON.stringify(session))
+  } catch (error) {
+    console.error("Error setting client session:", error)
+  }
+}
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+export function clearClientSession() {
+  if (typeof window === "undefined") return
 
-    await supabase.from("student_access_log").insert([
-      {
-        student_id: studentId,
-        email: email,
-        action: action,
-        success: success,
-        error_code: errorCode,
-        error_message: errorMessage,
-        ip_address: ipAddress,
-        user_agent: userAgent,
-        session_data: sessionData ? JSON.stringify(sessionData) : null,
-      },
-    ])
-  } catch (logError) {
-    console.error("Failed to log student access:", logError)
+  try {
+    localStorage.removeItem("user-session")
+  } catch (error) {
+    console.error("Error clearing client session:", error)
   }
 }
