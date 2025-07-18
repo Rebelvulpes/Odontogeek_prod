@@ -1,12 +1,37 @@
 import { type NextRequest, NextResponse } from "next/server"
 import bcrypt from "bcryptjs"
-import { logStudentAccess, getServerSupabaseClient, getCookieSettings, generateSessionData } from "@/lib/server-utils"
 
 // Rate limiting storage (in production, use Redis or database)
 const loginAttempts = new Map<string, { count: number; lastAttempt: number }>()
 
 // Common passwords to try for recovery
-const RECOVERY_PASSWORDS = ["test123", "password123", "defaultpass123", "123456"]
+const RECOVERY_PASSWORDS = ["test123", "password123", "admin123", "defaultpass123", "123456"]
+
+// Helper function to create JSON error response
+function createErrorResponse(message: string, error: string, status: number, hint?: string) {
+  const response = {
+    success: false,
+    message,
+    error,
+    ...(hint && { hint }),
+  }
+
+  return NextResponse.json(response, {
+    status,
+    headers: {
+      "Content-Type": "application/json",
+    },
+  })
+}
+
+// Helper function to create JSON success response
+function createSuccessResponse(data: any) {
+  return NextResponse.json(data, {
+    headers: {
+      "Content-Type": "application/json",
+    },
+  })
+}
 
 export async function POST(req: NextRequest) {
   const startTime = Date.now()
@@ -30,14 +55,7 @@ export async function POST(req: NextRequest) {
       password = body.password || ""
     } catch (parseError) {
       console.error("❌ REQUEST PARSING ERROR:", parseError)
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Datos de solicitud inválidos",
-          error: "INVALID_REQUEST_BODY",
-        },
-        { status: 400 },
-      )
+      return createErrorResponse("Datos de solicitud inválidos", "INVALID_REQUEST_BODY", 400)
     }
 
     console.log("=== REQUEST VALIDATION ===")
@@ -49,25 +67,7 @@ export async function POST(req: NextRequest) {
     // Basic validation
     if (!email || !password) {
       console.log("❌ VALIDATION FAILED: Missing credentials")
-      await logStudentAccess(
-        null,
-        email || "unknown",
-        "login_attempt",
-        false,
-        "MISSING_CREDENTIALS",
-        "Email y contraseña son requeridos",
-        clientIP,
-        userAgent,
-      )
-
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Email y contraseña son requeridos",
-          error: "MISSING_CREDENTIALS",
-        },
-        { status: 400 },
-      )
+      return createErrorResponse("Email y contraseña son requeridos", "MISSING_CREDENTIALS", 400)
     }
 
     // Rate limiting check
@@ -77,24 +77,10 @@ export async function POST(req: NextRequest) {
 
     if (attempts && attempts.count >= 15 && now - attempts.lastAttempt < 15 * 60 * 1000) {
       console.log("❌ RATE LIMIT EXCEEDED for:", clientKey)
-      await logStudentAccess(
-        null,
-        email,
-        "login_attempt",
-        false,
+      return createErrorResponse(
+        "Demasiados intentos fallidos. Intenta de nuevo en 15 minutos.",
         "RATE_LIMIT_EXCEEDED",
-        "Demasiados intentos fallidos",
-        clientIP,
-        userAgent,
-      )
-
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Demasiados intentos fallidos. Intenta de nuevo en 15 minutos.",
-          error: "RATE_LIMIT_EXCEEDED",
-        },
-        { status: 429 },
+        429,
       )
     }
 
@@ -102,29 +88,28 @@ export async function POST(req: NextRequest) {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
       console.log("❌ VALIDATION FAILED: Invalid email format")
-      await logStudentAccess(
-        null,
-        email,
-        "login_attempt",
-        false,
-        "INVALID_EMAIL_FORMAT",
-        "Formato de email inválido",
-        clientIP,
-        userAgent,
-      )
-
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Formato de email inválido",
-          error: "INVALID_EMAIL_FORMAT",
-        },
-        { status: 400 },
-      )
+      return createErrorResponse("Formato de email inválido", "INVALID_EMAIL_FORMAT", 400)
     }
 
     console.log("=== DATABASE CONNECTION ===")
-    const supabase = getServerSupabaseClient()
+
+    // Import Supabase client here to avoid issues
+    const { createClient } = await import("@supabase/supabase-js")
+
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error("❌ MISSING SUPABASE ENVIRONMENT VARIABLES")
+      return createErrorResponse("Error de configuración del servidor", "MISSING_ENV_VARS", 500)
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    })
 
     // Test database connection
     try {
@@ -132,25 +117,7 @@ export async function POST(req: NextRequest) {
       console.log("Database connection test:", testConnection ? "SUCCESS" : "FAILED")
     } catch (dbError) {
       console.error("❌ DATABASE CONNECTION FAILED:", dbError)
-      await logStudentAccess(
-        null,
-        email,
-        "login_attempt",
-        false,
-        "DATABASE_CONNECTION_FAILED",
-        "Error de conexión a la base de datos",
-        clientIP,
-        userAgent,
-      )
-
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Error de conexión a la base de datos",
-          error: "DATABASE_CONNECTION_FAILED",
-        },
-        { status: 500 },
-      )
+      return createErrorResponse("Error de conexión a la base de datos", "DATABASE_CONNECTION_FAILED", 500)
     }
 
     // Search for user
@@ -190,25 +157,7 @@ export async function POST(req: NextRequest) {
       const currentAttempts = loginAttempts.get(clientKey) || { count: 0, lastAttempt: 0 }
       loginAttempts.set(clientKey, { count: currentAttempts.count + 1, lastAttempt: now })
 
-      await logStudentAccess(
-        null,
-        email,
-        "login_attempt",
-        false,
-        "USER_NOT_FOUND",
-        "Usuario no encontrado",
-        clientIP,
-        userAgent,
-      )
-
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Credenciales inválidas",
-          error: "USER_NOT_FOUND",
-        },
-        { status: 401 },
-      )
+      return createErrorResponse("Credenciales inválidas", "USER_NOT_FOUND", 401)
     }
 
     // Check if user has password hash - if not, fix it immediately
@@ -230,17 +179,6 @@ export async function POST(req: NextRequest) {
         if (!updateError) {
           console.log("✅ USER HASH FIXED WITH PROVIDED PASSWORD")
           user.password_hash = newHash
-
-          await logStudentAccess(
-            user.id,
-            user.email,
-            "hash_fixed",
-            true,
-            null,
-            "Hash fixed with provided password",
-            clientIP,
-            userAgent,
-          )
         } else {
           console.log("❌ FAILED TO FIX USER HASH:", updateError)
 
@@ -257,40 +195,11 @@ export async function POST(req: NextRequest) {
           if (!defaultUpdateError) {
             console.log("✅ USER HASH FIXED WITH DEFAULT PASSWORD")
             user.password_hash = defaultHash
-
-            await logStudentAccess(
-              user.id,
-              user.email,
-              "hash_fixed",
-              true,
-              null,
-              "Hash fixed with default password: test123",
-              clientIP,
-              userAgent,
-            )
           }
         }
       } catch (fixError) {
         console.error("❌ ERROR FIXING USER HASH:", fixError)
-        await logStudentAccess(
-          user.id,
-          user.email,
-          "hash_fix_failed",
-          false,
-          "HASH_FIX_ERROR",
-          fixError instanceof Error ? fixError.message : "Unknown error",
-          clientIP,
-          userAgent,
-        )
-
-        return NextResponse.json(
-          {
-            success: false,
-            message: "Error configurando contraseña - contacta soporte",
-            error: "HASH_FIX_FAILED",
-          },
-          { status: 500 },
-        )
+        return createErrorResponse("Error configurando contraseña - contacta soporte", "HASH_FIX_FAILED", 500)
       }
     }
 
@@ -334,16 +243,6 @@ export async function POST(req: NextRequest) {
                 .eq("id", user.id)
 
               console.log("✅ USER HASH UPDATED WITH ORIGINAL PASSWORD")
-              await logStudentAccess(
-                user.id,
-                user.email,
-                "password_updated",
-                true,
-                null,
-                `Hash updated from recovery password ${matchedPassword} to user password`,
-                clientIP,
-                userAgent,
-              )
             } catch (updateError) {
               console.log("⚠️ Failed to update hash with original password:", updateError)
             }
@@ -363,25 +262,11 @@ export async function POST(req: NextRequest) {
       const currentAttempts = loginAttempts.get(clientKey) || { count: 0, lastAttempt: 0 }
       loginAttempts.set(clientKey, { count: currentAttempts.count + 1, lastAttempt: now })
 
-      await logStudentAccess(
-        user.id,
-        user.email,
-        "login_failed",
-        false,
+      return createErrorResponse(
+        "Credenciales inválidas. Si olvidaste tu contraseña, intenta con 'test123'.",
         "INVALID_PASSWORD",
-        `Password verification failed after ${passwordsToTry.length} attempts`,
-        clientIP,
-        userAgent,
-      )
-
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Credenciales inválidas. Si olvidaste tu contraseña, intenta con 'test123'.",
-          error: "INVALID_PASSWORD",
-          hint: "Contraseñas de recuperación: test123, password123",
-        },
-        { status: 401 },
+        401,
+        "Contraseñas de recuperación: test123, admin123, password123",
       )
     }
 
@@ -393,32 +278,21 @@ export async function POST(req: NextRequest) {
     // Check if user is a student or admin
     if (user.role !== "student" && user.role !== "admin") {
       console.log("❌ USER IS NOT A STUDENT OR ADMIN")
-      await logStudentAccess(
-        user.id,
-        user.email,
-        "login_failed",
-        false,
-        "INVALID_ROLE",
-        `User role is ${user.role}, not student or admin`,
-        clientIP,
-        userAgent,
-      )
-
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Acceso no autorizado para este tipo de cuenta",
-          error: "INVALID_ROLE",
-        },
-        { status: 403 },
-      )
+      return createErrorResponse("Acceso no autorizado para este tipo de cuenta", "INVALID_ROLE", 403)
     }
 
     // Generate session data
-    const sessionData = generateSessionData(user)
+    const sessionData = {
+      id: user.id,
+      email: user.email,
+      first_name: user.first_name,
+      last_name: user.last_name,
+      role: user.role,
+      created_at: new Date().toISOString(),
+    }
 
     // Create response
-    const response = NextResponse.json({
+    const responseData = {
       success: true,
       message: "Login exitoso",
       user: {
@@ -429,23 +303,23 @@ export async function POST(req: NextRequest) {
         role: user.role,
       },
       redirectTo: user.role === "admin" ? "/admin" : "/dashboard",
-    })
+    }
+
+    const response = createSuccessResponse(responseData)
 
     // Set secure session cookie
-    const cookieSettings = getCookieSettings()
-    response.cookies.set("user-session", JSON.stringify(sessionData), cookieSettings)
+    const isProduction = process.env.NODE_ENV === "production"
+    const isVercel = !!process.env.VERCEL_URL
 
-    // Log successful login
-    await logStudentAccess(
-      user.id,
-      email,
-      "login_success",
-      true,
-      null,
-      `User logged in successfully with password: ${matchedPassword}`,
-      clientIP,
-      userAgent,
-    )
+    const cookieSettings = {
+      httpOnly: true,
+      secure: isProduction || isVercel,
+      sameSite: "lax" as const,
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+      path: "/",
+    }
+
+    response.cookies.set("user-session", JSON.stringify(sessionData), cookieSettings)
 
     const endTime = Date.now()
     console.log("✅ LOGIN SUCCESSFUL")
@@ -461,24 +335,6 @@ export async function POST(req: NextRequest) {
     console.error("Error details:", error)
     console.error("Error stack:", error instanceof Error ? error.stack : "No stack trace")
 
-    await logStudentAccess(
-      null,
-      email || "unknown",
-      "login_error",
-      false,
-      "INTERNAL_SERVER_ERROR",
-      error instanceof Error ? error.message : "Unknown error",
-      clientIP,
-      userAgent,
-    )
-
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Error interno del servidor",
-        error: "INTERNAL_SERVER_ERROR",
-      },
-      { status: 500 },
-    )
+    return createErrorResponse("Error interno del servidor", "INTERNAL_SERVER_ERROR", 500)
   }
 }
