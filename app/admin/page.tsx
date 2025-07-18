@@ -4,9 +4,15 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import {
   Video,
   Users,
@@ -23,8 +29,20 @@ import {
   Tag,
   ImageIcon,
   Presentation,
+  AlertCircle,
+  RefreshCw,
 } from "lucide-react"
 import { Navigation } from "@/components/navigation"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 interface Course {
   id: string
@@ -1275,4 +1293,796 @@ const AdminPage = () => {
 
           <TabsContent value="tags" className="space-y-4 sm:space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">\
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Etiquetas de Cursos</h2>
+              <Button size="sm" className="w-full sm:w-auto" onClick={() => setIsCreateTagDialogOpen(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                Crear Etiqueta
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {tags.map((tag) => (
+                <Card key={tag.id}>
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <Badge style={{ backgroundColor: tag.color + "20", color: tag.color }} className="text-xs">
+                        {tag.name}
+                      </Badge>
+                      <div className="flex items-center space-x-1">
+                        <Button variant="ghost" size="sm" onClick={() => openEditTagDialog(tag)}>
+                          <Edit className="w-3 h-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openDeleteTagDialog(tag)}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </div>
+                    <p className="text-sm text-gray-600">{tag.description || "Sin descripción"}</p>
+                    <p className="text-xs text-gray-400 mt-2">Slug: {tag.slug}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="users" className="space-y-4 sm:space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Gestión de Usuarios</h2>
+              <Button size="sm" className="w-full sm:w-auto" onClick={loadUsers} disabled={usersLoading}>
+                <RefreshCw className={`w-4 h-4 mr-2 ${usersLoading ? "animate-spin" : ""}`} />
+                {usersLoading ? "Cargando..." : "Actualizar"}
+              </Button>
+            </div>
+
+            {usersError && (
+              <Alert className="border-red-200 bg-red-50">
+                <AlertCircle className="h-4 w-4 text-red-600" />
+                <AlertDescription className="text-red-800">
+                  <strong>Error cargando usuarios:</strong> {usersError}
+                </AlertDescription>
+              </Alert>
+            )}
+
+            <Card>
+              <CardContent className="p-0">
+                {usersLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="text-center">
+                      <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
+                      <p className="text-gray-600">Cargando usuarios...</p>
+                    </div>
+                  </div>
+                ) : users.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Users className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+                    <p className="text-gray-600">No se encontraron usuarios</p>
+                    <p className="text-sm text-gray-500 mt-2">
+                      {usersError
+                        ? "Verifica la conexión y permisos"
+                        : "Los usuarios aparecerán aquí cuando se registren"}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="min-w-[250px]">Usuario</TableHead>
+                          <TableHead className="min-w-[100px]">Rol</TableHead>
+                          <TableHead className="min-w-[100px]">Cursos</TableHead>
+                          <TableHead className="min-w-[100px]">Gastado</TableHead>
+                          <TableHead className="min-w-[120px]">Fecha Registro</TableHead>
+                          <TableHead className="min-w-[100px]">Estado</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {users.map((user) => (
+                          <TableRow key={user.id}>
+                            <TableCell>
+                              <div className="flex items-center space-x-3">
+                                <div className="w-10 h-10 bg-gray-100 rounded-full overflow-hidden flex-shrink-0">
+                                  {user.avatar_url ? (
+                                    <img
+                                      src={user.avatar_url || "/placeholder.svg"}
+                                      alt={user.name}
+                                      className="w-full h-full object-cover"
+                                      onError={(e) => {
+                                        const target = e.target as HTMLImageElement
+                                        target.src = "/placeholder-user.jpg"
+                                      }}
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center bg-gray-200">
+                                      <Users className="w-5 h-5 text-gray-400" />
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="font-medium text-sm truncate">{user.name}</p>
+                                  <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                                  {user.is_test_user && (
+                                    <Badge variant="outline" className="text-xs mt-1">
+                                      Usuario de prueba
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant={user.role === "admin" ? "default" : "secondary"}
+                                className="text-xs capitalize"
+                              >
+                                {user.role}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-sm">{user.courses}</TableCell>
+                            <TableCell className="text-sm">${user.spent.toLocaleString()}</TableCell>
+                            <TableCell className="text-sm">{user.joinDate}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="text-xs text-green-600">
+                                Activo
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
+
+      {/* Create Course Dialog */}
+      <Dialog open={isCreateCourseDialogOpen} onOpenChange={setIsCreateCourseDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Crear Nuevo Curso</DialogTitle>
+            <DialogDescription>Completa la información para crear un nuevo curso</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreateCourse} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="title">Título del Curso</Label>
+                <Input
+                  id="title"
+                  value={newCourse.title}
+                  onChange={(e) => setNewCourse({ ...newCourse, title: e.target.value })}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="instructor">Instructor</Label>
+                <Input
+                  id="instructor"
+                  value={newCourse.instructor}
+                  onChange={(e) => setNewCourse({ ...newCourse, instructor: e.target.value })}
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="description">Descripción</Label>
+              <Textarea
+                id="description"
+                value={newCourse.description}
+                onChange={(e) => setNewCourse({ ...newCourse, description: e.target.value })}
+                rows={3}
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <Label htmlFor="price">Precio ($)</Label>
+                <Input
+                  id="price"
+                  type="number"
+                  step="0.01"
+                  value={newCourse.price}
+                  onChange={(e) => setNewCourse({ ...newCourse, price: e.target.value })}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="durationHours">Duración (horas)</Label>
+                <Input
+                  id="durationHours"
+                  type="number"
+                  value={newCourse.durationHours}
+                  onChange={(e) => setNewCourse({ ...newCourse, durationHours: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="thumbnailUrl">URL de Imagen</Label>
+                <Input
+                  id="thumbnailUrl"
+                  type="url"
+                  value={newCourse.thumbnailUrl}
+                  onChange={(e) => setNewCourse({ ...newCourse, thumbnailUrl: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label>Etiquetas</Label>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {tags.map((tag) => (
+                  <div key={tag.id} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`tag-${tag.id}`}
+                      checked={newCourse.tags.includes(tag.id)}
+                      onCheckedChange={() => handleTagToggle(tag.id)}
+                    />
+                    <Label htmlFor={`tag-${tag.id}`} className="text-sm cursor-pointer" style={{ color: tag.color }}>
+                      {tag.name}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-2 pt-4">
+              <Button type="button" variant="outline" onClick={() => setIsCreateCourseDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit">Crear Curso</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Course Dialog */}
+      <Dialog open={isEditCourseDialogOpen} onOpenChange={setIsEditCourseDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar Curso</DialogTitle>
+            <DialogDescription>Modifica la información del curso</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleUpdateCourse} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="edit-title">Título del Curso</Label>
+                <Input
+                  id="edit-title"
+                  value={newCourse.title}
+                  onChange={(e) => setNewCourse({ ...newCourse, title: e.target.value })}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-instructor">Instructor</Label>
+                <Input
+                  id="edit-instructor"
+                  value={newCourse.instructor}
+                  onChange={(e) => setNewCourse({ ...newCourse, instructor: e.target.value })}
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="edit-description">Descripción</Label>
+              <Textarea
+                id="edit-description"
+                value={newCourse.description}
+                onChange={(e) => setNewCourse({ ...newCourse, description: e.target.value })}
+                rows={3}
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <Label htmlFor="edit-price">Precio ($)</Label>
+                <Input
+                  id="edit-price"
+                  type="number"
+                  step="0.01"
+                  value={newCourse.price}
+                  onChange={(e) => setNewCourse({ ...newCourse, price: e.target.value })}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-durationHours">Duración (horas)</Label>
+                <Input
+                  id="edit-durationHours"
+                  type="number"
+                  value={newCourse.durationHours}
+                  onChange={(e) => setNewCourse({ ...newCourse, durationHours: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-thumbnailUrl">URL de Imagen</Label>
+                <Input
+                  id="edit-thumbnailUrl"
+                  type="url"
+                  value={newCourse.thumbnailUrl}
+                  onChange={(e) => setNewCourse({ ...newCourse, thumbnailUrl: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label>Etiquetas</Label>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {tags.map((tag) => (
+                  <div key={tag.id} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`edit-tag-${tag.id}`}
+                      checked={newCourse.tags.includes(tag.id)}
+                      onCheckedChange={() => handleTagToggle(tag.id)}
+                    />
+                    <Label
+                      htmlFor={`edit-tag-${tag.id}`}
+                      className="text-sm cursor-pointer"
+                      style={{ color: tag.color }}
+                    >
+                      {tag.name}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-2 pt-4">
+              <Button type="button" variant="outline" onClick={() => setIsEditCourseDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit">Actualizar Curso</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create/Edit Lesson Dialog */}
+      <Dialog open={isLessonDialogOpen} onOpenChange={setIsLessonDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{editingLesson ? "Editar Lección" : "Crear Nueva Lección"}</DialogTitle>
+            <DialogDescription>{selectedCourseData && `Curso: ${selectedCourseData.title}`}</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreateLesson} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="lesson-title">Título de la Lección</Label>
+                <Input
+                  id="lesson-title"
+                  value={newLesson.title}
+                  onChange={(e) => setNewLesson({ ...newLesson, title: e.target.value })}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="lesson-order">Orden</Label>
+                <Input
+                  id="lesson-order"
+                  type="number"
+                  value={newLesson.order}
+                  onChange={(e) => setNewLesson({ ...newLesson, order: e.target.value })}
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="lesson-description">Descripción</Label>
+              <Textarea
+                id="lesson-description"
+                value={newLesson.description}
+                onChange={(e) => setNewLesson({ ...newLesson, description: e.target.value })}
+                rows={3}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="lesson-video">URL del Video</Label>
+                <Input
+                  id="lesson-video"
+                  type="url"
+                  value={newLesson.videoUrl}
+                  onChange={(e) => setNewLesson({ ...newLesson, videoUrl: e.target.value })}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="lesson-duration">Duración (minutos)</Label>
+                <Input
+                  id="lesson-duration"
+                  type="number"
+                  value={newLesson.duration}
+                  onChange={(e) => setNewLesson({ ...newLesson, duration: e.target.value })}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="lesson-free"
+                checked={newLesson.isFree}
+                onCheckedChange={(checked) => setNewLesson({ ...newLesson, isFree: checked as boolean })}
+              />
+              <Label htmlFor="lesson-free">Lección gratuita</Label>
+            </div>
+
+            <div className="flex justify-end space-x-2 pt-4">
+              <Button type="button" variant="outline" onClick={() => setIsLessonDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit">{editingLesson ? "Actualizar" : "Crear"} Lección</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Tag Dialog */}
+      <Dialog open={isCreateTagDialogOpen} onOpenChange={setIsCreateTagDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Crear Nueva Etiqueta</DialogTitle>
+            <DialogDescription>Crea una nueva etiqueta para categorizar cursos</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreateTag} className="space-y-4">
+            <div>
+              <Label htmlFor="tag-name">Nombre de la Etiqueta</Label>
+              <Input
+                id="tag-name"
+                value={newTag.name}
+                onChange={(e) => setNewTag({ ...newTag, name: e.target.value })}
+                required
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="tag-color">Color</Label>
+              <Input
+                id="tag-color"
+                type="color"
+                value={newTag.color}
+                onChange={(e) => setNewTag({ ...newTag, color: e.target.value })}
+                className="h-10"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="tag-description">Descripción</Label>
+              <Textarea
+                id="tag-description"
+                value={newTag.description}
+                onChange={(e) => setNewTag({ ...newTag, description: e.target.value })}
+                rows={2}
+              />
+            </div>
+
+            <div className="flex justify-end space-x-2 pt-4">
+              <Button type="button" variant="outline" onClick={() => setIsCreateTagDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit">Crear Etiqueta</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Tag Dialog */}
+      <Dialog open={isEditTagDialogOpen} onOpenChange={setIsEditTagDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Etiqueta</DialogTitle>
+            <DialogDescription>Modifica la información de la etiqueta</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleEditTag} className="space-y-4">
+            <div>
+              <Label htmlFor="edit-tag-name">Nombre de la Etiqueta</Label>
+              <Input
+                id="edit-tag-name"
+                value={editingTag?.name || ""}
+                onChange={(e) => setEditingTag(editingTag ? { ...editingTag, name: e.target.value } : null)}
+                required
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="edit-tag-color">Color</Label>
+              <Input
+                id="edit-tag-color"
+                type="color"
+                value={editingTag?.color || "#3B82F6"}
+                onChange={(e) => setEditingTag(editingTag ? { ...editingTag, color: e.target.value } : null)}
+                className="h-10"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="edit-tag-description">Descripción</Label>
+              <Textarea
+                id="edit-tag-description"
+                value={editingTag?.description || ""}
+                onChange={(e) => setEditingTag(editingTag ? { ...editingTag, description: e.target.value } : null)}
+                rows={2}
+              />
+            </div>
+
+            <div className="flex justify-end space-x-2 pt-4">
+              <Button type="button" variant="outline" onClick={() => setIsEditTagDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit">Actualizar Etiqueta</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Tag Dialog */}
+      <AlertDialog open={isDeleteTagDialogOpen} onOpenChange={setIsDeleteTagDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar etiqueta?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción eliminará permanentemente la etiqueta "{tagToDelete?.name}". Los cursos que usen esta etiqueta
+              ya no la tendrán asociada.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteTag} className="bg-red-600 hover:bg-red-700">
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Create Slide Dialog */}
+      <Dialog open={isCreateSlideDialogOpen} onOpenChange={setIsCreateSlideDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Crear Nuevo Slide</DialogTitle>
+            <DialogDescription>Crea un nuevo slide para el carrusel de la página principal</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreateSlide} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="slide-title">Título</Label>
+                <Input
+                  id="slide-title"
+                  value={newSlide.title}
+                  onChange={(e) => setNewSlide({ ...newSlide, title: e.target.value })}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="slide-subtitle">Subtítulo</Label>
+                <Input
+                  id="slide-subtitle"
+                  value={newSlide.subtitle}
+                  onChange={(e) => setNewSlide({ ...newSlide, subtitle: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="slide-description">Descripción</Label>
+              <Textarea
+                id="slide-description"
+                value={newSlide.description}
+                onChange={(e) => setNewSlide({ ...newSlide, description: e.target.value })}
+                rows={3}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="slide-image">URL de Imagen</Label>
+                <Input
+                  id="slide-image"
+                  type="url"
+                  value={newSlide.image_url}
+                  onChange={(e) => setNewSlide({ ...newSlide, image_url: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="slide-type">Tipo de Slide</Label>
+                <select
+                  id="slide-type"
+                  value={newSlide.slide_type}
+                  onChange={(e) => setNewSlide({ ...newSlide, slide_type: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="general">General</option>
+                  <option value="course">Curso</option>
+                  <option value="promotion">Promoción</option>
+                  <option value="announcement">Anuncio</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="slide-cta-text">Texto del Botón</Label>
+                <Input
+                  id="slide-cta-text"
+                  value={newSlide.cta_text}
+                  onChange={(e) => setNewSlide({ ...newSlide, cta_text: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="slide-cta-link">Enlace del Botón</Label>
+                <Input
+                  id="slide-cta-link"
+                  value={newSlide.cta_link}
+                  onChange={(e) => setNewSlide({ ...newSlide, cta_link: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="slide-badge-text">Texto del Badge</Label>
+                <Input
+                  id="slide-badge-text"
+                  value={newSlide.badge_text}
+                  onChange={(e) => setNewSlide({ ...newSlide, badge_text: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="slide-background">Color de Fondo</Label>
+                <select
+                  id="slide-background"
+                  value={newSlide.background_color}
+                  onChange={(e) => setNewSlide({ ...newSlide, background_color: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="from-blue-900 to-indigo-900">Azul a Índigo</option>
+                  <option value="from-purple-900 to-pink-900">Púrpura a Rosa</option>
+                  <option value="from-green-900 to-teal-900">Verde a Teal</option>
+                  <option value="from-orange-900 to-red-900">Naranja a Rojo</option>
+                  <option value="from-gray-900 to-black">Gris a Negro</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-2 pt-4">
+              <Button type="button" variant="outline" onClick={() => setIsCreateSlideDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit">Crear Slide</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Slide Dialog */}
+      <Dialog open={isEditSlideDialogOpen} onOpenChange={setIsEditSlideDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar Slide</DialogTitle>
+            <DialogDescription>Modifica la información del slide del carrusel</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleUpdateSlide} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="edit-slide-title">Título</Label>
+                <Input
+                  id="edit-slide-title"
+                  value={newSlide.title}
+                  onChange={(e) => setNewSlide({ ...newSlide, title: e.target.value })}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-slide-subtitle">Subtítulo</Label>
+                <Input
+                  id="edit-slide-subtitle"
+                  value={newSlide.subtitle}
+                  onChange={(e) => setNewSlide({ ...newSlide, subtitle: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="edit-slide-description">Descripción</Label>
+              <Textarea
+                id="edit-slide-description"
+                value={newSlide.description}
+                onChange={(e) => setNewSlide({ ...newSlide, description: e.target.value })}
+                rows={3}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="edit-slide-image">URL de Imagen</Label>
+                <Input
+                  id="edit-slide-image"
+                  type="url"
+                  value={newSlide.image_url}
+                  onChange={(e) => setNewSlide({ ...newSlide, image_url: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-slide-type">Tipo de Slide</Label>
+                <select
+                  id="edit-slide-type"
+                  value={newSlide.slide_type}
+                  onChange={(e) => setNewSlide({ ...newSlide, slide_type: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="general">General</option>
+                  <option value="course">Curso</option>
+                  <option value="promotion">Promoción</option>
+                  <option value="announcement">Anuncio</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="edit-slide-cta-text">Texto del Botón</Label>
+                <Input
+                  id="edit-slide-cta-text"
+                  value={newSlide.cta_text}
+                  onChange={(e) => setNewSlide({ ...newSlide, cta_text: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-slide-cta-link">Enlace del Botón</Label>
+                <Input
+                  id="edit-slide-cta-link"
+                  value={newSlide.cta_link}
+                  onChange={(e) => setNewSlide({ ...newSlide, cta_link: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="edit-slide-badge-text">Texto del Badge</Label>
+                <Input
+                  id="edit-slide-badge-text"
+                  value={newSlide.badge_text}
+                  onChange={(e) => setNewSlide({ ...newSlide, badge_text: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-slide-background">Color de Fondo</Label>
+                <select
+                  id="edit-slide-background"
+                  value={newSlide.background_color}
+                  onChange={(e) => setNewSlide({ ...newSlide, background_color: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="from-blue-900 to-indigo-900">Azul a Índigo</option>
+                  <option value="from-purple-900 to-pink-900">Púrpura a Rosa</option>
+                  <option value="from-green-900 to-teal-900">Verde a Teal</option>
+                  <option value="from-orange-900 to-red-900">Naranja a Rojo</option>
+                  <option value="from-gray-900 to-black">Gris a Negro</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-2 pt-4">
+              <Button type="button" variant="outline" onClick={() => setIsEditSlideDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit">Actualizar Slide</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
+export default AdminPage
