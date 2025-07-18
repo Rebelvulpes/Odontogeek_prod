@@ -103,6 +103,22 @@ interface CarouselSlide {
   }>
 }
 
+interface User {
+  id: string
+  name: string
+  email: string
+  role: string
+  courses: number
+  spent: number
+  joinDate: string
+  avatar_url?: string
+  is_test_user?: boolean
+  enrollment_count: number
+  total_spent: number
+  created_at: string
+  updated_at: string
+}
+
 interface Stats {
   totalUsers: number
   totalCourses: number
@@ -112,7 +128,7 @@ interface Stats {
 
 const AdminPage = () => {
   const [courses, setCourses] = useState<Course[]>([])
-  const [users, setUsers] = useState<any[]>([])
+  const [users, setUsers] = useState<User[]>([])
   const [tags, setTags] = useState<CourseTag[]>([])
   const [carouselSlides, setCarouselSlides] = useState<CarouselSlide[]>([])
   const [stats, setStats] = useState<Stats>({
@@ -122,6 +138,7 @@ const AdminPage = () => {
     totalRevenue: 0,
   })
   const [loading, setLoading] = useState(true)
+  const [usersLoading, setUsersLoading] = useState(false)
   const [newCourse, setNewCourse] = useState({
     title: "",
     description: "",
@@ -199,6 +216,41 @@ const AdminPage = () => {
     }
   }
 
+  const loadUsers = async () => {
+    try {
+      console.log("=== LOADING USERS ===")
+      setUsersLoading(true)
+
+      const response = await fetch("/api/admin/users")
+      console.log("Users API response status:", response.status)
+
+      if (!response.ok) {
+        console.error("Users API error:", response.status, response.statusText)
+        const errorText = await response.text()
+        console.error("Error response:", errorText)
+        setUsers([])
+        return
+      }
+
+      const result = await response.json()
+      console.log("Users API result:", result)
+
+      if (result.success) {
+        const usersData = result.data || result.users || []
+        console.log("Setting users data:", usersData.length, "users")
+        setUsers(usersData)
+      } else {
+        console.error("Error loading users:", result.message)
+        setUsers([])
+      }
+    } catch (error) {
+      console.error("Error cargando usuarios:", error)
+      setUsers([])
+    } finally {
+      setUsersLoading(false)
+    }
+  }
+
   const loadCourses = async () => {
     try {
       setLoading(true)
@@ -248,6 +300,7 @@ const AdminPage = () => {
     loadCourses()
     loadTags()
     loadCarouselSlides()
+    loadUsers() // Load users on component mount
   }, [])
 
   const handleCreateCourse = async (e: React.FormEvent) => {
@@ -1267,7 +1320,22 @@ const AdminPage = () => {
           </TabsContent>
 
           <TabsContent value="users" className="space-y-4 sm:space-y-6">
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Usuarios Registrados</h2>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Usuarios Registrados</h2>
+              <Button size="sm" className="w-full sm:w-auto" onClick={loadUsers} disabled={usersLoading}>
+                {usersLoading ? (
+                  <>
+                    <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2" />
+                    Cargando...
+                  </>
+                ) : (
+                  <>
+                    <Users className="w-4 h-4 mr-2" />
+                    Actualizar Usuarios
+                  </>
+                )}
+              </Button>
+            </div>
 
             <Card>
               <CardContent className="p-0">
@@ -1277,6 +1345,7 @@ const AdminPage = () => {
                       <TableRow>
                         <TableHead className="min-w-[150px]">Usuario</TableHead>
                         <TableHead className="min-w-[200px]">Email</TableHead>
+                        <TableHead className="min-w-[80px]">Rol</TableHead>
                         <TableHead className="min-w-[80px]">Cursos</TableHead>
                         <TableHead className="min-w-[100px]">Total Gastado</TableHead>
                         <TableHead className="min-w-[120px]">Fecha de Registro</TableHead>
@@ -1284,9 +1353,18 @@ const AdminPage = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {users.length === 0 ? (
+                      {usersLoading ? (
                         <TableRow>
-                          <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                          <TableCell colSpan={7} className="text-center py-8">
+                            <div className="flex items-center justify-center space-x-2">
+                              <div className="animate-spin w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full" />
+                              <span className="text-gray-500">Cargando usuarios...</span>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ) : users.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center py-8 text-gray-500">
                             <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
                             <p className="text-sm sm:text-base">No hay usuarios registrados</p>
                             <p className="text-xs sm:text-sm">Los usuarios aparecerán aquí cuando se registren</p>
@@ -1295,17 +1373,53 @@ const AdminPage = () => {
                       ) : (
                         users.map((user) => (
                           <TableRow key={user.id}>
-                            <TableCell className="font-medium text-sm sm:text-base">{user.name}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center space-x-3">
+                                <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
+                                  {user.avatar_url ? (
+                                    <img
+                                      src={user.avatar_url || "/placeholder.svg"}
+                                      alt={user.name}
+                                      className="w-8 h-8 rounded-full object-cover"
+                                      onError={(e) => {
+                                        const target = e.target as HTMLImageElement
+                                        target.style.display = "none"
+                                      }}
+                                    />
+                                  ) : (
+                                    <span className="text-xs font-medium text-gray-600">
+                                      {user.name.charAt(0).toUpperCase()}
+                                    </span>
+                                  )}
+                                </div>
+                                <div>
+                                  <p className="font-medium text-sm sm:text-base">{user.name}</p>
+                                  {user.is_test_user && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      Test
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                            </TableCell>
                             <TableCell className="text-sm sm:text-base">{user.email}</TableCell>
+                            <TableCell>
+                              <Badge
+                                variant={user.role === "admin" ? "default" : "secondary"}
+                                className="text-xs capitalize"
+                              >
+                                {user.role}
+                              </Badge>
+                            </TableCell>
                             <TableCell className="text-sm sm:text-base">{user.courses}</TableCell>
-                            <TableCell className="text-sm sm:text-base">${user.spent}</TableCell>
+                            <TableCell className="text-sm sm:text-base">${user.spent.toLocaleString()}</TableCell>
                             <TableCell className="text-sm sm:text-base">{user.joinDate}</TableCell>
                             <TableCell>
                               <div className="flex items-center space-x-2">
-                                <Button variant="ghost" size="sm">
+                                <Button variant="ghost" size="sm" title="Ver detalles">
                                   <Eye className="w-3 h-3 sm:w-4 sm:h-4" />
                                 </Button>
-                                <Button variant="ghost" size="sm">
+                                <Button variant="ghost" size="sm" title="Editar usuario">
                                   <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
                                 </Button>
                               </div>
