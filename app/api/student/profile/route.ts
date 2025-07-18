@@ -74,6 +74,14 @@ export async function PUT(req: NextRequest) {
       )
     }
 
+    // Handle avatar update if provided
+    const avatarUrl = userSession.avatar_url
+    if (req.headers.get("content-type")?.includes("multipart/form-data")) {
+      // TODO: Implement file upload for avatar
+      // For now, we'll keep the existing avatar
+      console.log("Avatar upload not implemented yet")
+    }
+
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
     // Check if email is already taken by another user
@@ -105,6 +113,7 @@ export async function PUT(req: NextRequest) {
       first_name: first_name.trim(),
       last_name: last_name.trim(),
       email: email.toLowerCase().trim(),
+      avatar_url: avatarUrl,
       updated_at: new Date().toISOString(),
     }
 
