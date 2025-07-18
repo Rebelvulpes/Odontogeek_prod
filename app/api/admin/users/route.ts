@@ -8,16 +8,47 @@ export async function GET(req: NextRequest) {
   try {
     console.log("=== GET ADMIN USERS ===")
     console.log("Timestamp:", new Date().toISOString())
+    console.log("Request headers:", Object.fromEntries(req.headers.entries()))
 
-    // Get user session
-    const sessionCookie = req.cookies.get("user-session")
-    if (!sessionCookie) {
-      console.log("❌ NO SESSION COOKIE")
+    // Get user session from cookie
+    const cookieHeader = req.headers.get("cookie")
+    console.log("Cookie header:", cookieHeader)
+
+    if (!cookieHeader) {
+      console.log("❌ NO COOKIE HEADER")
       return NextResponse.json(
         {
           success: false,
-          message: "No hay sesión activa",
-          error: "NO_SESSION",
+          message: "No hay sesión activa - sin cookies",
+          error: "NO_COOKIES",
+        },
+        { status: 401 },
+      )
+    }
+
+    // Parse cookies manually
+    const cookies = cookieHeader.split(";").reduce(
+      (acc, cookie) => {
+        const [key, value] = cookie.trim().split("=")
+        if (key && value) {
+          acc[key] = decodeURIComponent(value)
+        }
+        return acc
+      },
+      {} as Record<string, string>,
+    )
+
+    console.log("Parsed cookies:", Object.keys(cookies))
+
+    const sessionCookie = cookies["user-session"]
+    if (!sessionCookie) {
+      console.log("❌ NO SESSION COOKIE")
+      console.log("Available cookies:", Object.keys(cookies))
+      return NextResponse.json(
+        {
+          success: false,
+          message: "No hay sesión activa - sin cookie de sesión",
+          error: "NO_SESSION_COOKIE",
         },
         { status: 401 },
       )
@@ -25,16 +56,31 @@ export async function GET(req: NextRequest) {
 
     let userSession
     try {
-      userSession = JSON.parse(sessionCookie.value)
+      userSession = JSON.parse(sessionCookie)
       console.log("Session user ID:", userSession.id)
+      console.log("Session email:", userSession.email)
       console.log("Session role:", userSession.role)
     } catch (parseError) {
       console.error("❌ SESSION PARSE ERROR:", parseError)
       return NextResponse.json(
         {
           success: false,
-          message: "Sesión inválida",
-          error: "INVALID_SESSION",
+          message: "Sesión inválida - no se puede parsear",
+          error: "INVALID_SESSION_FORMAT",
+        },
+        { status: 401 },
+      )
+    }
+
+    // Validate session structure
+    if (!userSession.id || !userSession.email || !userSession.role) {
+      console.log("❌ INCOMPLETE SESSION DATA")
+      console.log("Session data:", userSession)
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Sesión incompleta",
+          error: "INCOMPLETE_SESSION",
         },
         { status: 401 },
       )
@@ -43,16 +89,19 @@ export async function GET(req: NextRequest) {
     // Verify user is admin
     if (userSession.role !== "admin") {
       console.log("❌ USER IS NOT ADMIN")
+      console.log("User role:", userSession.role)
       return NextResponse.json(
         {
           success: false,
           message: "Acceso denegado - Se requieren permisos de administrador",
           error: "ACCESS_DENIED",
+          userRole: userSession.role,
         },
         { status: 403 },
       )
     }
 
+    console.log("✅ ADMIN ACCESS VERIFIED")
     console.log("=== FETCHING USERS ===")
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
@@ -82,8 +131,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          message: "Error obteniendo usuarios",
-          error: "QUERY_ERROR",
+          message: "Error obteniendo usuarios de la base de datos",
+          error: "DATABASE_ERROR",
           details: usersError.message,
         },
         { status: 500 },
@@ -180,7 +229,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: formattedUsers, // Changed from 'users' to 'data' to match expected format
+      data: formattedUsers,
       users: formattedUsers, // Keep both for compatibility
       count: formattedUsers.length,
       stats: {
