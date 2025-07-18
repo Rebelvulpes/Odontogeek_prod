@@ -1,29 +1,29 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { notFound, useParams } from "next/navigation"
-import Link from "next/link"
+import { useState, useEffect } from "react"
+import { useParams } from "next/navigation"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ChevronLeft, ChevronRight, Play, Clock, BookOpen, Home, Lock } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { ArrowLeft, ArrowRight, BookOpen, Clock, User, Lock } from "lucide-react"
+import Link from "next/link"
 
-// Define types for the data
 interface Lesson {
   id: string
   title: string
-  description: string
-  video_url: string
-  duration_minutes: number
-  is_free: boolean
+  content: string
+  video_url?: string
+  duration_minutes?: number
   order_index: number
 }
 
 interface Course {
   id: string
   title: string
+  description: string
+  instructor: string
   lessons: Lesson[]
 }
 
@@ -42,291 +42,281 @@ export default function LessonPage() {
   const lessonId = params.lessonId as string
 
   const [data, setData] = useState<LessonData | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState("")
 
   useEffect(() => {
-    if (!courseId || !lessonId) return
-
-    async function fetchLessonData() {
-      try {
-        setLoading(true)
-        setError(null)
-        const response = await fetch("/api/student/lesson", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ courseId, lessonId }),
-        })
-
-        const result = await response.json()
-
-        if (result.success) {
-          setData(result.data)
-        } else {
-          setError(result.message || "Error al cargar la lección.")
-          if (response.status === 404) {
-            // This will be caught by Next.js error boundary
-            notFound()
-          }
-        }
-      } catch (err) {
-        setError("No se pudo conectar con el servidor. Inténtalo de nuevo más tarde.")
-      } finally {
-        setLoading(false)
-      }
+    if (courseId && lessonId) {
+      fetchLessonData()
     }
-
-    fetchLessonData()
   }, [courseId, lessonId])
 
-  if (loading) {
-    return <LessonPageLoadingSkeleton />
+  const fetchLessonData = async () => {
+    try {
+      setIsLoading(true)
+      setError("")
+
+      const response = await fetch("/api/student/lesson", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include", // Important: include cookies
+        body: JSON.stringify({ courseId, lessonId }),
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        setData(result.data)
+      } else {
+        if (response.status === 401) {
+          // Session expired - redirect to login
+          window.location.assign("/auth/login")
+          return
+        } else if (response.status === 403) {
+          // Not enrolled or access denied
+          setError(result.message || "No tienes acceso a esta lección")
+        } else {
+          setError(result.message || "Error al cargar la lección")
+        }
+      }
+    } catch (error) {
+      console.error("Lesson fetch error:", error)
+      setError("Error de conexión. Por favor, recarga la página.")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-6">
+        <div className="max-w-4xl mx-auto">
+          {/* Header Skeleton */}
+          <div className="mb-6">
+            <Skeleton className="h-4 w-32 mb-4" />
+            <Skeleton className="h-8 w-96 mb-2" />
+            <Skeleton className="h-4 w-64" />
+          </div>
+
+          {/* Content Skeleton */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2">
+              <Card>
+                <CardHeader>
+                  <Skeleton className="h-6 w-full mb-2" />
+                  <Skeleton className="h-4 w-3/4" />
+                </CardHeader>
+                <CardContent>
+                  <Skeleton className="h-64 w-full mb-4" />
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-3/4" />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div>
+              <Card>
+                <CardHeader>
+                  <Skeleton className="h-5 w-32" />
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {[1, 2, 3, 4].map((i) => (
+                      <Skeleton key={i} className="h-10 w-full" />
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   if (error) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <Alert variant="destructive" className="max-w-2xl mx-auto">
-          <Lock className="h-4 w-4" />
-          <AlertTitle>Acceso Denegado</AlertTitle>
-          <AlertDescription>
-            <p>{error}</p>
-            <p className="mt-2">Asegúrate de haber iniciado sesión y estar inscrito en este curso.</p>
-            <div className="mt-4">
-              <Link href="/dashboard">
-                <Button variant="secondary">Ir a mi Dashboard</Button>
-              </Link>
+      <div className="min-h-screen bg-gray-50 p-6 flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="text-center text-red-600 flex items-center justify-center">
+              <Lock className="h-5 w-5 mr-2" />
+              Acceso Denegado
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+            <div className="mt-4 space-y-2">
+              <Button onClick={fetchLessonData} className="w-full">
+                Reintentar
+              </Button>
+              <Button asChild variant="outline" className="w-full bg-transparent">
+                <Link href="/dashboard">Volver al Dashboard</Link>
+              </Button>
             </div>
-          </AlertDescription>
-        </Alert>
+          </CardContent>
+        </Card>
       </div>
     )
   }
 
   if (!data) {
-    return null
+    return (
+      <div className="min-h-screen bg-gray-50 p-6 flex items-center justify-center">
+        <Card>
+          <CardContent className="p-6">
+            <p>No se pudieron cargar los datos de la lección.</p>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
-
-  const { lesson, course, previousLesson, nextLesson, currentIndex, totalLessons } = data
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white border-b sticky top-0 z-40">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Link href="/" className="flex items-center space-x-2">
-                <img src="/images/odontogeek-logo-new.png" alt="OdontoGeek" className="h-8 w-auto" />
+      <div className="bg-white shadow-sm border-b">
+        <div className="max-w-4xl mx-auto px-6 py-4">
+          <div className="flex items-center space-x-4">
+            <Button asChild variant="ghost" size="sm">
+              <Link href={`/courses/${courseId}`}>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Volver al Curso
               </Link>
-              <div className="hidden md:flex items-center space-x-2 text-sm text-gray-600">
-                <Link href={`/courses/${course.id}`} className="hover:text-blue-600">
-                  {course.title}
-                </Link>
-                <span>/</span>
-                <span className="text-gray-900">{lesson.title}</span>
-              </div>
-            </div>
-            <div className="flex items-center space-x-3">
-              <Badge variant="secondary" className="text-xs">
-                {currentIndex + 1} de {totalLessons}
-              </Badge>
-              <Link href={`/courses/${course.id}`}>
-                <Button variant="outline" size="sm">
-                  <BookOpen className="w-4 h-4 mr-2" />
-                  Ver Curso
-                </Button>
-              </Link>
+            </Button>
+            <div className="flex-1">
+              <h1 className="text-xl font-semibold text-gray-900">{data.lesson.title}</h1>
+              <p className="text-sm text-gray-600">
+                Lección {data.currentIndex + 1} de {data.totalLessons} • {data.course.title}
+              </p>
             </div>
           </div>
         </div>
-      </header>
+      </div>
 
-      <div className="container mx-auto px-4 py-6">
-        <div className="grid lg:grid-cols-4 gap-6">
-          {/* Video Player */}
-          <div className="lg:col-span-3 space-y-6">
+      <div className="max-w-4xl mx-auto p-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Main Content */}
+          <div className="lg:col-span-2">
             <Card>
-              <CardContent className="p-0">
-                <div className="aspect-video bg-black rounded-t-lg overflow-hidden">
-                  <video
-                    key={lesson.video_url}
-                    controls
-                    className="w-full h-full"
-                    poster="/placeholder.svg?height=400&width=600"
-                    preload="metadata"
-                  >
-                    <source src={lesson.video_url} type="video/mp4" />
-                    Tu navegador no soporta el elemento de video.
-                  </video>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  {data.lesson.title}
+                  {data.lesson.duration_minutes && (
+                    <Badge variant="secondary" className="flex items-center">
+                      <Clock className="h-3 w-3 mr-1" />
+                      {data.lesson.duration_minutes} min
+                    </Badge>
+                  )}
+                </CardTitle>
+                <CardDescription className="flex items-center">
+                  <User className="h-4 w-4 mr-2" />
+                  {data.course.instructor}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {/* Video Player */}
+                {data.lesson.video_url && (
+                  <div className="mb-6">
+                    <div className="aspect-video bg-black rounded-lg overflow-hidden">
+                      <video
+                        controls
+                        className="w-full h-full"
+                        poster="/placeholder.svg?height=400&width=600&text=Video+Lesson"
+                      >
+                        <source src={data.lesson.video_url} type="video/mp4" />
+                        Tu navegador no soporta el elemento de video.
+                      </video>
+                    </div>
+                  </div>
+                )}
+
+                {/* Lesson Content */}
+                <div className="prose max-w-none">
+                  <div
+                    dangerouslySetInnerHTML={{
+                      __html: data.lesson.content || "<p>Contenido de la lección no disponible.</p>",
+                    }}
+                  />
                 </div>
-                <div className="p-6">
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      <h1 className="text-2xl font-bold text-gray-900 mb-2">{lesson.title}</h1>
-                      <p className="text-gray-600">{lesson.description}</p>
-                    </div>
-                    <div className="flex items-center text-sm text-gray-500">
-                      <Clock className="w-4 h-4 mr-1" />
-                      {lesson.duration_minutes} min
-                    </div>
-                  </div>
 
-                  {/* Navigation Buttons */}
-                  <div className="flex items-center justify-between pt-4 border-t">
-                    <div>
-                      {previousLesson ? (
-                        <Link href={`/courses/${course.id}/lessons/${previousLesson.id}`}>
-                          <Button variant="outline" className="flex items-center bg-transparent">
-                            <ChevronLeft className="w-4 h-4 mr-2" />
-                            <div className="text-left">
-                              <div className="text-xs text-gray-500">Anterior</div>
-                              <div className="font-medium truncate max-w-[150px]">{previousLesson.title}</div>
-                            </div>
-                          </Button>
-                        </Link>
-                      ) : (
-                        <Button variant="outline" disabled className="flex items-center bg-transparent">
-                          <ChevronLeft className="w-4 h-4 mr-2" />
-                          <div className="text-left">
-                            <div className="text-xs text-gray-400">Primera lección</div>
-                          </div>
-                        </Button>
-                      )}
-                    </div>
+                {/* Navigation */}
+                <div className="flex justify-between items-center mt-8 pt-6 border-t">
+                  {data.previousLesson ? (
+                    <Button asChild variant="outline">
+                      <Link href={`/courses/${courseId}/lessons/${data.previousLesson.id}`}>
+                        <ArrowLeft className="h-4 w-4 mr-2" />
+                        Lección Anterior
+                      </Link>
+                    </Button>
+                  ) : (
+                    <div />
+                  )}
 
-                    <div className="text-center">
-                      <div className="text-sm text-gray-600">
-                        Lección {currentIndex + 1} de {totalLessons}
-                      </div>
-                      <div className="w-32 bg-gray-200 rounded-full h-2 mt-1">
-                        <div
-                          className="bg-blue-600 h-2 rounded-full transition-all"
-                          style={{ width: `${((currentIndex + 1) / totalLessons) * 100}%` }}
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      {nextLesson ? (
-                        <Link href={`/courses/${course.id}/lessons/${nextLesson.id}`}>
-                          <Button className="flex items-center">
-                            <div className="text-right">
-                              <div className="text-xs opacity-90">Siguiente</div>
-                              <div className="font-medium truncate max-w-[150px]">{nextLesson.title}</div>
-                            </div>
-                            <ChevronRight className="w-4 h-4 ml-2" />
-                          </Button>
-                        </Link>
-                      ) : (
-                        <Link href={`/courses/${course.id}`}>
-                          <Button className="flex items-center">
-                            <div className="text-right">
-                              <div className="text-xs opacity-90">Finalizar</div>
-                              <div className="font-medium">Ver Curso</div>
-                            </div>
-                            <Home className="w-4 h-4 ml-2" />
-                          </Button>
-                        </Link>
-                      )}
-                    </div>
-                  </div>
+                  {data.nextLesson ? (
+                    <Button asChild>
+                      <Link href={`/courses/${courseId}/lessons/${data.nextLesson.id}`}>
+                        Siguiente Lección
+                        <ArrowRight className="h-4 w-4 ml-2" />
+                      </Link>
+                    </Button>
+                  ) : (
+                    <Button asChild variant="outline">
+                      <Link href={`/courses/${courseId}`}>
+                        <BookOpen className="h-4 w-4 mr-2" />
+                        Ver Curso Completo
+                      </Link>
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>
           </div>
 
           {/* Sidebar - Course Lessons */}
-          <div className="space-y-6">
+          <div>
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">{course.title}</CardTitle>
+                <CardTitle className="text-lg">Lecciones del Curso</CardTitle>
               </CardHeader>
-              <CardContent className="p-0">
-                <div className="max-h-[600px] overflow-y-auto">
-                  {course.lessons.map((courseLesson: Lesson, index: number) => (
-                    <Link
-                      key={courseLesson.id}
-                      href={`/courses/${course.id}/lessons/${courseLesson.id}`}
-                      className="block"
-                    >
-                      <div
-                        className={`flex items-center space-x-3 p-4 border-b hover:bg-gray-50 transition-colors ${
-                          courseLesson.id === lesson.id ? "bg-blue-50 border-l-4 border-l-blue-600" : ""
+              <CardContent>
+                <div className="space-y-2">
+                  {data.course.lessons
+                    .sort((a, b) => a.order_index - b.order_index)
+                    .map((lesson, index) => (
+                      <Link
+                        key={lesson.id}
+                        href={`/courses/${courseId}/lessons/${lesson.id}`}
+                        className={`block p-3 rounded-lg border transition-colors ${
+                          lesson.id === data.lesson.id
+                            ? "bg-blue-50 border-blue-200 text-blue-900"
+                            : "hover:bg-gray-50 border-gray-200"
                         }`}
                       >
-                        <div
-                          className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 ${
-                            courseLesson.id === lesson.id
-                              ? "bg-blue-600 text-white"
-                              : index < currentIndex
-                                ? "bg-green-100 text-green-600"
-                                : "bg-gray-100 text-gray-600"
-                          }`}
-                        >
-                          {index < currentIndex ? "✓" : courseLesson.order_index}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm truncate">{courseLesson.title}</div>
-                          <div className="flex items-center text-xs text-gray-500 mt-1">
-                            <Clock className="w-3 h-3 mr-1" />
-                            {courseLesson.duration_minutes} min
-                            {courseLesson.is_free && (
-                              <Badge variant="secondary" className="ml-2 text-xs bg-green-100 text-green-800">
-                                Gratis
-                              </Badge>
-                            )}
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <p className="text-sm font-medium line-clamp-2">{lesson.title}</p>
+                            <p className="text-xs text-gray-500">Lección {index + 1}</p>
                           </div>
+                          {lesson.duration_minutes && (
+                            <Badge variant="outline" className="text-xs">
+                              {lesson.duration_minutes}m
+                            </Badge>
+                          )}
                         </div>
-                        {courseLesson.id === lesson.id && <Play className="w-4 h-4 text-blue-600" />}
-                      </div>
-                    </Link>
-                  ))}
+                      </Link>
+                    ))}
                 </div>
               </CardContent>
             </Card>
           </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function LessonPageLoadingSkeleton() {
-  return (
-    <div className="container mx-auto px-4 py-6">
-      <div className="grid lg:grid-cols-4 gap-6">
-        <div className="lg:col-span-3 space-y-6">
-          <Card>
-            <Skeleton className="aspect-video w-full rounded-t-lg" />
-            <div className="p-6">
-              <Skeleton className="h-8 w-3/4 mb-4" />
-              <Skeleton className="h-4 w-full mb-2" />
-              <Skeleton className="h-4 w-2/3" />
-              <div className="flex justify-between mt-6 pt-4 border-t">
-                <Skeleton className="h-12 w-32" />
-                <Skeleton className="h-12 w-32" />
-              </div>
-            </div>
-          </Card>
-        </div>
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <Skeleton className="h-6 w-full" />
-            </CardHeader>
-            <CardContent>
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="flex items-center space-x-3 p-4">
-                  <Skeleton className="h-8 w-8 rounded-full" />
-                  <div className="flex-1 space-y-2">
-                    <Skeleton className="h-4 w-full" />
-                    <Skeleton className="h-3 w-1/2" />
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
         </div>
       </div>
     </div>

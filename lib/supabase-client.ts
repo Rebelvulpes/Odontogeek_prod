@@ -7,10 +7,16 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error("Missing Supabase environment variables")
 }
 
+// Client-side Supabase client - ONLY uses public anon key
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
-// Server-side client with service role key
+// Server-side client factory - ONLY for API routes
 export const createServerClient = () => {
+  // This should ONLY be called from server-side code
+  if (typeof window !== "undefined") {
+    throw new Error("❌ SECURITY ERROR: createServerClient called from client-side")
+  }
+
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
   if (!serviceRoleKey) {
@@ -20,60 +26,21 @@ export const createServerClient = () => {
   return createClient(supabaseUrl, serviceRoleKey)
 }
 
-// Helper functions for common operations
+// Helper functions for common operations - CLIENT-SIDE SAFE
 export const supabaseHelpers = {
-  // Test connection
+  // Test connection using anon key
   async testConnection() {
     try {
       const { data, error } = await supabase.from("courses").select("count").limit(1)
-
       return { success: !error, error }
     } catch (error) {
       return { success: false, error }
     }
   },
 
-  // Create user
-  async createUser(userData: {
-    email: string
-    firstName: string
-    lastName: string
-    role?: string
-  }) {
-    const { data, error } = await supabase
-      .from("users")
-      .insert([
-        {
-          email: userData.email,
-          first_name: userData.firstName,
-          last_name: userData.lastName,
-          role: userData.role || "student",
-        },
-      ])
-      .select()
-
-    return { data, error }
-  },
-
-  // Get courses
+  // Get public courses using anon key
   async getCourses() {
     const { data, error } = await supabase.from("courses").select("*").eq("status", "published")
-
-    return { data, error }
-  },
-
-  // Enroll user in course
-  async enrollUser(userId: string, courseId: string) {
-    const { data, error } = await supabase
-      .from("enrollments")
-      .insert([
-        {
-          user_id: userId,
-          course_id: courseId,
-        },
-      ])
-      .select()
-
     return { data, error }
   },
 }

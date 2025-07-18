@@ -3,19 +3,15 @@
 import type React from "react"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { useToast } from "@/hooks/use-toast"
-import { Icons } from "@/components/icons"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Loader2 } from "lucide-react"
 import Link from "next/link"
 
 export default function RegisterPage() {
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState("")
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -23,30 +19,35 @@ export default function RegisterPage() {
     password: "",
     confirmPassword: "",
   })
-  const router = useRouter()
-  const { toast } = useToast()
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState("")
 
-  async function onSubmit(event: React.SyntheticEvent) {
-    event.preventDefault()
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData((prev) => ({
+      ...prev,
+      [e.target.name]: e.target.value,
+    }))
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
     setIsLoading(true)
     setError("")
 
-    // Validaciones del frontend
+    // Validation
     if (formData.password !== formData.confirmPassword) {
       setError("Las contraseñas no coinciden")
       setIsLoading(false)
       return
     }
 
-    if (formData.password.length < 8) {
-      setError("La contraseña debe tener al menos 8 caracteres")
+    if (formData.password.length < 6) {
+      setError("La contraseña debe tener al menos 6 caracteres")
       setIsLoading(false)
       return
     }
 
     try {
-      console.log("Submitting registration form...")
-
       const response = await fetch("/api/auth/register", {
         method: "POST",
         headers: {
@@ -60,61 +61,64 @@ export default function RegisterPage() {
         }),
       })
 
-      const result = await response.json()
-      console.log("Registration response:", result)
+      const data = await response.json()
 
-      if (result.success) {
-        toast({
-          title: "Registro exitoso",
-          description: "Tu cuenta ha sido creada exitosamente.",
-        })
-
-        // Redirigir al dashboard ya que el usuario está logueado automáticamente
-        router.push(result.redirectTo || "/dashboard")
+      if (data.success) {
+        // Force a full page reload to ensure cookie is properly set
+        window.location.assign(data.redirectTo || "/dashboard")
       } else {
-        setError(result.message || "Error en el registro")
+        setError(data.message || "Error al crear la cuenta")
       }
-    } catch (err) {
-      console.error("Registration error:", err)
-      setError("Error de conexión. Intenta nuevamente.")
+    } catch (error) {
+      console.error("Registration error:", error)
+      setError("Error de conexión. Por favor, intenta de nuevo.")
     } finally {
       setIsLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1 text-center">
-          <div className="flex items-center justify-center mb-4">
-            <img src="/images/odontogeek-logo-new.png" alt="OdontoGeek" className="h-16 w-auto max-w-[200px]" />
-          </div>
-          <CardTitle className="text-2xl">Crear cuenta</CardTitle>
-          <CardDescription>Ingresa tus datos para crear tu cuenta en OdontoGeek</CardDescription>
+        <CardHeader className="space-y-1">
+          <CardTitle className="text-2xl font-bold text-center">Crear Cuenta</CardTitle>
+          <CardDescription className="text-center">
+            Completa el formulario para crear tu cuenta de estudiante
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={onSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="firstName">Nombre</Label>
                 <Input
                   id="firstName"
+                  name="firstName"
+                  type="text"
                   placeholder="Juan"
                   value={formData.firstName}
-                  onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                  disabled={isLoading}
+                  onChange={handleChange}
                   required
+                  disabled={isLoading}
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="lastName">Apellido</Label>
                 <Input
                   id="lastName"
+                  name="lastName"
+                  type="text"
                   placeholder="Pérez"
                   value={formData.lastName}
-                  onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                  disabled={isLoading}
+                  onChange={handleChange}
                   required
+                  disabled={isLoading}
                 />
               </div>
             </div>
@@ -123,12 +127,13 @@ export default function RegisterPage() {
               <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
-                placeholder="juan@ejemplo.com"
+                name="email"
                 type="email"
+                placeholder="tu@email.com"
                 value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                disabled={isLoading}
+                onChange={handleChange}
                 required
+                disabled={isLoading}
               />
             </div>
 
@@ -136,12 +141,13 @@ export default function RegisterPage() {
               <Label htmlFor="password">Contraseña</Label>
               <Input
                 id="password"
+                name="password"
                 type="password"
-                placeholder="••••••••"
+                placeholder="Mínimo 6 caracteres"
                 value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                disabled={isLoading}
+                onChange={handleChange}
                 required
+                disabled={isLoading}
               />
             </div>
 
@@ -149,41 +155,35 @@ export default function RegisterPage() {
               <Label htmlFor="confirmPassword">Confirmar Contraseña</Label>
               <Input
                 id="confirmPassword"
+                name="confirmPassword"
                 type="password"
-                placeholder="••••••••"
+                placeholder="Repite tu contraseña"
                 value={formData.confirmPassword}
-                onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                disabled={isLoading}
+                onChange={handleChange}
                 required
+                disabled={isLoading}
               />
             </div>
 
-            {error && (
-              <Alert className="border-red-200 bg-red-50">
-                <AlertDescription className="text-red-800">{error}</AlertDescription>
-              </Alert>
-            )}
-
-            <Button disabled={isLoading} className="w-full" type="submit">
+            <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? (
                 <>
-                  <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Creando cuenta...
                 </>
               ) : (
-                "Crear cuenta"
+                "Crear Cuenta"
               )}
             </Button>
           </form>
-        </CardContent>
-        <CardFooter>
-          <div className="text-center text-sm w-full">
-            ¿Ya tienes cuenta?{" "}
-            <Link href="/auth/login" className="text-blue-600 hover:underline">
-              Iniciar sesión
+
+          <div className="mt-4 text-center text-sm">
+            <span className="text-gray-600">¿Ya tienes cuenta? </span>
+            <Link href="/auth/login" className="text-blue-600 hover:text-blue-500 font-medium">
+              Inicia sesión aquí
             </Link>
           </div>
-        </CardFooter>
+        </CardContent>
       </Card>
     </div>
   )
