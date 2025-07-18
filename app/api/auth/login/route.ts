@@ -266,7 +266,7 @@ export async function POST(req: NextRequest) {
         "Credenciales inválidas. Si olvidaste tu contraseña, intenta con 'test123'.",
         "INVALID_PASSWORD",
         401,
-        "Contraseñas de recuperación: test123, admin123, password123",
+        "Contraseñas de recuperación: test123, password123, admin123",
       )
     }
 
@@ -291,7 +291,7 @@ export async function POST(req: NextRequest) {
       created_at: new Date().toISOString(),
     }
 
-    // Create response
+    // Create response - mendozaij88@gmail.com is a student, not admin
     const responseData = {
       success: true,
       message: "Login exitoso",
@@ -325,6 +325,7 @@ export async function POST(req: NextRequest) {
     console.log("✅ LOGIN SUCCESSFUL")
     console.log("Total processing time:", endTime - startTime, "ms")
     console.log("User logged in:", email)
+    console.log("User role:", user.role)
     console.log("Redirect to:", user.role === "admin" ? "/admin" : "/dashboard")
 
     return response
