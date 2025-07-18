@@ -1,43 +1,33 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getUserSessionFromCookie, getServerSupabaseClient } from "@/lib/server-utils"
+import { getUserSessionFromCookie } from "@/lib/server-utils"
 
 export async function GET(req: NextRequest) {
   try {
+    console.log("=== AUTH ME REQUEST ===")
+
+    // Get user session from cookie
     const cookieHeader = req.headers.get("cookie")
     const userSession = getUserSessionFromCookie(cookieHeader)
 
     if (!userSession) {
-      return NextResponse.json({ success: false, message: "No session found", error: "NO_SESSION" }, { status: 401 })
+      console.log("❌ No valid session found")
+      return NextResponse.json({ success: false, message: "No hay sesión válida" }, { status: 401 })
     }
 
-    // Verify user still exists in database
-    const supabase = getServerSupabaseClient()
-    const { data: user, error } = await supabase
-      .from("users")
-      .select("id, email, first_name, last_name, role, created_at")
-      .eq("id", userSession.id)
-      .single()
-
-    if (error || !user) {
-      return NextResponse.json({ success: false, message: "User not found", error: "USER_NOT_FOUND" }, { status: 404 })
-    }
+    console.log("✅ Valid session found for user:", userSession.email)
 
     return NextResponse.json({
       success: true,
       user: {
-        id: user.id,
-        email: user.email,
-        first_name: user.first_name,
-        last_name: user.last_name,
-        role: user.role,
-        created_at: user.created_at,
+        id: userSession.id,
+        email: userSession.email,
+        first_name: userSession.first_name,
+        last_name: userSession.last_name,
+        role: userSession.role,
       },
     })
   } catch (error) {
-    console.error("Auth me error:", error)
-    return NextResponse.json(
-      { success: false, message: "Internal server error", error: "INTERNAL_ERROR" },
-      { status: 500 },
-    )
+    console.error("❌ Auth me error:", error)
+    return NextResponse.json({ success: false, message: "Error interno del servidor" }, { status: 500 })
   }
 }

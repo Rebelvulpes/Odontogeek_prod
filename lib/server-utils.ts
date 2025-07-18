@@ -87,31 +87,31 @@ export const logStudentAccess = async (
   try {
     const supabase = getServerSupabaseClient()
 
-    // Check if student_access_logs table exists
+    // Check if student_access_log table exists
     const { data: tableExists } = await supabase
       .from("information_schema.tables")
       .select("table_name")
-      .eq("table_name", "student_access_logs")
+      .eq("table_name", "student_access_log")
       .single()
 
     if (!tableExists) {
-      console.log("⚠️ student_access_logs table does not exist, skipping log")
+      console.log("⚠️ student_access_log table does not exist, skipping log")
       return
     }
 
     const logEntry = {
-      user_id: userId,
+      student_id: userId,
       email,
       action,
       success,
       error_code: errorCode,
-      details,
+      error_message: details,
       ip_address: ipAddress,
       user_agent: userAgent,
-      timestamp: new Date().toISOString(),
+      created_at: new Date().toISOString(),
     }
 
-    const { error } = await supabase.from("student_access_logs").insert([logEntry])
+    const { error } = await supabase.from("student_access_log").insert([logEntry])
 
     if (error) {
       console.error("❌ Failed to log student access:", error)

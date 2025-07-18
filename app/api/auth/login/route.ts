@@ -13,45 +13,45 @@ export async function POST(req: NextRequest) {
   const clientIP = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown"
   const userAgent = req.headers.get("user-agent") || "unknown"
 
+  let email = ""
+  let password = ""
+
   try {
     console.log("=== LOGIN REQUEST START ===")
     console.log("Timestamp:", new Date().toISOString())
     console.log("Environment:", process.env.NODE_ENV)
     console.log("Host:", req.headers.get("host"))
+    console.log("Client IP:", clientIP)
 
-    const body = await req.json()
-    const email = body.email
-    const password = body.password
-
-    if (!email || !password) {
-      await logStudentAccess(
-        null,
-        email || "unknown",
-        "login_attempt",
-        false,
-        "MISSING_CREDENTIALS",
-        "Missing email or password",
-        clientIP,
-        userAgent,
+    // Parse request body
+    try {
+      const body = await req.json()
+      email = body.email?.trim()
+      password = body.password
+    } catch (parseError) {
+      console.error("❌ REQUEST PARSING ERROR:", parseError)
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Datos de solicitud inválidos",
+          error: "INVALID_REQUEST_BODY",
+        },
+        { status: 400 },
       )
-      return NextResponse.json({ success: false, message: "Email y contraseña son requeridos" }, { status: 400 })
     }
-
-    console.log("Login attempt for:", email)
 
     console.log("=== REQUEST VALIDATION ===")
     console.log("Email provided:", !!email)
     console.log("Email value:", email)
     console.log("Password provided:", !!password)
     console.log("Password length:", password?.length)
-    console.log("Password type:", typeof password)
 
     // Basic validation
     if (!email || !password) {
       console.log("❌ VALIDATION FAILED: Missing credentials")
       await logStudentAccess(
         null,
-        email,
+        email || "unknown",
         "login_attempt",
         false,
         "MISSING_CREDENTIALS",
@@ -175,7 +175,6 @@ export async function POST(req: NextRequest) {
       console.log("First Name:", user.first_name)
       console.log("Last Name:", user.last_name)
       console.log("Role:", user.role)
-      console.log("Is Test User:", user.is_test_user)
       console.log("Has Password Hash:", !!user.password_hash)
       console.log("Password Hash Length:", user.password_hash?.length)
       console.log("Password Hash Type:", typeof user.password_hash)
@@ -391,7 +390,7 @@ export async function POST(req: NextRequest) {
     // Clear failed attempts on successful login
     loginAttempts.delete(clientKey)
 
-    // Check if user is a student
+    // Check if user is a student or admin
     if (user.role !== "student" && user.role !== "admin") {
       console.log("❌ USER IS NOT A STUDENT OR ADMIN")
       await logStudentAccess(
@@ -418,7 +417,7 @@ export async function POST(req: NextRequest) {
     // Generate session data
     const sessionData = generateSessionData(user)
 
-    // Create response with session cookie
+    // Create response
     const response = NextResponse.json({
       success: true,
       message: "Login exitoso",
@@ -429,6 +428,7 @@ export async function POST(req: NextRequest) {
         last_name: user.last_name,
         role: user.role,
       },
+      redirectTo: user.role === "admin" ? "/admin" : "/dashboard",
     })
 
     // Set secure session cookie
@@ -442,12 +442,17 @@ export async function POST(req: NextRequest) {
       "login_success",
       true,
       null,
-      "User logged in successfully",
+      `User logged in successfully with password: ${matchedPassword}`,
       clientIP,
       userAgent,
     )
 
-    console.log("✅ LOGIN SUCCESSFUL for:", email)
+    const endTime = Date.now()
+    console.log("✅ LOGIN SUCCESSFUL")
+    console.log("Total processing time:", endTime - startTime, "ms")
+    console.log("User logged in:", email)
+    console.log("Redirect to:", user.role === "admin" ? "/admin" : "/dashboard")
+
     return response
   } catch (error) {
     const endTime = Date.now()
@@ -458,7 +463,7 @@ export async function POST(req: NextRequest) {
 
     await logStudentAccess(
       null,
-      "unknown",
+      email || "unknown",
       "login_error",
       false,
       "INTERNAL_SERVER_ERROR",
@@ -467,6 +472,13 @@ export async function POST(req: NextRequest) {
       userAgent,
     )
 
-    return NextResponse.json({ success: false, message: "Error interno del servidor" }, { status: 500 })
+    return NextResponse.json(
+      {
+        success: false,
+        message: "Error interno del servidor",
+        error: "INTERNAL_SERVER_ERROR",
+      },
+      { status: 500 },
+    )
   }
 }

@@ -1,14 +1,52 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { BookOpen, Clock, Trophy, User, Play, AlertCircle, ShoppingCart, Star, Calendar } from "lucide-react"
+import {
+  BookOpen,
+  Clock,
+  Trophy,
+  TrendingUp,
+  User,
+  Calendar,
+  ShoppingCart,
+  GraduationCap,
+  AlertCircle,
+} from "lucide-react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
+
+interface Course {
+  id: string
+  title: string
+  description: string
+  thumbnail_url: string
+  price: number
+  instructor: string
+  duration: string
+  level: string
+  created_at: string
+}
+
+interface Enrollment {
+  id: string
+  enrolled_at: string
+  progress: number
+  completed_at: string | null
+  course: Course
+}
+
+interface DashboardStats {
+  totalCourses: number
+  completedCourses: number
+  inProgressCourses: number
+  totalProgress: number
+}
 
 interface DashboardData {
   user: {
@@ -17,81 +55,59 @@ interface DashboardData {
     first_name: string
     last_name: string
     role: string
-    member_since: string
   }
-  stats: {
-    totalCourses: number
-    completedCourses: number
-    inProgressCourses: number
-    notStartedCourses: number
-    totalLessons: number
-    averageProgress: number
-  }
-  enrollments: Array<{
-    id: string
-    progress: number
-    enrolled_at: string
-    completed_at: string | null
-    courses: {
-      id: string
-      title: string
-      description: string
-      thumbnail_url: string | null
-      price: number
-      instructor: string
-      duration_hours: number
-      lessons: Array<{
-        id: string
-        title: string
-        duration_minutes: number
-      }>
-    }
-  }>
+  stats: DashboardStats
+  enrollments: Enrollment[]
+  recentActivity: any[]
   hasEnrollments: boolean
 }
 
 export default function DashboardPage() {
-  const [data, setData] = useState<DashboardData | null>(null)
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState("")
+  const [error, setError] = useState<string | null>(null)
+  const router = useRouter()
 
   useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        console.log("🔄 Fetching dashboard data...")
-        const response = await fetch("/api/student/dashboard", {
-          credentials: "include",
-          headers: {
-            "Cache-Control": "no-cache",
-          },
-        })
-
-        console.log("📡 Response status:", response.status)
-        const result = await response.json()
-        console.log("📊 Response data:", result)
-
-        if (result.success) {
-          setData(result.data)
-          console.log("✅ Dashboard data loaded successfully")
-        } else {
-          console.error("❌ Dashboard API error:", result)
-          if (result.error === "NO_SESSION") {
-            console.log("🔄 Redirecting to login...")
-            window.location.assign("/auth/login")
-            return
-          }
-          setError(result.message || "Error al cargar el dashboard")
-        }
-      } catch (err) {
-        console.error("❌ Dashboard fetch error:", err)
-        setError("Error de conexión. Por favor, recarga la página.")
-      } finally {
-        setLoading(false)
-      }
-    }
-
     fetchDashboardData()
   }, [])
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+
+      const response = await fetch("/api/student/dashboard", {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          // Redirect to login if not authenticated
+          router.push("/auth/login")
+          return
+        }
+        throw new Error(data.message || "Error al cargar el dashboard")
+      }
+
+      if (data.success) {
+        setDashboardData(data.data)
+      } else {
+        throw new Error(data.message || "Error al cargar los datos")
+      }
+    } catch (error) {
+      console.error("Dashboard error:", error)
+      setError(error instanceof Error ? error.message : "Error desconocido")
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleLogout = async () => {
     try {
@@ -99,83 +115,37 @@ export default function DashboardPage() {
         method: "POST",
         credentials: "include",
       })
+      router.push("/auth/login")
     } catch (error) {
       console.error("Logout error:", error)
-    } finally {
-      window.location.assign("/auth/login")
+      // Force redirect even if logout fails
+      router.push("/auth/login")
     }
   }
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="bg-white shadow-sm border-b">
-          <div className="max-w-7xl mx-auto px-6 py-4">
-            <div className="flex justify-between items-center">
-              <div>
-                <Skeleton className="h-8 w-64 mb-2" />
-                <Skeleton className="h-4 w-96" />
-              </div>
-              <Skeleton className="h-10 w-32" />
-            </div>
-          </div>
-        </div>
-
-        <div className="max-w-7xl mx-auto p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            {[...Array(4)].map((_, i) => (
-              <Card key={i}>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <Skeleton className="h-4 w-20" />
-                  <Skeleton className="h-4 w-4" />
-                </CardHeader>
-                <CardContent>
-                  <Skeleton className="h-8 w-12 mb-2" />
-                  <Skeleton className="h-3 w-24" />
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-
-          <div className="space-y-4">
-            <Skeleton className="h-6 w-32" />
-            {[...Array(3)].map((_, i) => (
-              <Card key={i}>
-                <CardContent className="p-6">
-                  <div className="flex items-start space-x-4">
-                    <Skeleton className="h-16 w-16 rounded" />
-                    <div className="flex-1 space-y-2">
-                      <Skeleton className="h-5 w-48" />
-                      <Skeleton className="h-4 w-32" />
-                      <Skeleton className="h-2 w-full" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </div>
-    )
+    return <DashboardSkeleton />
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle className="text-center text-red-600">Error</CardTitle>
+            <CardTitle className="flex items-center gap-2 text-red-600">
+              <AlertCircle className="h-5 w-5" />
+              Error
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
               <AlertDescription>{error}</AlertDescription>
             </Alert>
-            <div className="space-y-2">
-              <Button onClick={() => window.location.reload()} className="w-full">
+            <div className="flex gap-2">
+              <Button onClick={fetchDashboardData} variant="outline" className="flex-1 bg-transparent">
                 Reintentar
               </Button>
-              <Button onClick={handleLogout} variant="outline" className="w-full bg-transparent">
+              <Button onClick={handleLogout} variant="destructive" className="flex-1">
                 Cerrar Sesión
               </Button>
             </div>
@@ -185,64 +155,69 @@ export default function DashboardPage() {
     )
   }
 
-  if (!data) {
+  if (!dashboardData) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
-        <Alert>
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>No se pudieron cargar los datos del dashboard.</AlertDescription>
-        </Alert>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6">
+            <p className="text-center text-gray-600">No se pudieron cargar los datos del dashboard</p>
+            <Button onClick={fetchDashboardData} className="w-full mt-4">
+              Reintentar
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     )
   }
 
-  const memberSince = new Date(data.user.member_since).toLocaleDateString("es-ES", {
-    year: "numeric",
-    month: "long",
-  })
-
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">¡Bienvenido, {data.user.first_name}!</h1>
-              <p className="text-gray-600 flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                Miembro desde {memberSince}
-              </p>
+      <header className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center gap-3">
+              <GraduationCap className="h-8 w-8 text-blue-600" />
+              <h1 className="text-xl font-semibold text-gray-900">OdontoGeek</h1>
             </div>
-            <Button onClick={handleLogout} variant="outline" size="sm">
-              Cerrar Sesión
-            </Button>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <User className="h-4 w-4 text-gray-500" />
+                <span className="text-sm text-gray-700">
+                  {dashboardData.user.first_name} {dashboardData.user.last_name}
+                </span>
+              </div>
+              <Button onClick={handleLogout} variant="outline" size="sm">
+                Cerrar Sesión
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
+      </header>
 
-      <div className="max-w-7xl mx-auto p-6">
-        {/* Statistics */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Welcome Section */}
+        <div className="mb-8">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">¡Bienvenido, {dashboardData.user.first_name}!</h2>
+          <p className="text-gray-600">
+            {dashboardData.hasEnrollments
+              ? "Continúa tu aprendizaje donde lo dejaste"
+              : "Comienza tu viaje de aprendizaje explorando nuestros cursos"}
+          </p>
+        </div>
+
+        {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Cursos Totales</CardTitle>
+              <CardTitle className="text-sm font-medium">Cursos Inscritos</CardTitle>
               <BookOpen className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{data.stats.totalCourses}</div>
-              <p className="text-xs text-muted-foreground">Cursos inscritos</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Completados</CardTitle>
-              <Trophy className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{data.stats.completedCourses}</div>
-              <p className="text-xs text-muted-foreground">Cursos terminados</p>
+              <div className="text-2xl font-bold">{dashboardData.stats.totalCourses}</div>
+              <p className="text-xs text-muted-foreground">
+                {dashboardData.stats.totalCourses === 0 ? "Ningún curso inscrito" : "Total de cursos"}
+              </p>
             </CardContent>
           </Card>
 
@@ -252,160 +227,224 @@ export default function DashboardPage() {
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{data.stats.inProgressCourses}</div>
+              <div className="text-2xl font-bold">{dashboardData.stats.inProgressCourses}</div>
               <p className="text-xs text-muted-foreground">Cursos activos</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Progreso Promedio</CardTitle>
-              <Star className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Completados</CardTitle>
+              <Trophy className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{data.stats.averageProgress}%</div>
+              <div className="text-2xl font-bold">{dashboardData.stats.completedCourses}</div>
+              <p className="text-xs text-muted-foreground">Cursos finalizados</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Progreso Promedio</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{dashboardData.stats.totalProgress}%</div>
               <p className="text-xs text-muted-foreground">Progreso general</p>
             </CardContent>
           </Card>
         </div>
 
         {/* Main Content */}
-        <div>
-          <h2 className="text-xl font-semibold mb-6">Mis Cursos</h2>
+        {dashboardData.hasEnrollments ? (
+          <EnrolledCoursesSection enrollments={dashboardData.enrollments} />
+        ) : (
+          <EmptyStateSection />
+        )}
+      </main>
+    </div>
+  )
+}
 
-          {!data.hasEnrollments ? (
-            /* Empty State - No Courses */
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* Welcome Card */}
-              <Card className="lg:col-span-2">
-                <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                  <div className="w-24 h-24 bg-blue-100 rounded-full flex items-center justify-center mb-6">
-                    <BookOpen className="h-12 w-12 text-blue-600" />
-                  </div>
-                  <h3 className="text-2xl font-bold text-gray-900 mb-2">¡Comienza tu viaje de aprendizaje!</h3>
-                  <p className="text-gray-600 mb-6 max-w-md">
-                    Aún no tienes cursos inscritos. Explora nuestro catálogo de cursos especializados en odontología y
-                    comienza a desarrollar tus habilidades profesionales.
-                  </p>
-                  <div className="flex flex-col sm:flex-row gap-4">
-                    <Button asChild size="lg">
-                      <Link href="/courses">
-                        <ShoppingCart className="h-4 w-4 mr-2" />
-                        Explorar Cursos
-                      </Link>
-                    </Button>
-                    <Button asChild variant="outline" size="lg">
-                      <Link href="/courses">Ver Catálogo Completo</Link>
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Benefits Cards */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Trophy className="h-5 w-5 text-yellow-600" />
-                    Certificaciones
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-gray-600 mb-4">
-                    Obtén certificados reconocidos al completar nuestros cursos especializados.
-                  </p>
-                  <ul className="text-sm text-gray-500 space-y-1">
-                    <li>• Certificados oficiales</li>
-                    <li>• Reconocimiento profesional</li>
-                    <li>• Validez internacional</li>
-                  </ul>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Play className="h-5 w-5 text-green-600" />
-                    Aprendizaje Flexible
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-gray-600 mb-4">
-                    Aprende a tu ritmo con contenido de alta calidad disponible 24/7.
-                  </p>
-                  <ul className="text-sm text-gray-500 space-y-1">
-                    <li>• Videos HD de alta calidad</li>
-                    <li>• Acceso de por vida</li>
-                    <li>• Soporte de expertos</li>
-                  </ul>
-                </CardContent>
-              </Card>
-            </div>
-          ) : (
-            /* Enrolled Courses */
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {data.enrollments.map((enrollment) => (
-                <Card key={enrollment.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-                  <div className="aspect-video bg-muted relative">
-                    {enrollment.courses.thumbnail_url ? (
-                      <img
-                        src={enrollment.courses.thumbnail_url || "/placeholder.svg"}
-                        alt={enrollment.courses.title}
-                        className="object-cover w-full h-full"
-                      />
-                    ) : (
-                      <div className="flex items-center justify-center h-full">
-                        <BookOpen className="h-12 w-12 text-muted-foreground" />
-                      </div>
-                    )}
-                    {enrollment.completed_at && (
-                      <Badge className="absolute top-2 right-2" variant="default">
-                        ✓ Completado
-                      </Badge>
-                    )}
-                    {enrollment.progress === 0 && !enrollment.completed_at && (
-                      <Badge className="absolute top-2 right-2" variant="secondary">
-                        Nuevo
-                      </Badge>
-                    )}
-                  </div>
-
-                  <CardHeader>
-                    <CardTitle className="line-clamp-2">{enrollment.courses.title}</CardTitle>
-                    <CardDescription className="line-clamp-2">{enrollment.courses.description}</CardDescription>
-                  </CardHeader>
-
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between text-sm text-muted-foreground">
-                      <div className="flex items-center">
-                        <User className="h-4 w-4 mr-1" />
-                        {enrollment.courses.instructor}
-                      </div>
-                      <div className="flex items-center">
-                        <Clock className="h-4 w-4 mr-1" />
-                        {enrollment.courses.duration_hours}h
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span>Progreso</span>
-                        <span>{enrollment.progress}%</span>
-                      </div>
-                      <Progress value={enrollment.progress} className="h-2" />
-                    </div>
-
-                    <Button asChild className="w-full">
-                      <Link href={`/courses/${enrollment.courses.id}`}>
-                        {enrollment.progress > 0 ? "Continuar Curso" : "Comenzar Curso"}
-                      </Link>
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </div>
+function EnrolledCoursesSection({ enrollments }: { enrollments: Enrollment[] }) {
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h3 className="text-lg font-semibold text-gray-900">Mis Cursos</h3>
+        <Link href="/courses">
+          <Button variant="outline" size="sm">
+            <ShoppingCart className="h-4 w-4 mr-2" />
+            Explorar Más Cursos
+          </Button>
+        </Link>
       </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {enrollments.map((enrollment) => (
+          <Card key={enrollment.id} className="hover:shadow-md transition-shadow">
+            <CardHeader>
+              <div className="aspect-video bg-gray-200 rounded-md mb-3 overflow-hidden">
+                {enrollment.course.thumbnail_url ? (
+                  <img
+                    src={enrollment.course.thumbnail_url || "/placeholder.svg"}
+                    alt={enrollment.course.title}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <BookOpen className="h-12 w-12 text-gray-400" />
+                  </div>
+                )}
+              </div>
+              <CardTitle className="text-lg">{enrollment.course.title}</CardTitle>
+              <CardDescription className="line-clamp-2">{enrollment.course.description}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between text-sm text-gray-600">
+                <span>Instructor: {enrollment.course.instructor}</span>
+                <Badge variant="secondary">{enrollment.course.level}</Badge>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Progreso</span>
+                  <span>{enrollment.progress || 0}%</span>
+                </div>
+                <Progress value={enrollment.progress || 0} className="h-2" />
+              </div>
+
+              <div className="flex items-center gap-2 text-sm text-gray-500">
+                <Calendar className="h-4 w-4" />
+                <span>Inscrito: {new Date(enrollment.enrolled_at).toLocaleDateString("es-ES")}</span>
+              </div>
+
+              <Link href={`/courses/${enrollment.course.id}`}>
+                <Button className="w-full">{enrollment.progress === 0 ? "Comenzar Curso" : "Continuar Curso"}</Button>
+              </Link>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function EmptyStateSection() {
+  return (
+    <div className="text-center py-12">
+      <Card className="max-w-2xl mx-auto">
+        <CardContent className="pt-8 pb-8">
+          <div className="mb-6">
+            <div className="mx-auto w-24 h-24 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+              <GraduationCap className="h-12 w-12 text-blue-600" />
+            </div>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">¡Comienza tu viaje de aprendizaje!</h3>
+            <p className="text-gray-600 mb-6">
+              Aún no tienes cursos inscritos. Explora nuestra amplia selección de cursos de odontología y comienza a
+              aprender hoy mismo.
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            <Link href="/courses">
+              <Button size="lg" className="w-full sm:w-auto">
+                <ShoppingCart className="h-5 w-5 mr-2" />
+                Explorar Cursos Disponibles
+              </Button>
+            </Link>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-8 text-sm text-gray-600">
+              <div className="flex flex-col items-center">
+                <BookOpen className="h-8 w-8 text-blue-600 mb-2" />
+                <span className="font-medium">Cursos Especializados</span>
+                <span className="text-xs">Contenido de alta calidad</span>
+              </div>
+              <div className="flex flex-col items-center">
+                <Trophy className="h-8 w-8 text-blue-600 mb-2" />
+                <span className="font-medium">Certificaciones</span>
+                <span className="text-xs">Obtén certificados oficiales</span>
+              </div>
+              <div className="flex flex-col items-center">
+                <Clock className="h-8 w-8 text-blue-600 mb-2" />
+                <span className="font-medium">A tu Ritmo</span>
+                <span className="text-xs">Aprende cuando quieras</span>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function DashboardSkeleton() {
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header Skeleton */}
+      <header className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-8 w-8 rounded" />
+              <Skeleton className="h-6 w-32" />
+            </div>
+            <div className="flex items-center gap-4">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-8 w-20" />
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Welcome Section Skeleton */}
+        <div className="mb-8">
+          <Skeleton className="h-8 w-64 mb-2" />
+          <Skeleton className="h-4 w-96" />
+        </div>
+
+        {/* Stats Cards Skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          {[...Array(4)].map((_, i) => (
+            <Card key={i}>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-4 w-4" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-8 w-12 mb-1" />
+                <Skeleton className="h-3 w-20" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* Content Skeleton */}
+        <div className="space-y-6">
+          <Skeleton className="h-6 w-32" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[...Array(3)].map((_, i) => (
+              <Card key={i}>
+                <CardHeader>
+                  <Skeleton className="aspect-video w-full rounded-md mb-3" />
+                  <Skeleton className="h-6 w-3/4" />
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-2/3" />
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex justify-between">
+                    <Skeleton className="h-4 w-20" />
+                    <Skeleton className="h-5 w-16" />
+                  </div>
+                  <Skeleton className="h-2 w-full" />
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-10 w-full" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </main>
     </div>
   )
 }

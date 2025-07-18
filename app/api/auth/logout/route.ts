@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getUserSessionFromCookie, logStudentAccess, getCookieSettings } from "@/lib/server-utils"
+import { getUserSessionFromCookie, logStudentAccess } from "@/lib/server-utils"
 
 export async function POST(req: NextRequest) {
   const clientIP = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown"
@@ -8,22 +8,26 @@ export async function POST(req: NextRequest) {
   try {
     console.log("=== LOGOUT REQUEST ===")
 
+    // Get user session from cookie before clearing it
     const cookieHeader = req.headers.get("cookie")
     const userSession = getUserSessionFromCookie(cookieHeader)
 
+    // Create response
     const response = NextResponse.json({
       success: true,
       message: "Logout exitoso",
     })
 
     // Clear session cookie
-    const cookieSettings = getCookieSettings()
     response.cookies.set("user-session", "", {
-      ...cookieSettings,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
       maxAge: 0, // Expire immediately
+      path: "/",
     })
 
-    // Log logout
+    // Log logout if we had a valid session
     if (userSession) {
       await logStudentAccess(
         userSession.id,
@@ -35,14 +39,14 @@ export async function POST(req: NextRequest) {
         clientIP,
         userAgent,
       )
-      console.log("✅ LOGOUT SUCCESSFUL for:", userSession.email)
+      console.log("✅ User logged out:", userSession.email)
     } else {
-      console.log("⚠️ LOGOUT without valid session")
+      console.log("⚠️ Logout attempt without valid session")
     }
 
     return response
   } catch (error) {
-    console.error("❌ LOGOUT ERROR:", error)
+    console.error("❌ Logout error:", error)
 
     // Still clear the cookie even if logging fails
     const response = NextResponse.json({
@@ -50,10 +54,12 @@ export async function POST(req: NextRequest) {
       message: "Logout exitoso",
     })
 
-    const cookieSettings = getCookieSettings()
     response.cookies.set("user-session", "", {
-      ...cookieSettings,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
       maxAge: 0,
+      path: "/",
     })
 
     return response
