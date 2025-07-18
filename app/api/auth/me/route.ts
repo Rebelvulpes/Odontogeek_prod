@@ -11,7 +11,14 @@ export async function GET(req: NextRequest) {
 
     if (!userSession) {
       console.log("❌ No valid session found")
-      return NextResponse.json({ success: false, message: "No hay sesión válida" }, { status: 401 })
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Sesión no válida",
+          error: "INVALID_SESSION",
+        },
+        { status: 401 },
+      )
     }
 
     console.log("✅ Valid session found for user:", userSession.email)
@@ -28,6 +35,13 @@ export async function GET(req: NextRequest) {
     })
   } catch (error) {
     console.error("❌ Auth me error:", error)
-    return NextResponse.json({ success: false, message: "Error interno del servidor" }, { status: 500 })
+    return NextResponse.json(
+      {
+        success: false,
+        message: "Error interno del servidor",
+        error: "INTERNAL_SERVER_ERROR",
+      },
+      { status: 500 },
+    )
   }
 }

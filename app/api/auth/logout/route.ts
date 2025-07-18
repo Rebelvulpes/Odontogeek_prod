@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
   try {
     console.log("=== LOGOUT REQUEST ===")
 
-    // Get user session from cookie before clearing it
+    // Get user session from cookie
     const cookieHeader = req.headers.get("cookie")
     const userSession = getUserSessionFromCookie(cookieHeader)
 
@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      maxAge: 0, // Expire immediately
+      maxAge: 0,
       path: "/",
     })
 
@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
       )
       console.log("✅ User logged out:", userSession.email)
     } else {
-      console.log("⚠️ Logout attempt without valid session")
+      console.log("✅ Logout request (no active session)")
     }
 
     return response

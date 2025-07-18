@@ -23,11 +23,11 @@ export async function POST(req: NextRequest) {
     console.log("Host:", req.headers.get("host"))
     console.log("Client IP:", clientIP)
 
-    // Parse request body
+    // Parse request body with error handling
     try {
       const body = await req.json()
-      email = body.email?.trim()
-      password = body.password
+      email = body.email?.trim() || ""
+      password = body.password || ""
     } catch (parseError) {
       console.error("❌ REQUEST PARSING ERROR:", parseError)
       return NextResponse.json(
