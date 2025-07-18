@@ -1,59 +1,32 @@
 import { type NextRequest, NextResponse } from "next/server"
 import bcrypt from "bcryptjs"
-import { logStudentAccess, getServerSupabaseClient } from "@/lib/server-utils"
+import { getCookieSettings, generateSessionData, validatePassword } from "@/lib/server-utils"
 
 export async function POST(req: NextRequest) {
+  const startTime = Date.now()
   const clientIP = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown"
-  const userAgent = req.headers.get("user-agent") || "unknown"
-
-  let email = ""
-  let password = ""
-  let firstName = ""
-  let lastName = ""
 
   try {
-    const body = await req.json()
-    email = body.email
-    password = body.password
-    firstName = body.firstName
-    lastName = body.lastName
-  } catch (parseError) {
-    console.error("❌ REQUEST PARSING ERROR:", parseError)
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Datos de solicitud inválidos",
-        error: "INVALID_REQUEST_BODY",
-      },
-      { status: 400 },
-    )
-  }
-
-  try {
-    console.log("=== STUDENT REGISTRATION ATTEMPT START ===")
+    console.log("=== REGISTRATION REQUEST START ===")
     console.log("Timestamp:", new Date().toISOString())
-    console.log("Email:", email)
-    console.log("First Name:", firstName)
-    console.log("Last Name:", lastName)
+    console.log("Client IP:", clientIP)
 
-    // Basic validation
+    const body = await req.json()
+    const { email, password, firstName, lastName } = body
+
+    // Validation
     if (!email || !password || !firstName || !lastName) {
-      await logStudentAccess(
-        null,
-        email,
-        "registration_attempt",
-        false,
-        "MISSING_FIELDS",
-        "Todos los campos son requeridos",
-        clientIP,
-        userAgent,
-      )
+      return NextResponse.json({ success: false, message: "Todos los campos son requeridos" }, { status: 400 })
+    }
 
+    // Validate password strength
+    const passwordValidation = validatePassword(password)
+    if (!passwordValidation.isValid) {
       return NextResponse.json(
         {
           success: false,
-          message: "Todos los campos son requeridos",
-          error: "MISSING_FIELDS",
+          message: "Contraseña no válida",
+          errors: passwordValidation.errors,
         },
         { status: 400 },
       )
@@ -62,95 +35,47 @@ export async function POST(req: NextRequest) {
     // Email format validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
-      await logStudentAccess(
-        null,
-        email,
-        "registration_attempt",
-        false,
-        "INVALID_EMAIL_FORMAT",
-        "Formato de email inválido",
-        clientIP,
-        userAgent,
-      )
-
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Formato de email inválido",
-          error: "INVALID_EMAIL_FORMAT",
-        },
-        { status: 400 },
-      )
+      return NextResponse.json({ success: false, message: "Formato de email inválido" }, { status: 400 })
     }
 
-    // Password strength validation
-    if (password.length < 6) {
-      await logStudentAccess(
-        null,
-        email,
-        "registration_attempt",
-        false,
-        "WEAK_PASSWORD",
-        "La contraseña debe tener al menos 6 caracteres",
-        clientIP,
-        userAgent,
-      )
+    // Connect to database
+    const { createClient } = await import("@supabase/supabase-js")
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-      return NextResponse.json(
-        {
-          success: false,
-          message: "La contraseña debe tener al menos 6 caracteres",
-          error: "WEAK_PASSWORD",
-        },
-        { status: 400 },
-      )
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error("❌ MISSING SUPABASE ENVIRONMENT VARIABLES")
+      return NextResponse.json({ success: false, message: "Error de configuración del servidor" }, { status: 500 })
     }
 
-    const supabase = getServerSupabaseClient()
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    })
 
     // Check if user already exists
-    const { data: existingUser } = await supabase
-      .from("users")
-      .select("id, email")
-      .eq("email", email.toLowerCase().trim())
-      .single()
+    const normalizedEmail = email.toLowerCase().trim()
+    const { data: existingUser } = await supabase.from("users").select("id").eq("email", normalizedEmail).single()
 
     if (existingUser) {
-      await logStudentAccess(
-        null,
-        email,
-        "registration_attempt",
-        false,
-        "USER_ALREADY_EXISTS",
-        "El usuario ya existe",
-        clientIP,
-        userAgent,
-      )
-
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Ya existe una cuenta con este email",
-          error: "USER_ALREADY_EXISTS",
-        },
-        { status: 409 },
-      )
+      return NextResponse.json({ success: false, message: "El email ya está registrado" }, { status: 409 })
     }
 
     // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10)
+    const passwordHash = await bcrypt.hash(password, 10)
 
     // Create user
     const { data: newUser, error: createError } = await supabase
       .from("users")
       .insert([
         {
-          email: email.toLowerCase().trim(),
-          password_hash: hashedPassword,
+          email: normalizedEmail,
+          password_hash: passwordHash,
           first_name: firstName.trim(),
           last_name: lastName.trim(),
           role: "student",
-          is_test_user: false,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         },
@@ -160,119 +85,47 @@ export async function POST(req: NextRequest) {
 
     if (createError || !newUser) {
       console.error("❌ USER CREATION FAILED:", createError)
-      await logStudentAccess(
-        null,
-        email,
-        "registration_failed",
-        false,
-        "USER_CREATION_FAILED",
-        createError?.message || "Error creating user",
-        clientIP,
-        userAgent,
-      )
-
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Error al crear la cuenta",
-          error: "USER_CREATION_FAILED",
-        },
-        { status: 500 },
-      )
+      return NextResponse.json({ success: false, message: "Error al crear la cuenta" }, { status: 500 })
     }
 
     console.log("✅ USER CREATED SUCCESSFULLY:", newUser.id)
 
-    // Auto-enroll in welcome course
-    const { data: welcomeCourse } = await supabase
-      .from("courses")
-      .select("id")
-      .eq("title", "Curso de Bienvenida")
-      .single()
-
-    if (welcomeCourse) {
-      const { error: enrollError } = await supabase.from("enrollments").insert([
-        {
-          user_id: newUser.id,
-          course_id: welcomeCourse.id,
-          enrolled_at: new Date().toISOString(),
-          progress: 0,
-        },
-      ])
-
-      if (!enrollError) {
-        console.log("✅ USER AUTO-ENROLLED IN WELCOME COURSE")
-      }
-    }
-
-    // Create user session
-    const userSession = {
-      id: newUser.id,
-      email: newUser.email,
-      first_name: newUser.first_name,
-      last_name: newUser.last_name,
-      role: newUser.role,
-      avatar_url: newUser.avatar_url,
-      created_at: newUser.created_at,
-    }
-
-    // Log successful registration
-    await logStudentAccess(
-      newUser.id,
-      newUser.email,
-      "registration_success",
-      true,
-      null,
-      "User registered successfully",
-      clientIP,
-      userAgent,
-      userSession,
-    )
+    // Generate session data with timestamp
+    const sessionData = generateSessionData(newUser)
 
     // Create response
-    const response = NextResponse.json({
+    const responseData = {
       success: true,
       message: "Cuenta creada exitosamente",
-      user: userSession,
+      user: {
+        id: newUser.id,
+        email: newUser.email,
+        first_name: newUser.first_name,
+        last_name: newUser.last_name,
+        role: newUser.role,
+      },
       redirectTo: "/dashboard",
-    })
+    }
 
-    // Set session cookie
-    const cookieValue = JSON.stringify(userSession)
-    response.cookies.set("user-session", cookieValue, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60, // 7 days
-      path: "/",
-    })
+    const response = NextResponse.json(responseData)
 
-    console.log("=== REGISTRATION SUCCESS ===")
-    console.log("User registered:", newUser.email)
+    // Set secure session cookie with 7-day expiration
+    const cookieSettings = getCookieSettings()
+    response.cookies.set("user-session", JSON.stringify(sessionData), cookieSettings)
+
+    const endTime = Date.now()
+    console.log("✅ REGISTRATION SUCCESSFUL")
+    console.log("Total processing time:", endTime - startTime, "ms")
+    console.log("New user registered:", normalizedEmail)
+    console.log("Session expires in:", cookieSettings.maxAge, "seconds (7 days)")
 
     return response
   } catch (error) {
+    const endTime = Date.now()
     console.error("=== REGISTRATION ERROR ===")
+    console.error("Total processing time:", endTime - startTime, "ms")
     console.error("Error details:", error)
 
-    await logStudentAccess(
-      null,
-      email || "unknown",
-      "registration_error",
-      false,
-      "INTERNAL_SERVER_ERROR",
-      error instanceof Error ? error.message : "Unknown error",
-      clientIP,
-      userAgent,
-    )
-
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Error interno del servidor",
-        error: "INTERNAL_SERVER_ERROR",
-      },
-      { status: 500 },
-    )
+    return NextResponse.json({ success: false, message: "Error interno del servidor" }, { status: 500 })
   }
 }

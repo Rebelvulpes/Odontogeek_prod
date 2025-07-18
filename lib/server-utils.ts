@@ -21,21 +21,24 @@ export const getServerSupabaseClient = () => {
   })
 }
 
-// Cookie configuration based on environment
+// Cookie configuration - 7 days natural maximum
 export const getCookieSettings = () => {
   const isProduction = process.env.NODE_ENV === "production"
   const isVercel = !!process.env.VERCEL_URL
+
+  // 7 days natural = 7 * 24 * 60 * 60 seconds
+  const SEVEN_DAYS_IN_SECONDS = 7 * 24 * 60 * 60
 
   return {
     httpOnly: true,
     secure: isProduction || isVercel, // Secure in production or Vercel
     sameSite: "lax" as const,
-    maxAge: 60 * 60 * 24 * 7, // 7 days
+    maxAge: SEVEN_DAYS_IN_SECONDS, // Exactly 7 natural days
     path: "/",
   }
 }
 
-// Parse user session from cookie header
+// Parse user session from cookie header with expiration validation
 export const getUserSessionFromCookie = (cookieHeader: string | null) => {
   if (!cookieHeader) return null
 
@@ -60,6 +63,18 @@ export const getUserSessionFromCookie = (cookieHeader: string | null) => {
     if (!userSession.id || !userSession.email) {
       console.log("❌ Invalid session structure")
       return null
+    }
+
+    // Check if session is expired (7 days from creation)
+    if (userSession.created_at) {
+      const sessionCreated = new Date(userSession.created_at).getTime()
+      const now = Date.now()
+      const sevenDaysInMs = 7 * 24 * 60 * 60 * 1000 // 7 days in milliseconds
+
+      if (now - sessionCreated > sevenDaysInMs) {
+        console.log("❌ Session expired - older than 7 days")
+        return null
+      }
     }
 
     return userSession
@@ -145,7 +160,7 @@ export const validatePassword = (password: string): { isValid: boolean; errors: 
   }
 }
 
-// Generate secure session data
+// Generate secure session data with creation timestamp
 export const generateSessionData = (user: any) => {
   return {
     id: user.id,
@@ -153,6 +168,6 @@ export const generateSessionData = (user: any) => {
     first_name: user.first_name,
     last_name: user.last_name,
     role: user.role,
-    created_at: new Date().toISOString(),
+    created_at: new Date().toISOString(), // Track when session was created
   }
 }

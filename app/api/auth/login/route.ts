@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import bcrypt from "bcryptjs"
+import { getCookieSettings, generateSessionData } from "@/lib/server-utils"
 
 // Rate limiting storage (in production, use Redis or database)
 const loginAttempts = new Map<string, { count: number; lastAttempt: number }>()
@@ -281,17 +282,10 @@ export async function POST(req: NextRequest) {
       return createErrorResponse("Acceso no autorizado para este tipo de cuenta", "INVALID_ROLE", 403)
     }
 
-    // Generate session data
-    const sessionData = {
-      id: user.id,
-      email: user.email,
-      first_name: user.first_name,
-      last_name: user.last_name,
-      role: user.role,
-      created_at: new Date().toISOString(),
-    }
+    // Generate session data with timestamp
+    const sessionData = generateSessionData(user)
 
-    // Create response - mendozaij88@gmail.com is a student, not admin
+    // Create response
     const responseData = {
       success: true,
       message: "Login exitoso",
@@ -307,18 +301,8 @@ export async function POST(req: NextRequest) {
 
     const response = createSuccessResponse(responseData)
 
-    // Set secure session cookie
-    const isProduction = process.env.NODE_ENV === "production"
-    const isVercel = !!process.env.VERCEL_URL
-
-    const cookieSettings = {
-      httpOnly: true,
-      secure: isProduction || isVercel,
-      sameSite: "lax" as const,
-      maxAge: 60 * 60 * 24 * 7, // 7 days
-      path: "/",
-    }
-
+    // Set secure session cookie with 7-day expiration
+    const cookieSettings = getCookieSettings()
     response.cookies.set("user-session", JSON.stringify(sessionData), cookieSettings)
 
     const endTime = Date.now()
@@ -326,6 +310,7 @@ export async function POST(req: NextRequest) {
     console.log("Total processing time:", endTime - startTime, "ms")
     console.log("User logged in:", email)
     console.log("User role:", user.role)
+    console.log("Session expires in:", cookieSettings.maxAge, "seconds (7 days)")
     console.log("Redirect to:", user.role === "admin" ? "/admin" : "/dashboard")
 
     return response
