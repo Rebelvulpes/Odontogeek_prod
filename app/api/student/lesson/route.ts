@@ -1,125 +1,112 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
+import { logStudentAccess, getServerSupabaseClient, getUserSessionFromCookie } from "@/lib/server-utils"
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
-
-// Helper function to log student access attempts
-async function logStudentAccess(
-  studentId: string | null,
-  email: string,
-  action: string,
-  success: boolean,
-  errorCode: string | null,
-  errorMessage: string,
-  ipAddress: string,
-  userAgent: string,
-  sessionData?: any,
-) {
-  try {
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
-    await supabase.from("student_access_log").insert([
-      {
-        student_id: studentId,
-        email: email,
-        action: action,
-        success: success,
-        error_code: errorCode,
-        error_message: errorMessage,
-        ip_address: ipAddress,
-        user_agent: userAgent,
-        session_data: sessionData ? JSON.stringify(sessionData) : null,
-      },
-    ])
-  } catch (logError) {
-    console.error("Failed to log student access:", logError)
-  }
-}
-
-export async function POST(req: NextRequest) {
+export async function GET(req: NextRequest) {
   const clientIP = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown"
   const userAgent = req.headers.get("user-agent") || "unknown"
-  let userSession: any = null
+  const cookieHeader = req.headers.get("cookie")
+
+  const { searchParams } = new URL(req.url)
+  const courseId = searchParams.get("courseId")
+  const lessonId = searchParams.get("lessonId")
 
   try {
-    console.log("=== STUDENT LESSON ACCESS ATTEMPT ===")
-    const { courseId, lessonId } = await req.json()
+    console.log("=== LESSON API REQUEST ===")
+    console.log("Timestamp:", new Date().toISOString())
+    console.log("Course ID:", courseId)
+    console.log("Lesson ID:", lessonId)
 
-    // 1. Get session from cookie
-    const sessionCookie = req.cookies.get("user-session")
-    if (!sessionCookie) {
-      console.log("❌ NO SESSION COOKIE")
+    if (!courseId || !lessonId) {
       return NextResponse.json(
-        { success: false, message: "No hay sesión activa", error: "NO_SESSION" },
-        { status: 401 },
+        {
+          success: false,
+          message: "Course ID y Lesson ID son requeridos",
+          error: "MISSING_PARAMETERS",
+        },
+        { status: 400 },
       )
     }
 
-    try {
-      userSession = JSON.parse(sessionCookie.value)
-    } catch (e) {
-      console.log("❌ INVALID SESSION COOKIE")
-      return NextResponse.json(
-        { success: false, message: "Sesión inválida", error: "INVALID_SESSION" },
-        { status: 401 },
-      )
-    }
+    // Get user session from cookie
+    const userSession = getUserSessionFromCookie(cookieHeader)
 
-    // 2. Validate session and role
-    if (userSession.role !== "student") {
-      console.log("❌ UNAUTHORIZED ROLE:", userSession.role)
+    if (!userSession) {
+      console.log("❌ NO SESSION COOKIE FOUND")
       await logStudentAccess(
-        userSession.id,
-        userSession.email,
-        "lesson_access_denied",
+        null,
+        "unknown",
+        "lesson_access",
         false,
-        "UNAUTHORIZED_ROLE",
-        `User role is not student: ${userSession.role}`,
+        "NO_SESSION",
+        "No session cookie found",
         clientIP,
         userAgent,
-        { courseId, lessonId },
       )
+
       return NextResponse.json(
-        { success: false, message: "Acceso denegado", error: "UNAUTHORIZED_ROLE" },
-        { status: 403 },
+        {
+          success: false,
+          message: "Sesión no válida",
+          error: "NO_SESSION",
+        },
+        { status: 401 },
       )
     }
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    console.log("✅ SESSION FOUND:", userSession.email)
 
-    // 3. Verify enrollment
-    console.log(`Verifying enrollment for student ${userSession.id} in course ${courseId}`)
+    const supabase = getServerSupabaseClient()
+
+    // Verify user is enrolled in the course
     const { data: enrollment, error: enrollmentError } = await supabase
       .from("enrollments")
-      .select("id")
+      .select("id, progress")
       .eq("user_id", userSession.id)
       .eq("course_id", courseId)
       .single()
 
     if (enrollmentError || !enrollment) {
-      console.log("❌ NOT ENROLLED")
+      console.log("❌ USER NOT ENROLLED IN COURSE")
       await logStudentAccess(
         userSession.id,
         userSession.email,
-        "lesson_access_denied",
+        "lesson_access",
         false,
         "NOT_ENROLLED",
-        "Student not enrolled in course",
+        `User not enrolled in course ${courseId}`,
         clientIP,
         userAgent,
-        { courseId, lessonId },
       )
+
       return NextResponse.json(
-        { success: false, message: "No estás inscrito en este curso", error: "NOT_ENROLLED" },
+        {
+          success: false,
+          message: "No tienes acceso a este curso",
+          error: "NOT_ENROLLED",
+        },
         { status: 403 },
       )
     }
-    console.log("✅ Enrollment verified")
 
-    // 4. Fetch lesson and course data
+    // Get lesson details
     const { data: lesson, error: lessonError } = await supabase
       .from("lessons")
-      .select("*")
+      .select(`
+        id,
+        title,
+        description,
+        content,
+        video_url,
+        duration_minutes,
+        order_index,
+        course_id,
+        courses (
+          id,
+          title,
+          description,
+          instructor
+        )
+      `)
       .eq("id", lessonId)
       .eq("course_id", courseId)
       .single()
@@ -129,81 +116,86 @@ export async function POST(req: NextRequest) {
       await logStudentAccess(
         userSession.id,
         userSession.email,
-        "lesson_access_failed",
+        "lesson_access",
         false,
         "LESSON_NOT_FOUND",
-        "Lesson not found in DB",
+        `Lesson ${lessonId} not found in course ${courseId}`,
         clientIP,
         userAgent,
-        { courseId, lessonId },
       )
+
       return NextResponse.json(
-        { success: false, message: "Lección no encontrada", error: "LESSON_NOT_FOUND" },
+        {
+          success: false,
+          message: "Lección no encontrada",
+          error: "LESSON_NOT_FOUND",
+        },
         { status: 404 },
       )
     }
 
-    const { data: course, error: courseError } = await supabase
-      .from("courses")
-      .select("*, lessons(*)")
-      .eq("id", courseId)
-      .single()
+    // Get previous and next lessons
+    const { data: allLessons } = await supabase
+      .from("lessons")
+      .select("id, title, order_index")
+      .eq("course_id", courseId)
+      .order("order_index", { ascending: true })
 
-    if (courseError || !course) {
-      console.log("❌ COURSE NOT FOUND")
-      return NextResponse.json(
-        { success: false, message: "Curso no encontrado", error: "COURSE_NOT_FOUND" },
-        { status: 404 },
-      )
+    const currentIndex = allLessons?.findIndex((l) => l.id === lessonId) || 0
+    const previousLesson = currentIndex > 0 ? allLessons?.[currentIndex - 1] : null
+    const nextLesson = currentIndex < (allLessons?.length || 0) - 1 ? allLessons?.[currentIndex + 1] : null
+
+    const lessonData = {
+      lesson,
+      enrollment,
+      navigation: {
+        previous: previousLesson,
+        next: nextLesson,
+        currentIndex: currentIndex + 1,
+        totalLessons: allLessons?.length || 0,
+      },
     }
 
-    // 5. Calculate navigation
-    course.lessons.sort((a: any, b: any) => a.order_index - b.order_index)
-    const currentIndex = course.lessons.findIndex((l: any) => l.id === lesson.id)
-    const previousLesson = currentIndex > 0 ? course.lessons[currentIndex - 1] : null
-    const nextLesson = currentIndex < course.lessons.length - 1 ? course.lessons[currentIndex + 1] : null
-
-    // 6. Log successful access
+    // Log successful lesson access
     await logStudentAccess(
       userSession.id,
       userSession.email,
-      "lesson_access_success",
+      "lesson_access",
       true,
       null,
-      "Lesson accessed successfully",
+      `Accessed lesson ${lessonId} in course ${courseId}`,
       clientIP,
       userAgent,
-      { courseId, lessonId, lessonTitle: lesson.title },
     )
 
-    // 7. Return data
+    console.log("✅ LESSON DATA RETRIEVED SUCCESSFULLY")
+    console.log("Lesson title:", lesson.title)
+
     return NextResponse.json({
       success: true,
-      data: {
-        lesson,
-        course,
-        previousLesson,
-        nextLesson,
-        currentIndex,
-        totalLessons: course.lessons.length,
-      },
+      data: lessonData,
     })
   } catch (error) {
-    console.error("=== LESSON ACCESS API ERROR ===", error)
-    const email = userSession ? userSession.email : "unknown"
-    const id = userSession ? userSession.id : null
+    console.error("=== LESSON API ERROR ===")
+    console.error("Error details:", error)
+
     await logStudentAccess(
-      id,
-      email,
-      "lesson_access_error",
+      null,
+      "unknown",
+      "lesson_error",
       false,
       "INTERNAL_SERVER_ERROR",
-      error.message,
+      error instanceof Error ? error.message : "Unknown error",
       clientIP,
       userAgent,
     )
+
     return NextResponse.json(
-      { success: false, message: "Error interno del servidor", error: "INTERNAL_SERVER_ERROR" },
+      {
+        success: false,
+        message: "Error interno del servidor",
+        error: "INTERNAL_SERVER_ERROR",
+      },
       { status: 500 },
     )
   }

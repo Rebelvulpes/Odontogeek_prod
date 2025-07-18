@@ -1,10 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
 import bcrypt from "bcryptjs"
-import { logStudentAccess } from "@/lib/utils"
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+import { logStudentAccess, getServerSupabaseClient } from "@/lib/server-utils"
 
 // Rate limiting storage (in production, use Redis or database)
 const loginAttempts = new Map<string, { count: number; lastAttempt: number }>()
@@ -16,7 +12,25 @@ export async function POST(req: NextRequest) {
   const startTime = Date.now()
   const clientIP = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown"
   const userAgent = req.headers.get("user-agent") || "unknown"
-  const { email, password } = await req.json() // Declare email and password variables
+
+  let email = ""
+  let password = ""
+
+  try {
+    const body = await req.json()
+    email = body.email
+    password = body.password
+  } catch (parseError) {
+    console.error("❌ REQUEST PARSING ERROR:", parseError)
+    return NextResponse.json(
+      {
+        success: false,
+        message: "Datos de solicitud inválidos",
+        error: "INVALID_REQUEST_BODY",
+      },
+      { status: 400 },
+    )
+  }
 
   try {
     console.log("=== STUDENT LOGIN ATTEMPT START ===")
@@ -109,7 +123,7 @@ export async function POST(req: NextRequest) {
     }
 
     console.log("=== DATABASE CONNECTION ===")
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    const supabase = getServerSupabaseClient()
 
     // Test database connection
     try {
@@ -264,7 +278,7 @@ export async function POST(req: NextRequest) {
           "hash_fix_failed",
           false,
           "HASH_FIX_ERROR",
-          fixError.message,
+          fixError instanceof Error ? fixError.message : "Unknown error",
           clientIP,
           userAgent,
         )
@@ -288,7 +302,6 @@ export async function POST(req: NextRequest) {
 
     let passwordMatch = false
     let matchedPassword = null
-    let verificationError = null
 
     // Try the provided password first, then recovery passwords
     const passwordsToTry = [password, ...RECOVERY_PASSWORDS.filter((p) => p !== password)]
@@ -340,7 +353,6 @@ export async function POST(req: NextRequest) {
         }
       } catch (compareError) {
         console.error(`❌ BCRYPT COMPARE ERROR on attempt ${i + 1}:`, compareError)
-        verificationError = compareError
       }
     }
 

@@ -7,33 +7,36 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { ArrowLeft, ArrowRight, BookOpen, Clock, User, Lock } from "lucide-react"
+import { ChevronLeft, ChevronRight, Clock, BookOpen, AlertCircle } from "lucide-react"
 import Link from "next/link"
 
-interface Lesson {
-  id: string
-  title: string
-  content: string
-  video_url?: string
-  duration_minutes?: number
-  order_index: number
-}
-
-interface Course {
-  id: string
-  title: string
-  description: string
-  instructor: string
-  lessons: Lesson[]
-}
-
 interface LessonData {
-  lesson: Lesson
-  course: Course
-  previousLesson: Lesson | null
-  nextLesson: Lesson | null
-  currentIndex: number
-  totalLessons: number
+  lesson: {
+    id: string
+    title: string
+    description: string
+    content: string
+    video_url: string | null
+    duration_minutes: number
+    order_index: number
+    course_id: string
+    courses: {
+      id: string
+      title: string
+      description: string
+      instructor: string
+    }
+  }
+  enrollment: {
+    id: string
+    progress: number
+  }
+  navigation: {
+    previous: { id: string; title: string } | null
+    next: { id: string; title: string } | null
+    currentIndex: number
+    totalLessons: number
+  }
 }
 
 export default function LessonPage() {
@@ -42,98 +45,64 @@ export default function LessonPage() {
   const lessonId = params.lessonId as string
 
   const [data, setData] = useState<LessonData | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
 
   useEffect(() => {
+    const fetchLessonData = async () => {
+      try {
+        const response = await fetch(`/api/student/lesson?courseId=${courseId}&lessonId=${lessonId}`, {
+          credentials: "include",
+        })
+
+        const result = await response.json()
+
+        if (result.success) {
+          setData(result.data)
+        } else {
+          if (result.error === "NO_SESSION") {
+            // Redirect to login if no session
+            window.location.assign("/auth/login")
+            return
+          }
+          setError(result.message || "Error al cargar la lección")
+        }
+      } catch (err) {
+        console.error("Lesson fetch error:", err)
+        setError("Error de conexión. Por favor, recarga la página.")
+      } finally {
+        setLoading(false)
+      }
+    }
+
     if (courseId && lessonId) {
       fetchLessonData()
     }
   }, [courseId, lessonId])
 
-  const fetchLessonData = async () => {
-    try {
-      setIsLoading(true)
-      setError("")
-
-      const response = await fetch("/api/student/lesson", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include", // Important: include cookies
-        body: JSON.stringify({ courseId, lessonId }),
-      })
-
-      const result = await response.json()
-
-      if (result.success) {
-        setData(result.data)
-      } else {
-        if (response.status === 401) {
-          // Session expired - redirect to login
-          window.location.assign("/auth/login")
-          return
-        } else if (response.status === 403) {
-          // Not enrolled or access denied
-          setError(result.message || "No tienes acceso a esta lección")
-        } else {
-          setError(result.message || "Error al cargar la lección")
-        }
-      }
-    } catch (error) {
-      console.error("Lesson fetch error:", error)
-      setError("Error de conexión. Por favor, recarga la página.")
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  if (isLoading) {
+  if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 p-6">
-        <div className="max-w-4xl mx-auto">
-          {/* Header Skeleton */}
-          <div className="mb-6">
-            <Skeleton className="h-4 w-32 mb-4" />
-            <Skeleton className="h-8 w-96 mb-2" />
-            <Skeleton className="h-4 w-64" />
+      <div className="container mx-auto px-4 py-8">
+        <div className="space-y-6">
+          <div className="flex items-center space-x-2">
+            <Skeleton className="h-4 w-4" />
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-4 w-4" />
+            <Skeleton className="h-4 w-48" />
           </div>
 
-          {/* Content Skeleton */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2">
-              <Card>
-                <CardHeader>
-                  <Skeleton className="h-6 w-full mb-2" />
-                  <Skeleton className="h-4 w-3/4" />
-                </CardHeader>
-                <CardContent>
-                  <Skeleton className="h-64 w-full mb-4" />
-                  <div className="space-y-2">
-                    <Skeleton className="h-4 w-full" />
-                    <Skeleton className="h-4 w-full" />
-                    <Skeleton className="h-4 w-3/4" />
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            <div>
-              <Card>
-                <CardHeader>
-                  <Skeleton className="h-5 w-32" />
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {[1, 2, 3, 4].map((i) => (
-                      <Skeleton key={i} className="h-10 w-full" />
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
+          <Card>
+            <CardHeader>
+              <Skeleton className="h-8 w-3/4" />
+              <Skeleton className="h-4 w-1/2" />
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Skeleton className="h-64 w-full" />
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-4 w-1/2" />
+            </CardContent>
+          </Card>
         </div>
       </div>
     )
@@ -141,181 +110,120 @@ export default function LessonPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 p-6 flex items-center justify-center">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle className="text-center text-red-600 flex items-center justify-center">
-              <Lock className="h-5 w-5 mr-2" />
-              Acceso Denegado
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-            <div className="mt-4 space-y-2">
-              <Button onClick={fetchLessonData} className="w-full">
-                Reintentar
-              </Button>
-              <Button asChild variant="outline" className="w-full bg-transparent">
-                <Link href="/dashboard">Volver al Dashboard</Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="container mx-auto px-4 py-8">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       </div>
     )
   }
 
   if (!data) {
     return (
-      <div className="min-h-screen bg-gray-50 p-6 flex items-center justify-center">
-        <Card>
-          <CardContent className="p-6">
-            <p>No se pudieron cargar los datos de la lección.</p>
-          </CardContent>
-        </Card>
+      <div className="container mx-auto px-4 py-8">
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>No se pudieron cargar los datos de la lección.</AlertDescription>
+        </Alert>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-4xl mx-auto px-6 py-4">
-          <div className="flex items-center space-x-4">
-            <Button asChild variant="ghost" size="sm">
-              <Link href={`/courses/${courseId}`}>
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Volver al Curso
-              </Link>
-            </Button>
-            <div className="flex-1">
-              <h1 className="text-xl font-semibold text-gray-900">{data.lesson.title}</h1>
-              <p className="text-sm text-gray-600">
-                Lección {data.currentIndex + 1} de {data.totalLessons} • {data.course.title}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div className="container mx-auto px-4 py-8">
+      <div className="space-y-6">
+        {/* Breadcrumb */}
+        <nav className="flex items-center space-x-2 text-sm text-muted-foreground">
+          <Link href="/dashboard" className="hover:text-foreground">
+            Dashboard
+          </Link>
+          <ChevronRight className="h-4 w-4" />
+          <Link href={`/courses/${data.lesson.course_id}`} className="hover:text-foreground">
+            {data.lesson.courses.title}
+          </Link>
+          <ChevronRight className="h-4 w-4" />
+          <span className="text-foreground">{data.lesson.title}</span>
+        </nav>
 
-      <div className="max-w-4xl mx-auto p-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Content */}
-          <div className="lg:col-span-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  {data.lesson.title}
-                  {data.lesson.duration_minutes && (
-                    <Badge variant="secondary" className="flex items-center">
-                      <Clock className="h-3 w-3 mr-1" />
-                      {data.lesson.duration_minutes} min
-                    </Badge>
-                  )}
-                </CardTitle>
-                <CardDescription className="flex items-center">
-                  <User className="h-4 w-4 mr-2" />
-                  {data.course.instructor}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {/* Video Player */}
-                {data.lesson.video_url && (
-                  <div className="mb-6">
-                    <div className="aspect-video bg-black rounded-lg overflow-hidden">
-                      <video
-                        controls
-                        className="w-full h-full"
-                        poster="/placeholder.svg?height=400&width=600&text=Video+Lesson"
-                      >
-                        <source src={data.lesson.video_url} type="video/mp4" />
-                        Tu navegador no soporta el elemento de video.
-                      </video>
-                    </div>
-                  </div>
-                )}
-
-                {/* Lesson Content */}
-                <div className="prose max-w-none">
-                  <div
-                    dangerouslySetInnerHTML={{
-                      __html: data.lesson.content || "<p>Contenido de la lección no disponible.</p>",
-                    }}
-                  />
-                </div>
-
-                {/* Navigation */}
-                <div className="flex justify-between items-center mt-8 pt-6 border-t">
-                  {data.previousLesson ? (
-                    <Button asChild variant="outline">
-                      <Link href={`/courses/${courseId}/lessons/${data.previousLesson.id}`}>
-                        <ArrowLeft className="h-4 w-4 mr-2" />
-                        Lección Anterior
-                      </Link>
-                    </Button>
-                  ) : (
-                    <div />
-                  )}
-
-                  {data.nextLesson ? (
-                    <Button asChild>
-                      <Link href={`/courses/${courseId}/lessons/${data.nextLesson.id}`}>
-                        Siguiente Lección
-                        <ArrowRight className="h-4 w-4 ml-2" />
-                      </Link>
-                    </Button>
-                  ) : (
-                    <Button asChild variant="outline">
-                      <Link href={`/courses/${courseId}`}>
-                        <BookOpen className="h-4 w-4 mr-2" />
-                        Ver Curso Completo
-                      </Link>
-                    </Button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Sidebar - Course Lessons */}
+        {/* Lesson Header */}
+        <div className="flex items-center justify-between">
           <div>
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Lecciones del Curso</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {data.course.lessons
-                    .sort((a, b) => a.order_index - b.order_index)
-                    .map((lesson, index) => (
-                      <Link
-                        key={lesson.id}
-                        href={`/courses/${courseId}/lessons/${lesson.id}`}
-                        className={`block p-3 rounded-lg border transition-colors ${
-                          lesson.id === data.lesson.id
-                            ? "bg-blue-50 border-blue-200 text-blue-900"
-                            : "hover:bg-gray-50 border-gray-200"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <p className="text-sm font-medium line-clamp-2">{lesson.title}</p>
-                            <p className="text-xs text-gray-500">Lección {index + 1}</p>
-                          </div>
-                          {lesson.duration_minutes && (
-                            <Badge variant="outline" className="text-xs">
-                              {lesson.duration_minutes}m
-                            </Badge>
-                          )}
-                        </div>
-                      </Link>
-                    ))}
-                </div>
-              </CardContent>
-            </Card>
+            <h1 className="text-3xl font-bold tracking-tight">{data.lesson.title}</h1>
+            <p className="text-muted-foreground mt-2">{data.lesson.description}</p>
+          </div>
+          <Badge variant="secondary">
+            Lección {data.navigation.currentIndex} de {data.navigation.totalLessons}
+          </Badge>
+        </div>
+
+        {/* Video Player */}
+        {data.lesson.video_url && (
+          <Card>
+            <CardContent className="p-0">
+              <div className="aspect-video bg-black rounded-lg overflow-hidden">
+                <video controls className="w-full h-full" poster="/placeholder.jpg">
+                  <source src={data.lesson.video_url} type="video/mp4" />
+                  Tu navegador no soporta el elemento de video.
+                </video>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Lesson Content */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <BookOpen className="h-5 w-5 mr-2" />
+              Contenido de la Lección
+            </CardTitle>
+            <CardDescription className="flex items-center">
+              <Clock className="h-4 w-4 mr-1" />
+              Duración: {data.lesson.duration_minutes} minutos
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: data.lesson.content }} />
+          </CardContent>
+        </Card>
+
+        {/* Navigation */}
+        <div className="flex justify-between items-center">
+          <div>
+            {data.navigation.previous ? (
+              <Button variant="outline" asChild>
+                <Link href={`/courses/${courseId}/lessons/${data.navigation.previous.id}`}>
+                  <ChevronLeft className="h-4 w-4 mr-2" />
+                  Anterior: {data.navigation.previous.title}
+                </Link>
+              </Button>
+            ) : (
+              <Button variant="outline" disabled>
+                <ChevronLeft className="h-4 w-4 mr-2" />
+                Lección Anterior
+              </Button>
+            )}
+          </div>
+
+          <Button asChild>
+            <Link href={`/courses/${courseId}`}>Ver Curso Completo</Link>
+          </Button>
+
+          <div>
+            {data.navigation.next ? (
+              <Button asChild>
+                <Link href={`/courses/${courseId}/lessons/${data.navigation.next.id}`}>
+                  Siguiente: {data.navigation.next.title}
+                  <ChevronRight className="h-4 w-4 ml-2" />
+                </Link>
+              </Button>
+            ) : (
+              <Button disabled>
+                Siguiente Lección
+                <ChevronRight className="h-4 w-4 ml-2" />
+              </Button>
+            )}
           </div>
         </div>
       </div>

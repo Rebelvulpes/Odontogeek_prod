@@ -1,50 +1,50 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
 import bcrypt from "bcryptjs"
-import { logStudentAccess } from "@/lib/utils"
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+import { logStudentAccess, getServerSupabaseClient } from "@/lib/server-utils"
 
 export async function POST(req: NextRequest) {
-  const startTime = Date.now()
   const clientIP = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown"
   const userAgent = req.headers.get("user-agent") || "unknown"
-  let email: string | undefined // Declare email variable
+
+  let email = ""
+  let password = ""
+  let firstName = ""
+  let lastName = ""
+
+  try {
+    const body = await req.json()
+    email = body.email
+    password = body.password
+    firstName = body.firstName
+    lastName = body.lastName
+  } catch (parseError) {
+    console.error("❌ REQUEST PARSING ERROR:", parseError)
+    return NextResponse.json(
+      {
+        success: false,
+        message: "Datos de solicitud inválidos",
+        error: "INVALID_REQUEST_BODY",
+      },
+      { status: 400 },
+    )
+  }
 
   try {
     console.log("=== STUDENT REGISTRATION ATTEMPT START ===")
     console.log("Timestamp:", new Date().toISOString())
-    console.log("Client IP:", clientIP)
-    console.log("User Agent:", userAgent)
-
-    const { email: reqEmail, password, firstName, lastName } = await req.json()
-    email = reqEmail // Assign email from request
-
-    console.log("=== REQUEST DATA ===")
     console.log("Email:", email)
     console.log("First Name:", firstName)
     console.log("Last Name:", lastName)
-    console.log("Password provided:", !!password)
-    console.log("Password length:", password?.length)
 
-    // Comprehensive validation
-    const validationErrors = []
-
-    if (!email) validationErrors.push("Email es requerido")
-    if (!password) validationErrors.push("Contraseña es requerida")
-    if (!firstName) validationErrors.push("Nombre es requerido")
-    if (!lastName) validationErrors.push("Apellido es requerido")
-
-    if (validationErrors.length > 0) {
-      console.log("❌ VALIDATION FAILED:", validationErrors)
+    // Basic validation
+    if (!email || !password || !firstName || !lastName) {
       await logStudentAccess(
         null,
         email,
         "registration_attempt",
         false,
-        "MISSING_REQUIRED_FIELDS",
-        validationErrors.join(", "),
+        "MISSING_FIELDS",
+        "Todos los campos son requeridos",
         clientIP,
         userAgent,
       )
@@ -52,39 +52,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          message: validationErrors.join(", "),
-          error: "MISSING_REQUIRED_FIELDS",
+          message: "Todos los campos son requeridos",
+          error: "MISSING_FIELDS",
         },
         { status: 400 },
       )
     }
 
-    if (password.length < 6) {
-      console.log("❌ VALIDATION FAILED: Password too short")
-      await logStudentAccess(
-        null,
-        email,
-        "registration_attempt",
-        false,
-        "PASSWORD_TOO_SHORT",
-        "La contraseña debe tener al menos 6 caracteres",
-        clientIP,
-        userAgent,
-      )
-
-      return NextResponse.json(
-        {
-          success: false,
-          message: "La contraseña debe tener al menos 6 caracteres",
-          error: "PASSWORD_TOO_SHORT",
-        },
-        { status: 400 },
-      )
-    }
-
+    // Email format validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
-      console.log("❌ VALIDATION FAILED: Invalid email format")
       await logStudentAccess(
         null,
         email,
@@ -106,22 +83,15 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    console.log("=== DATABASE CONNECTION ===")
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
-
-    // Test database connection
-    try {
-      const { data: testConnection } = await supabase.from("users").select("count").limit(1)
-      console.log("Database connection test:", testConnection ? "SUCCESS" : "FAILED")
-    } catch (dbError) {
-      console.error("❌ DATABASE CONNECTION FAILED:", dbError)
+    // Password strength validation
+    if (password.length < 6) {
       await logStudentAccess(
         null,
         email,
         "registration_attempt",
         false,
-        "DATABASE_CONNECTION_FAILED",
-        "Error de conexión a la base de datos",
+        "WEAK_PASSWORD",
+        "La contraseña debe tener al menos 6 caracteres",
         clientIP,
         userAgent,
       )
@@ -129,37 +99,30 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          message: "Error de conexión a la base de datos",
-          error: "DATABASE_CONNECTION_FAILED",
+          message: "La contraseña debe tener al menos 6 caracteres",
+          error: "WEAK_PASSWORD",
         },
-        { status: 500 },
+        { status: 400 },
       )
     }
 
-    // Check if user already exists
-    console.log("=== CHECKING EXISTING USER ===")
-    const normalizedEmail = email.toLowerCase().trim()
-    console.log("Checking for email:", normalizedEmail)
+    const supabase = getServerSupabaseClient()
 
-    const { data: existingUser, error: checkError } = await supabase
+    // Check if user already exists
+    const { data: existingUser } = await supabase
       .from("users")
-      .select("id, email, role")
-      .eq("email", normalizedEmail)
+      .select("id, email")
+      .eq("email", email.toLowerCase().trim())
       .single()
 
-    console.log("Existing user check result:")
-    console.log("- User found:", !!existingUser)
-    console.log("- Check error:", checkError)
-
     if (existingUser) {
-      console.log("❌ USER ALREADY EXISTS")
       await logStudentAccess(
-        existingUser.id,
+        null,
         email,
         "registration_attempt",
         false,
         "USER_ALREADY_EXISTS",
-        "Ya existe un usuario con este email",
+        "El usuario ya existe",
         clientIP,
         userAgent,
       )
@@ -167,165 +130,43 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          message: "Ya existe un usuario con este email",
+          message: "Ya existe una cuenta con este email",
           error: "USER_ALREADY_EXISTS",
         },
         { status: 409 },
       )
     }
 
-    // Generate password hash with comprehensive verification
-    console.log("=== GENERATING PASSWORD HASH ===")
-    const saltRounds = 10
-    console.log("Salt rounds:", saltRounds)
-    console.log("Password to hash length:", password.length)
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10)
 
-    let passwordHash: string
-    let hashVerified = false
-    let attempts = 0
-    const maxAttempts = 5
-
-    while (!hashVerified && attempts < maxAttempts) {
-      attempts++
-      console.log(`Hash generation attempt ${attempts}/${maxAttempts}`)
-
-      try {
-        const hashStart = Date.now()
-        passwordHash = await bcrypt.hash(password, saltRounds)
-        const hashEnd = Date.now()
-
-        console.log("Hash generation completed in:", hashEnd - hashStart, "ms")
-        console.log("Hash generated successfully")
-        console.log("Hash length:", passwordHash.length)
-        console.log("Hash algorithm:", passwordHash.substring(0, 4))
-        console.log("Hash preview:", passwordHash.substring(0, 30))
-
-        // Comprehensive hash verification
-        let verifyAttempts = 0
-        let verifySuccess = false
-        const maxVerifyAttempts = 5
-
-        while (!verifySuccess && verifyAttempts < maxVerifyAttempts) {
-          verifyAttempts++
-          console.log(`Hash verification attempt ${verifyAttempts}/${maxVerifyAttempts}`)
-
-          try {
-            const verifyStart = Date.now()
-            const verifyResult = await bcrypt.compare(password, passwordHash)
-            const verifyEnd = Date.now()
-
-            console.log(`Hash verification attempt ${verifyAttempts} completed in:`, verifyEnd - verifyStart, "ms")
-            console.log(`Hash verification attempt ${verifyAttempts} result:`, verifyResult)
-
-            if (verifyResult) {
-              hashVerified = true
-              verifySuccess = true
-              console.log("✅ HASH VERIFICATION SUCCESSFUL")
-              break
-            } else {
-              console.log(`❌ Hash verification failed on attempt ${verifyAttempts}`)
-              // Wait a bit before retrying
-              await new Promise((resolve) => setTimeout(resolve, 100))
-            }
-          } catch (verifyError) {
-            console.error(`❌ Hash verification error on attempt ${verifyAttempts}:`, verifyError)
-            // Wait a bit before retrying
-            await new Promise((resolve) => setTimeout(resolve, 100))
-          }
-        }
-
-        if (!hashVerified) {
-          console.log(`❌ Hash verification failed after ${verifyAttempts} attempts, retrying hash generation`)
-          // Wait before retrying hash generation
-          await new Promise((resolve) => setTimeout(resolve, 200))
-          continue
-        }
-      } catch (hashError) {
-        console.error(`❌ HASH GENERATION ERROR on attempt ${attempts}:`, hashError)
-        if (attempts === maxAttempts) {
-          await logStudentAccess(
-            null,
-            email,
-            "registration_attempt",
-            false,
-            "HASH_GENERATION_ERROR",
-            "Error procesando contraseña",
-            clientIP,
-            userAgent,
-          )
-
-          return NextResponse.json(
-            {
-              success: false,
-              message: "Error procesando contraseña",
-              error: "HASH_GENERATION_ERROR",
-            },
-            { status: 500 },
-          )
-        }
-        // Wait before retrying
-        await new Promise((resolve) => setTimeout(resolve, 200))
-      }
-    }
-
-    if (!hashVerified) {
-      console.error("❌ FAILED TO GENERATE VERIFIED HASH AFTER ALL ATTEMPTS")
-      await logStudentAccess(
-        null,
-        email,
-        "registration_attempt",
-        false,
-        "HASH_VERIFICATION_FAILED",
-        "Error generando hash de contraseña seguro",
-        clientIP,
-        userAgent,
-      )
-
-      return NextResponse.json(
+    // Create user
+    const { data: newUser, error: createError } = await supabase
+      .from("users")
+      .insert([
         {
-          success: false,
-          message: "Error generando hash de contraseña seguro",
-          error: "HASH_VERIFICATION_FAILED",
+          email: email.toLowerCase().trim(),
+          password_hash: hashedPassword,
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+          role: "student",
+          is_test_user: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         },
-        { status: 500 },
-      )
-    }
+      ])
+      .select()
+      .single()
 
-    // Create user data
-    const userData = {
-      email: normalizedEmail,
-      password_hash: passwordHash!,
-      first_name: firstName.trim(),
-      last_name: lastName.trim(),
-      role: "student",
-      is_test_user: false,
-      avatar_url: "/placeholder-user.jpg",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }
-
-    console.log("=== CREATING USER ===")
-    console.log("User data to insert:", {
-      ...userData,
-      password_hash: `${passwordHash!.substring(0, 20)}...`,
-    })
-
-    const { data: newUser, error: createError } = await supabase.from("users").insert([userData]).select().single()
-
-    console.log("=== USER CREATION RESULT ===")
-    console.log("Success:", !createError)
-    console.log("Error:", createError)
-    console.log("User created:", !!newUser)
-
-    if (createError) {
-      console.error("❌ USER CREATION ERROR:", createError)
+    if (createError || !newUser) {
+      console.error("❌ USER CREATION FAILED:", createError)
       await logStudentAccess(
         null,
         email,
-        "registration_attempt",
+        "registration_failed",
         false,
         "USER_CREATION_FAILED",
-        `Error creando usuario: ${createError.message}`,
+        createError?.message || "Error creating user",
         clientIP,
         userAgent,
       )
@@ -333,124 +174,35 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          message: `Error creando usuario: ${createError.message}`,
+          message: "Error al crear la cuenta",
           error: "USER_CREATION_FAILED",
         },
         { status: 500 },
       )
     }
 
-    if (!newUser) {
-      console.log("❌ NO USER RETURNED AFTER CREATION")
-      await logStudentAccess(
-        null,
-        email,
-        "registration_attempt",
-        false,
-        "NO_USER_RETURNED",
-        "Error: No se pudo crear el usuario",
-        clientIP,
-        userAgent,
-      )
+    console.log("✅ USER CREATED SUCCESSFULLY:", newUser.id)
 
-      return NextResponse.json(
+    // Auto-enroll in welcome course
+    const { data: welcomeCourse } = await supabase
+      .from("courses")
+      .select("id")
+      .eq("title", "Curso de Bienvenida")
+      .single()
+
+    if (welcomeCourse) {
+      const { error: enrollError } = await supabase.from("enrollments").insert([
         {
-          success: false,
-          message: "Error: No se pudo crear el usuario",
-          error: "NO_USER_RETURNED",
+          user_id: newUser.id,
+          course_id: welcomeCourse.id,
+          enrolled_at: new Date().toISOString(),
+          progress: 0,
         },
-        { status: 500 },
-      )
-    }
+      ])
 
-    console.log("✅ USER CREATED SUCCESSFULLY")
-    console.log("New user details:")
-    console.log("- ID:", newUser.id)
-    console.log("- Email:", newUser.email)
-    console.log("- Name:", newUser.first_name, newUser.last_name)
-    console.log("- Role:", newUser.role)
-
-    // Comprehensive post-creation verification
-    console.log("=== POST-CREATION VERIFICATION ===")
-    let verificationPassed = false
-    let verificationAttempts = 0
-    const maxVerificationAttempts = 3
-
-    while (!verificationPassed && verificationAttempts < maxVerificationAttempts) {
-      verificationAttempts++
-      console.log(`Post-creation verification attempt ${verificationAttempts}/${maxVerificationAttempts}`)
-
-      try {
-        const loginVerification = await bcrypt.compare(password, newUser.password_hash)
-        console.log(`Post-creation login verification attempt ${verificationAttempts}:`, loginVerification)
-
-        if (loginVerification) {
-          verificationPassed = true
-          console.log("✅ POST-CREATION VERIFICATION SUCCESSFUL")
-        } else {
-          console.log(`❌ Post-creation verification failed on attempt ${verificationAttempts}`)
-
-          if (verificationAttempts === maxVerificationAttempts) {
-            // Last attempt - try to fix the user
-            console.log("🔄 ATTEMPTING TO FIX USER HASH")
-            const fixHash = await bcrypt.hash(password, 10)
-            const { error: fixError } = await supabase
-              .from("users")
-              .update({
-                password_hash: fixHash,
-                updated_at: new Date().toISOString(),
-              })
-              .eq("id", newUser.id)
-
-            if (!fixError) {
-              console.log("✅ User hash fixed after creation")
-              newUser.password_hash = fixHash
-              verificationPassed = true
-            } else {
-              console.log("❌ Failed to fix user hash:", fixError)
-            }
-          }
-        }
-      } catch (verifyError) {
-        console.error(`❌ POST-CREATION VERIFICATION ERROR on attempt ${verificationAttempts}:`, verifyError)
+      if (!enrollError) {
+        console.log("✅ USER AUTO-ENROLLED IN WELCOME COURSE")
       }
-
-      if (!verificationPassed && verificationAttempts < maxVerificationAttempts) {
-        await new Promise((resolve) => setTimeout(resolve, 200))
-      }
-    }
-
-    // Create default enrollment for new student
-    console.log("=== CREATING DEFAULT ENROLLMENT ===")
-    try {
-      const { data: availableCourse } = await supabase
-        .from("courses")
-        .select("id, title")
-        .where("title", "ilike", "%Bienvenida%")
-        .limit(1)
-        .single()
-
-      if (availableCourse) {
-        const { error: enrollmentError } = await supabase.from("enrollments").insert([
-          {
-            user_id: newUser.id,
-            course_id: availableCourse.id,
-            enrolled_at: new Date().toISOString(),
-            progress: 0,
-            status: "active",
-          },
-        ])
-
-        if (!enrollmentError) {
-          console.log("✅ Default enrollment created for course:", availableCourse.title)
-        } else {
-          console.log("⚠️ Failed to create default enrollment:", enrollmentError)
-        }
-      } else {
-        console.log("⚠️ No welcome course found to enroll new user.")
-      }
-    } catch (enrollmentError) {
-      console.log("⚠️ Error creating default enrollment:", enrollmentError)
     }
 
     // Create user session
@@ -464,9 +216,6 @@ export async function POST(req: NextRequest) {
       created_at: newUser.created_at,
     }
 
-    console.log("=== CREATING SESSION ===")
-    console.log("Session data:", userSession)
-
     // Log successful registration
     await logStudentAccess(
       newUser.id,
@@ -474,23 +223,22 @@ export async function POST(req: NextRequest) {
       "registration_success",
       true,
       null,
-      "Usuario registrado exitosamente",
+      "User registered successfully",
       clientIP,
       userAgent,
       userSession,
     )
 
+    // Create response
     const response = NextResponse.json({
       success: true,
-      message: "Usuario creado exitosamente",
+      message: "Cuenta creada exitosamente",
       user: userSession,
       redirectTo: "/dashboard",
     })
 
     // Set session cookie
     const cookieValue = JSON.stringify(userSession)
-    console.log("Setting cookie with value length:", cookieValue.length)
-
     response.cookies.set("user-session", cookieValue, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -499,18 +247,13 @@ export async function POST(req: NextRequest) {
       path: "/",
     })
 
-    const endTime = Date.now()
     console.log("=== REGISTRATION SUCCESS ===")
-    console.log("Total processing time:", endTime - startTime, "ms")
     console.log("User registered:", newUser.email)
 
     return response
   } catch (error) {
-    const endTime = Date.now()
     console.error("=== REGISTRATION ERROR ===")
-    console.error("Total processing time:", endTime - startTime, "ms")
     console.error("Error details:", error)
-    console.error("Error stack:", error instanceof Error ? error.stack : "No stack trace")
 
     await logStudentAccess(
       null,

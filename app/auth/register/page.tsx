@@ -17,16 +17,15 @@ export default function RegisterPage() {
     lastName: "",
     email: "",
     password: "",
-    confirmPassword: "",
   })
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData((prev) => ({
-      ...prev,
+    setFormData({
+      ...formData,
       [e.target.name]: e.target.value,
-    }))
+    })
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -34,31 +33,13 @@ export default function RegisterPage() {
     setIsLoading(true)
     setError("")
 
-    // Validation
-    if (formData.password !== formData.confirmPassword) {
-      setError("Las contraseñas no coinciden")
-      setIsLoading(false)
-      return
-    }
-
-    if (formData.password.length < 6) {
-      setError("La contraseña debe tener al menos 6 caracteres")
-      setIsLoading(false)
-      return
-    }
-
     try {
       const response = await fetch("/api/auth/register", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          email: formData.email,
-          password: formData.password,
-        }),
+        body: JSON.stringify(formData),
       })
 
       const data = await response.json()
@@ -82,9 +63,7 @@ export default function RegisterPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold text-center">Crear Cuenta</CardTitle>
-          <CardDescription className="text-center">
-            Completa el formulario para crear tu cuenta de estudiante
-          </CardDescription>
+          <CardDescription className="text-center">Regístrate para acceder a los cursos de OdontoGeek</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -148,20 +127,7 @@ export default function RegisterPage() {
                 onChange={handleChange}
                 required
                 disabled={isLoading}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirmar Contraseña</Label>
-              <Input
-                id="confirmPassword"
-                name="confirmPassword"
-                type="password"
-                placeholder="Repite tu contraseña"
-                value={formData.confirmPassword}
-                onChange={handleChange}
-                required
-                disabled={isLoading}
+                minLength={6}
               />
             </div>
 
