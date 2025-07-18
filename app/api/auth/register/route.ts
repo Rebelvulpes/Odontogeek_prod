@@ -5,6 +5,39 @@ import bcrypt from "bcryptjs"
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
+// Helper function to log student access attempts
+async function logStudentAccess(
+  studentId: string | null,
+  email: string,
+  action: string,
+  success: boolean,
+  errorCode: string | null,
+  errorMessage: string,
+  ipAddress: string,
+  userAgent: string,
+  sessionData?: any,
+) {
+  try {
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+    await supabase.from("student_access_log").insert([
+      {
+        student_id: studentId,
+        email: email,
+        action: action,
+        success: success,
+        error_code: errorCode,
+        error_message: errorMessage,
+        ip_address: ipAddress,
+        user_agent: userAgent,
+        session_data: sessionData ? JSON.stringify(sessionData) : null,
+      },
+    ])
+  } catch (logError) {
+    console.error("Failed to log student access:", logError)
+  }
+}
+
 export async function POST(req: NextRequest) {
   const startTime = Date.now()
   const clientIP = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown"
@@ -422,7 +455,12 @@ export async function POST(req: NextRequest) {
     // Create default enrollment for new student
     console.log("=== CREATING DEFAULT ENROLLMENT ===")
     try {
-      const { data: availableCourse } = await supabase.from("courses").select("id, title").limit(1).single()
+      const { data: availableCourse } = await supabase
+        .from("courses")
+        .select("id, title")
+        .where("title", "ilike", "%Bienvenida%")
+        .limit(1)
+        .single()
 
       if (availableCourse) {
         const { error: enrollmentError } = await supabase.from("enrollments").insert([
@@ -440,6 +478,8 @@ export async function POST(req: NextRequest) {
         } else {
           console.log("⚠️ Failed to create default enrollment:", enrollmentError)
         }
+      } else {
+        console.log("⚠️ No welcome course found to enroll new user.")
       }
     } catch (enrollmentError) {
       console.log("⚠️ Error creating default enrollment:", enrollmentError)
@@ -523,38 +563,5 @@ export async function POST(req: NextRequest) {
       },
       { status: 500 },
     )
-  }
-}
-
-// Helper function to log student access attempts
-async function logStudentAccess(
-  studentId: string | null,
-  email: string,
-  action: string,
-  success: boolean,
-  errorCode: string | null,
-  errorMessage: string,
-  ipAddress: string,
-  userAgent: string,
-  sessionData?: any,
-) {
-  try {
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
-
-    await supabase.from("student_access_log").insert([
-      {
-        student_id: studentId,
-        email: email,
-        action: action,
-        success: success,
-        error_code: errorCode,
-        error_message: errorMessage,
-        ip_address: ipAddress,
-        user_agent: userAgent,
-        session_data: sessionData ? JSON.stringify(sessionData) : null,
-      },
-    ])
-  } catch (logError) {
-    console.error("Failed to log student access:", logError)
   }
 }
