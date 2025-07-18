@@ -1,54 +1,61 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getCookieSettings } from "@/lib/server-utils"
+import { getUserSessionFromCookie, logStudentAccess, getCookieSettings } from "@/lib/server-utils"
 
 export async function POST(req: NextRequest) {
+  const clientIP = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown"
+  const userAgent = req.headers.get("user-agent") || "unknown"
+
   try {
     console.log("=== LOGOUT REQUEST ===")
-    console.log("Timestamp:", new Date().toISOString())
-    console.log("Environment:", process.env.NODE_ENV)
-    console.log("Host:", req.headers.get("host"))
 
-    // Get current session for logging
-    const sessionCookie = req.cookies.get("user-session")
-    let userEmail = "unknown"
-
-    if (sessionCookie) {
-      try {
-        const userSession = JSON.parse(sessionCookie.value)
-        userEmail = userSession.email || "unknown"
-        console.log("Logging out user:", userEmail)
-      } catch (parseError) {
-        console.log("Could not parse session for logging:", parseError)
-      }
-    }
+    const cookieHeader = req.headers.get("cookie")
+    const userSession = getUserSessionFromCookie(cookieHeader)
 
     const response = NextResponse.json({
       success: true,
-      message: "Sesión cerrada exitosamente",
+      message: "Logout exitoso",
     })
 
-    // Clear session cookie with proper settings
+    // Clear session cookie
     const cookieSettings = getCookieSettings()
     response.cookies.set("user-session", "", {
       ...cookieSettings,
       maxAge: 0, // Expire immediately
     })
 
-    console.log("✅ LOGOUT SUCCESSFUL")
-    console.log("User logged out:", userEmail)
+    // Log logout
+    if (userSession) {
+      await logStudentAccess(
+        userSession.id,
+        userSession.email,
+        "logout",
+        true,
+        null,
+        "User logged out successfully",
+        clientIP,
+        userAgent,
+      )
+      console.log("✅ LOGOUT SUCCESSFUL for:", userSession.email)
+    } else {
+      console.log("⚠️ LOGOUT without valid session")
+    }
 
     return response
   } catch (error) {
-    console.error("=== LOGOUT ERROR ===")
-    console.error("Error details:", error)
+    console.error("❌ LOGOUT ERROR:", error)
 
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Error cerrando sesión",
-        error: "LOGOUT_ERROR",
-      },
-      { status: 500 },
-    )
+    // Still clear the cookie even if logging fails
+    const response = NextResponse.json({
+      success: true,
+      message: "Logout exitoso",
+    })
+
+    const cookieSettings = getCookieSettings()
+    response.cookies.set("user-session", "", {
+      ...cookieSettings,
+      maxAge: 0,
+    })
+
+    return response
   }
 }

@@ -1,61 +1,51 @@
 import { createClient } from "@supabase/supabase-js"
 
-// Server-side utilities - ONLY for API routes
-export async function logStudentAccess(
-  studentId: string | null,
-  email: string,
-  action: string,
-  success: boolean,
-  errorCode: string | null,
-  errorMessage: string,
-  ipAddress: string,
-  userAgent: string,
-  sessionData?: any,
-) {
-  try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
-    if (!supabaseServiceKey) {
-      console.error("❌ SUPABASE_SERVICE_ROLE_KEY not available")
-      return
-    }
+if (!supabaseUrl || !supabaseServiceKey) {
+  throw new Error("Missing Supabase environment variables")
+}
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+// Server-side Supabase client with service role key
+export const getServerSupabaseClient = () => {
+  if (typeof window !== "undefined") {
+    throw new Error("❌ SECURITY ERROR: getServerSupabaseClient called from client-side")
+  }
 
-    await supabase.from("student_access_log").insert([
-      {
-        student_id: studentId,
-        email: email,
-        action: action,
-        success: success,
-        error_code: errorCode,
-        error_message: errorMessage,
-        ip_address: ipAddress,
-        user_agent: userAgent,
-        session_data: sessionData ? JSON.stringify(sessionData) : null,
-      },
-    ])
-  } catch (logError) {
-    console.error("Failed to log student access:", logError)
+  return createClient(supabaseUrl, supabaseServiceKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  })
+}
+
+// Cookie configuration based on environment
+export const getCookieSettings = () => {
+  const isProduction = process.env.NODE_ENV === "production"
+  const isVercel = !!process.env.VERCEL_URL
+
+  return {
+    httpOnly: true,
+    secure: isProduction || isVercel, // Secure in production or Vercel
+    sameSite: "lax" as const,
+    maxAge: 60 * 60 * 24 * 7, // 7 days
+    path: "/",
   }
 }
 
-export function getServerSupabaseClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
-
-  return createClient(supabaseUrl, supabaseServiceKey)
-}
-
-export function getUserSessionFromCookie(cookieHeader: string | null) {
+// Parse user session from cookie header
+export const getUserSessionFromCookie = (cookieHeader: string | null) => {
   if (!cookieHeader) return null
 
   try {
     const cookies = cookieHeader.split(";").reduce(
       (acc, cookie) => {
         const [key, value] = cookie.trim().split("=")
-        acc[key] = value
+        if (key && value) {
+          acc[key] = decodeURIComponent(value)
+        }
         return acc
       },
       {} as Record<string, string>,
@@ -64,25 +54,105 @@ export function getUserSessionFromCookie(cookieHeader: string | null) {
     const sessionCookie = cookies["user-session"]
     if (!sessionCookie) return null
 
-    return JSON.parse(decodeURIComponent(sessionCookie))
+    const userSession = JSON.parse(sessionCookie)
+
+    // Validate session structure
+    if (!userSession.id || !userSession.email) {
+      console.log("❌ Invalid session structure")
+      return null
+    }
+
+    return userSession
   } catch (error) {
-    console.error("Error parsing session cookie:", error)
+    console.error("❌ Error parsing session cookie:", error)
     return null
   }
 }
 
-// Enhanced cookie settings for different environments
-export function getCookieSettings(isProduction: boolean = process.env.NODE_ENV === "production") {
+// Log student access for monitoring and security
+export const logStudentAccess = async (
+  userId: string | null,
+  email: string,
+  action: string,
+  success: boolean,
+  errorCode: string | null = null,
+  details: string | null = null,
+  ipAddress = "unknown",
+  userAgent = "unknown",
+) => {
+  if (typeof window !== "undefined") {
+    throw new Error("❌ SECURITY ERROR: logStudentAccess called from client-side")
+  }
+
+  try {
+    const supabase = getServerSupabaseClient()
+
+    // Check if student_access_logs table exists
+    const { data: tableExists } = await supabase
+      .from("information_schema.tables")
+      .select("table_name")
+      .eq("table_name", "student_access_logs")
+      .single()
+
+    if (!tableExists) {
+      console.log("⚠️ student_access_logs table does not exist, skipping log")
+      return
+    }
+
+    const logEntry = {
+      user_id: userId,
+      email,
+      action,
+      success,
+      error_code: errorCode,
+      details,
+      ip_address: ipAddress,
+      user_agent: userAgent,
+      timestamp: new Date().toISOString(),
+    }
+
+    const { error } = await supabase.from("student_access_logs").insert([logEntry])
+
+    if (error) {
+      console.error("❌ Failed to log student access:", error)
+    } else {
+      console.log(`📝 Logged: ${action} for ${email} - ${success ? "SUCCESS" : "FAILED"}`)
+    }
+  } catch (error) {
+    console.error("❌ Error in logStudentAccess:", error)
+  }
+}
+
+// Validate password strength
+export const validatePassword = (password: string): { isValid: boolean; errors: string[] } => {
+  const errors: string[] = []
+
+  if (password.length < 6) {
+    errors.push("La contraseña debe tener al menos 6 caracteres")
+  }
+
+  if (!/[A-Za-z]/.test(password)) {
+    errors.push("La contraseña debe contener al menos una letra")
+  }
+
+  if (!/[0-9]/.test(password)) {
+    errors.push("La contraseña debe contener al menos un número")
+  }
+
   return {
-    httpOnly: true,
-    secure: isProduction,
-    sameSite: "lax" as const,
-    maxAge: 7 * 24 * 60 * 60, // 7 days
-    path: "/",
-    // Add domain setting for production if needed
-    ...(isProduction &&
-      process.env.VERCEL_URL && {
-        domain: `.${process.env.VERCEL_URL.replace("https://", "")}`,
-      }),
+    isValid: errors.length === 0,
+    errors,
+  }
+}
+
+// Generate secure session data
+export const generateSessionData = (user: any) => {
+  return {
+    id: user.id,
+    email: user.email,
+    first_name: user.first_name,
+    last_name: user.last_name,
+    role: user.role,
+    created_at: new Date().toISOString(),
   }
 }
