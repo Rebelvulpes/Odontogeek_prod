@@ -47,6 +47,9 @@ export default function DashboardPage() {
           setData(result.data)
         } else {
           setError(result.message || "Error al cargar los datos del dashboard.")
+          if (result.error === "NO_SESSION") {
+            window.location.assign("/auth/login")
+          }
         }
       } catch (err) {
         setError("No se pudo conectar con el servidor. Inténtalo de nuevo más tarde.")

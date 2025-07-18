@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import bcrypt from "bcryptjs"
+import { logStudentAccess } from "@/lib/utils"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -10,39 +11,6 @@ const loginAttempts = new Map<string, { count: number; lastAttempt: number }>()
 
 // Common passwords to try for recovery
 const RECOVERY_PASSWORDS = ["test123", "password123", "defaultpass123", "123456"]
-
-// Helper function to log student access attempts
-async function logStudentAccess(
-  studentId: string | null,
-  email: string,
-  action: string,
-  success: boolean,
-  errorCode: string | null,
-  errorMessage: string,
-  ipAddress: string,
-  userAgent: string,
-  sessionData?: any,
-) {
-  try {
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
-
-    await supabase.from("student_access_log").insert([
-      {
-        student_id: studentId,
-        email: email,
-        action: action,
-        success: success,
-        error_code: errorCode,
-        error_message: errorMessage,
-        ip_address: ipAddress,
-        user_agent: userAgent,
-        session_data: sessionData ? JSON.stringify(sessionData) : null,
-      },
-    ])
-  } catch (logError) {
-    console.error("Failed to log student access:", logError)
-  }
-}
 
 export async function POST(req: NextRequest) {
   const startTime = Date.now()
