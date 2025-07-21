@@ -15,7 +15,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { ModeToggle } from "./mode-toggle"
 
 export default function Navigation() {
   const { data: session } = useSession()
@@ -63,7 +62,6 @@ export default function Navigation() {
               <Link href="/register">Register</Link>
             </>
           )}
-          <ModeToggle />
         </div>
 
         {/* Mobile Navigation */}
@@ -116,7 +114,6 @@ export default function Navigation() {
                   </Link>
                 </>
               )}
-              <ModeToggle />
             </div>
           </SheetContent>
         </Sheet>

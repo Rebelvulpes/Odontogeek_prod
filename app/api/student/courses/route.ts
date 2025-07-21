@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
+import { cookies } from "next/headers"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -9,8 +10,8 @@ export async function GET(req: NextRequest) {
     console.log("=== STUDENT COURSES ACCESS ===")
     console.log("Timestamp:", new Date().toISOString())
 
-    // Get session from cookie
-    const sessionCookie = req.cookies.get("user-session")
+    const cookieStore = await cookies()
+    const sessionCookie = cookieStore.get("user-session")
     console.log("Session cookie exists:", !!sessionCookie)
 
     if (!sessionCookie) {
@@ -66,265 +67,89 @@ export async function GET(req: NextRequest) {
       )
     }
 
-    // Admin users get access to ALL courses automatically
-    if (user.role === "admin") {
-      console.log("=== ADMIN USER - FETCHING ALL COURSES ===")
+    // Get user profile to check role
+    const { data: profile, error: profileError } = await supabase
+      .from("users")
+      .select("role")
+      .eq("id", user.id)
+      .single()
 
-      const { data: allCourses, error: coursesError } = await supabase
+    if (profileError) {
+      console.error("Error fetching user profile:", profileError)
+      return NextResponse.json({ error: "Error al obtener perfil de usuario" }, { status: 500 })
+    }
+
+    let coursesQuery
+
+    // If user is admin, get all courses automatically
+    if (profile.role === "admin") {
+      coursesQuery = supabase
         .from("courses")
         .select(`
-          id,
-          title,
-          description,
-          thumbnail_url,
-          price,
-          duration_hours,
-          level,
-          instructor,
-          created_at,
-          updated_at,
-          status
+          *,
+          course_tags (
+            course_tag_definitions (
+              name,
+              color
+            )
+          ),
+          lessons (
+            id,
+            title,
+            is_free
+          )
         `)
+        .eq("archived", false)
         .order("created_at", { ascending: false })
-
-      if (coursesError) {
-        console.error("❌ ERROR FETCHING COURSES FOR ADMIN:", coursesError)
-        return NextResponse.json(
-          {
-            success: false,
-            message: "Error cargando cursos",
-            error: "COURSES_FETCH_ERROR",
-          },
-          { status: 500 },
-        )
-      }
-
-      // Transform courses data for admin (full access)
-      const courses = (allCourses || []).map((course) => ({
-        id: course.id,
-        title: course.title,
-        description: course.description,
-        thumbnail_url: course.thumbnail_url || "/placeholder.svg",
-        price: course.price || 0,
-        duration_hours: course.duration_hours || 0,
-        level: course.level || "Principiante",
-        instructor: course.instructor || "Instructor",
-        progress: 100, // Admin has full access
-        enrolled_at: new Date().toISOString(),
-        completed_at: null,
-        last_accessed_at: null,
-        enrollment_id: `admin-${course.id}`,
-        status: "admin_access",
-        is_admin_access: true,
-      }))
-
-      console.log("✅ Admin courses loaded:", courses.length)
-
-      // Log admin access
-      try {
-        await supabase.from("student_access_log").insert([
-          {
-            student_id: user.id,
-            email: user.email,
-            action: "admin_courses_access",
-            success: true,
-            error_message: `Admin accessed all courses - ${courses.length} courses available`,
-            ip_address: req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown",
-            user_agent: req.headers.get("user-agent") || "unknown",
-            session_data: JSON.stringify({ coursesCount: courses.length, adminAccess: true }),
-          },
-        ])
-      } catch (logError) {
-        console.error("Failed to log admin access:", logError)
-      }
-
-      return NextResponse.json({
-        success: true,
-        courses: courses,
-        message: `Acceso de administrador - ${courses.length} cursos disponibles`,
-        isAdmin: true,
-      })
+    } else {
+      // For regular users, get enrolled courses
+      coursesQuery = supabase
+        .from("courses")
+        .select(`
+          *,
+          course_tags (
+            course_tag_definitions (
+              name,
+              color
+            )
+          ),
+          lessons (
+            id,
+            title,
+            is_free
+          ),
+          enrollments!inner (
+            enrolled_at,
+            progress
+          )
+        `)
+        .eq("archived", false)
+        .eq("enrollments.user_id", user.id)
+        .eq("enrollments.status", "active")
+        .order("created_at", { ascending: false })
     }
 
-    // For students, verify they have student role
-    if (user.role !== "student") {
-      console.log("❌ USER IS NOT A STUDENT")
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Acceso no autorizado - solo estudiantes",
-          error: "UNAUTHORIZED_ROLE",
-        },
-        { status: 403 },
-      )
+    const { data: courses, error: coursesError } = await coursesQuery
+
+    if (coursesError) {
+      console.error("Error fetching courses:", coursesError)
+      return NextResponse.json({ error: "Error al obtener cursos" }, { status: 500 })
     }
 
-    // Get student's enrolled courses with comprehensive data
-    console.log("=== FETCHING STUDENT COURSES ===")
-    const { data: enrollments, error: enrollmentsError } = await supabase
-      .from("enrollments")
-      .select(`
-        id,
-        progress,
-        status,
-        enrolled_at,
-        completed_at,
-        last_accessed_at,
-        courses (
-          id,
-          title,
-          description,
-          thumbnail_url,
-          price,
-          duration_hours,
-          level,
-          instructor,
-          created_at,
-          updated_at
-        )
-      `)
-      .eq("user_id", user.id)
-      .order("enrolled_at", { ascending: false })
-
-    console.log("Enrollments query result:")
-    console.log("- Success:", !enrollmentsError)
-    console.log("- Error:", enrollmentsError)
-    console.log("- Enrollments found:", enrollments?.length || 0)
-
-    if (enrollmentsError) {
-      console.error("❌ ERROR FETCHING ENROLLMENTS:", enrollmentsError)
-
-      // Log the error
-      try {
-        await supabase.from("student_access_log").insert([
-          {
-            student_id: user.id,
-            email: user.email,
-            action: "courses_fetch_error",
-            success: false,
-            error_code: "ENROLLMENTS_FETCH_ERROR",
-            error_message: `Error fetching enrollments: ${enrollmentsError.message}`,
-            ip_address: req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown",
-            user_agent: req.headers.get("user-agent") || "unknown",
-          },
-        ])
-      } catch (logError) {
-        console.error("Failed to log enrollments error:", logError)
-      }
-
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Error cargando cursos del estudiante",
-          error: "ENROLLMENTS_FETCH_ERROR",
-        },
-        { status: 500 },
-      )
-    }
-
-    // Transform enrollments data with comprehensive information
-    const courses = (enrollments || []).map((enrollment) => {
-      const course = enrollment.courses
-      return {
-        id: course.id,
-        title: course.title,
-        description: course.description,
-        thumbnail_url: course.thumbnail_url || "/placeholder.svg",
-        price: course.price || 0,
-        duration_hours: course.duration_hours || 0,
-        level: course.level || "Principiante",
-        instructor: course.instructor || "Instructor",
-        progress: enrollment.progress || 0,
-        enrolled_at: enrollment.enrolled_at,
-        completed_at: enrollment.completed_at,
-        last_accessed_at: enrollment.last_accessed_at,
-        enrollment_id: enrollment.id,
-        status: enrollment.status,
-        is_admin_access: false,
-      }
-    })
-
-    console.log("Transformed courses:", courses.length)
-
-    // If no courses found, create a default enrollment
-    if (courses.length === 0) {
-      console.log("=== NO COURSES FOUND - CREATING DEFAULT ENROLLMENT ===")
-
-      try {
-        // Get the first available course
-        const { data: availableCourse, error: courseError } = await supabase
-          .from("courses")
-          .select("*")
-          .limit(1)
-          .single()
-
-        if (availableCourse && !courseError) {
-          console.log("Creating default enrollment for course:", availableCourse.title)
-
-          const { data: newEnrollment, error: enrollmentError } = await supabase
-            .from("enrollments")
-            .insert([
-              {
-                user_id: user.id,
-                course_id: availableCourse.id,
-                enrolled_at: new Date().toISOString(),
-                progress: 0,
-                status: "active",
-              },
-            ])
-            .select(`
-              id,
-              progress,
-              status,
-              enrolled_at,
-              completed_at,
-              courses (
-                id,
-                title,
-                description,
-                thumbnail_url,
-                price,
-                duration_hours,
-                level,
-                instructor
-              )
-            `)
-            .single()
-
-          if (newEnrollment && !enrollmentError) {
-            console.log("✅ Default enrollment created successfully")
-
-            courses.push({
-              id: newEnrollment.courses.id,
-              title: newEnrollment.courses.title,
-              description: newEnrollment.courses.description,
-              thumbnail_url: newEnrollment.courses.thumbnail_url || "/placeholder.svg",
-              price: newEnrollment.courses.price || 0,
-              duration_hours: newEnrollment.courses.duration_hours || 0,
-              level: newEnrollment.courses.level || "Principiante",
-              instructor: newEnrollment.courses.instructor || "Instructor",
-              progress: 0,
-              enrolled_at: newEnrollment.enrolled_at,
-              completed_at: null,
-              last_accessed_at: null,
-              enrollment_id: newEnrollment.id,
-              status: "active",
-              is_admin_access: false,
-            })
-          } else {
-            console.log("❌ Failed to create default enrollment:", enrollmentError)
-          }
-        } else {
-          console.log("❌ No available courses found for default enrollment")
-        }
-      } catch (defaultEnrollmentError) {
-        console.error("❌ Error creating default enrollment:", defaultEnrollmentError)
-      }
-    }
+    // Format courses data
+    const formattedCourses =
+      courses?.map((course) => ({
+        ...course,
+        tags: course.course_tags?.map((ct: any) => ct.course_tag_definitions) || [],
+        lesson_count: course.lessons?.length || 0,
+        free_lessons_count: course.lessons?.filter((l: any) => l.is_free).length || 0,
+        progress: profile.role === "admin" ? 100 : course.enrollments?.[0]?.progress || 0,
+        is_admin_access: profile.role === "admin",
+      })) || []
 
     console.log("=== COURSES DATA PREPARED ===")
     console.log("User:", user.email)
-    console.log("Total courses:", courses.length)
+    console.log("Total courses:", formattedCourses.length)
 
     // Log successful courses access
     try {
@@ -334,10 +159,10 @@ export async function GET(req: NextRequest) {
           email: user.email,
           action: "courses_access",
           success: true,
-          error_message: `Courses accessed successfully - ${courses.length} courses found`,
+          error_message: `Courses accessed successfully - ${formattedCourses.length} courses found`,
           ip_address: req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown",
           user_agent: req.headers.get("user-agent") || "unknown",
-          session_data: JSON.stringify({ coursesCount: courses.length }),
+          session_data: JSON.stringify({ coursesCount: formattedCourses.length }),
         },
       ])
     } catch (logError) {
@@ -346,9 +171,9 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      courses: courses,
-      message: courses.length > 0 ? "Cursos cargados exitosamente" : "No tienes cursos inscritos aún",
-      isAdmin: false,
+      courses: formattedCourses,
+      message: formattedCourses.length > 0 ? "Cursos cargados exitosamente" : "No tienes cursos inscritos aún",
+      isAdmin: profile.role === "admin",
     })
   } catch (error) {
     console.error("=== COURSES ACCESS ERROR ===")
