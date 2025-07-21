@@ -108,7 +108,7 @@ export async function GET(request: NextRequest) {
 
     debugInfo.step = "lesson_lookup"
 
-    // Get lesson with course information - Fixed query without instructor column
+    // Get lesson with course information - Using only existing columns
     const { data: lesson, error: lessonError } = await supabase
       .from("lessons")
       .select(`
@@ -127,6 +127,7 @@ export async function GET(request: NextRequest) {
           title,
           description,
           price,
+          instructor,
           created_at
         )
       `)
@@ -143,6 +144,12 @@ export async function GET(request: NextRequest) {
 
     if (lessonError || !lesson) {
       debugInfo.error = `Lesson not found: ${lessonError?.message || "No lesson data"}`
+
+      // Get some debug info about available lessons
+      const { data: availableLessons } = await supabase.from("lessons").select("id, title, course_id").limit(5)
+
+      debugInfo.availableLessons = availableLessons
+
       await logStudentAccess(
         userSession.id,
         userSession.email,
@@ -230,6 +237,11 @@ export async function GET(request: NextRequest) {
           error: "Access denied. Enrollment required for premium content.",
           debug: debugInfo,
           requiresEnrollment: !lesson.is_free,
+          lesson_info: {
+            title: lesson.title,
+            is_free: lesson.is_free,
+            course_title: lesson.courses?.title,
+          },
         },
         { status: 403 },
       )
@@ -269,6 +281,7 @@ export async function GET(request: NextRequest) {
           title: lesson.courses?.title,
           description: lesson.courses?.description,
           price: lesson.courses?.price,
+          instructor: lesson.courses?.instructor,
         },
       },
       access: {

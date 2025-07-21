@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
 
     debugInfo.step = "courses_lookup"
 
-    // Get all courses with their lessons
+    // Get all published courses with their lessons
     const { data: courses, error: coursesError } = await supabase
       .from("courses")
       .select(`
@@ -61,9 +61,9 @@ export async function GET(request: NextRequest) {
         title,
         description,
         price,
-        thumbnail_url,
+        instructor,
         difficulty_level,
-        status,
+        thumbnail_url,
         created_at,
         lessons (
           id,
@@ -71,8 +71,7 @@ export async function GET(request: NextRequest) {
           description,
           duration_minutes,
           order_index,
-          is_free,
-          created_at
+          is_free
         )
       `)
       .eq("status", "published")
@@ -111,7 +110,7 @@ export async function GET(request: NextRequest) {
     // Get user's enrollments
     const { data: enrollments, error: enrollmentsError } = await supabase
       .from("enrollments")
-      .select("course_id, status, created_at")
+      .select("course_id, status, progress, enrolled_at")
       .eq("user_id", userSession.id)
       .eq("status", "active")
 
@@ -121,50 +120,75 @@ export async function GET(request: NextRequest) {
       count: enrollments?.length || 0,
     }
 
-    const enrolledCourseIds = new Set(enrollments?.map((e) => e.course_id) || [])
+    const enrollmentMap = new Map()
+    if (enrollments) {
+      enrollments.forEach((enrollment) => {
+        enrollmentMap.set(enrollment.course_id, enrollment)
+      })
+    }
 
-    debugInfo.step = "data_processing"
+    debugInfo.step = "processing_courses"
 
-    // Process courses data
-    const processedCourses = courses?.map((course) => {
-      const isEnrolled = enrolledCourseIds.has(course.id)
-      const sortedLessons = course.lessons?.sort((a, b) => (a.order_index || 0) - (b.order_index || 0)) || []
-      const freeLessons = sortedLessons.filter((lesson) => lesson.is_free)
-      const premiumLessons = sortedLessons.filter((lesson) => !lesson.is_free)
+    // Process courses with enrollment and access information
+    const processedCourses =
+      courses?.map((course) => {
+        const enrollment = enrollmentMap.get(course.id)
+        const isEnrolled = !!enrollment
 
-      return {
-        id: course.id,
-        title: course.title,
-        description: course.description,
-        price: course.price,
-        thumbnail_url: course.thumbnail_url,
-        difficulty_level: course.difficulty_level,
-        created_at: course.created_at,
-        lessons: {
-          total: sortedLessons.length,
-          free: freeLessons.length,
-          premium: premiumLessons.length,
-          list: sortedLessons.map((lesson) => ({
-            id: lesson.id,
-            title: lesson.title,
-            description: lesson.description,
-            duration_minutes: lesson.duration_minutes,
-            order_index: lesson.order_index,
-            is_free: lesson.is_free,
-            has_access: userSession.role === "admin" || lesson.is_free || isEnrolled,
-          })),
-        },
-        enrollment: {
-          is_enrolled: isEnrolled,
-          can_access_premium: userSession.role === "admin" || isEnrolled,
-        },
-      }
-    })
+        // Sort lessons by order_index
+        const sortedLessons = course.lessons?.sort((a, b) => (a.order_index || 0) - (b.order_index || 0)) || []
+
+        // Calculate access information for each lesson
+        const lessonsWithAccess = sortedLessons.map((lesson) => ({
+          ...lesson,
+          hasAccess: userSession.role === "admin" || lesson.is_free || isEnrolled,
+          accessType:
+            userSession.role === "admin" ? "admin" : lesson.is_free ? "free" : isEnrolled ? "enrolled" : "premium",
+        }))
+
+        // Calculate course statistics
+        const totalLessons = lessonsWithAccess.length
+        const freeLessons = lessonsWithAccess.filter((l) => l.is_free).length
+        const accessibleLessons = lessonsWithAccess.filter((l) => l.hasAccess).length
+        const totalDuration = lessonsWithAccess.reduce((sum, lesson) => sum + (lesson.duration_minutes || 0), 0)
+
+        return {
+          id: course.id,
+          title: course.title,
+          description: course.description,
+          price: course.price,
+          instructor: course.instructor,
+          difficulty_level: course.difficulty_level,
+          thumbnail_url: course.thumbnail_url,
+          created_at: course.created_at,
+          enrollment: enrollment
+            ? {
+                status: enrollment.status,
+                progress: enrollment.progress,
+                enrolled_at: enrollment.enrolled_at,
+              }
+            : null,
+          access: {
+            isEnrolled,
+            canEnroll: !isEnrolled,
+            hasFullAccess: userSession.role === "admin" || isEnrolled,
+          },
+          stats: {
+            totalLessons,
+            freeLessons,
+            premiumLessons: totalLessons - freeLessons,
+            accessibleLessons,
+            totalDuration,
+            estimatedHours: Math.ceil(totalDuration / 60),
+          },
+          lessons: lessonsWithAccess,
+        }
+      }) || []
 
     debugInfo.step = "success"
     debugInfo.success = true
     debugInfo.processingTime = Date.now() - startTime
-    debugInfo.coursesProcessed = processedCourses?.length || 0
+    debugInfo.coursesProcessed = processedCourses.length
 
     // Log successful access
     await logStudentAccess(
@@ -173,19 +197,23 @@ export async function GET(request: NextRequest) {
       "courses_access",
       true,
       null,
-      `Successfully fetched ${processedCourses?.length || 0} courses`,
+      `Successfully fetched ${processedCourses.length} courses`,
       ipAddress,
       userAgent,
     )
 
-    // Return courses data
     return NextResponse.json({
       success: true,
-      courses: processedCourses || [],
+      courses: processedCourses,
       user: {
         id: userSession.id,
         email: userSession.email,
         role: userSession.role,
+      },
+      summary: {
+        totalCourses: processedCourses.length,
+        enrolledCourses: processedCourses.filter((c) => c.access.isEnrolled).length,
+        availableCourses: processedCourses.filter((c) => !c.access.isEnrolled).length,
       },
       debug: debugInfo,
     })
