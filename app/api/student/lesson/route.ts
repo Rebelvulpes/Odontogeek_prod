@@ -4,40 +4,36 @@ import { cookies } from "next/headers"
 
 export async function GET(request: NextRequest) {
   try {
+    const cookieStore = cookies()
+    const supabase = createClient(cookieStore)
     const { searchParams } = new URL(request.url)
     const lessonId = searchParams.get("lessonId")
-    const courseId = searchParams.get("courseId")
 
-    if (!lessonId || !courseId) {
-      return NextResponse.json({ error: "Lesson ID y Course ID son requeridos" }, { status: 400 })
+    if (!lessonId) {
+      return NextResponse.json({ error: "ID de lección requerido" }, { status: 400 })
     }
 
-    const cookieStore = await cookies()
-    const supabase = createClient(cookieStore)
-
-    // Get current user
+    // Verificar autenticación
     const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession()
 
-    if (userError || !user) {
+    if (sessionError || !session) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 })
     }
 
-    // Get user profile to check role
-    const { data: profile, error: profileError } = await supabase
-      .from("users")
-      .select("role")
-      .eq("id", user.id)
-      .single()
+    const userId = session.user.id
 
-    if (profileError) {
-      console.error("Error fetching user profile:", profileError)
-      return NextResponse.json({ error: "Error al obtener perfil de usuario" }, { status: 500 })
+    // Obtener información del usuario
+    const { data: userData, error: userError } = await supabase.from("users").select("role").eq("id", userId).single()
+
+    if (userError) {
+      console.error("Error obteniendo datos del usuario:", userError)
+      return NextResponse.json({ error: "Error obteniendo datos del usuario" }, { status: 500 })
     }
 
-    // Get lesson details
+    // Obtener información de la lección
     const { data: lesson, error: lessonError } = await supabase
       .from("lessons")
       .select(`
@@ -49,33 +45,32 @@ export async function GET(request: NextRequest) {
         )
       `)
       .eq("id", lessonId)
-      .eq("course_id", courseId)
       .single()
 
     if (lessonError || !lesson) {
-      console.error("Error fetching lesson:", lessonError)
+      console.error("Error obteniendo lección:", lessonError)
       return NextResponse.json({ error: "Lección no encontrada" }, { status: 404 })
     }
 
     let hasAccess = false
     let accessType = "denied"
 
-    // Check access permissions
-    if (profile.role === "admin") {
-      // Admins have access to everything
+    // Verificar acceso
+    if (userData.role === "admin") {
+      // Los administradores tienen acceso a todo
       hasAccess = true
       accessType = "admin"
     } else if (lesson.is_free) {
-      // Free lessons are accessible to all logged-in users
+      // Las lecciones gratuitas son accesibles para usuarios con cuenta
       hasAccess = true
       accessType = "free"
     } else {
-      // Check if user is enrolled in the course
+      // Verificar si el usuario está inscrito en el curso
       const { data: enrollment, error: enrollmentError } = await supabase
         .from("enrollments")
-        .select("status")
-        .eq("user_id", user.id)
-        .eq("course_id", courseId)
+        .select("id, status")
+        .eq("user_id", userId)
+        .eq("course_id", lesson.course_id)
         .eq("status", "active")
         .single()
 
@@ -85,33 +80,33 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Registrar el intento de acceso
+    await supabase.from("student_access_logs").insert({
+      user_id: userId,
+      course_id: lesson.course_id,
+      lesson_id: lessonId,
+      access_type: accessType,
+      ip_address: request.headers.get("x-forwarded-for") || "unknown",
+      user_agent: request.headers.get("user-agent") || "unknown",
+    })
+
     if (!hasAccess) {
       return NextResponse.json(
         {
-          error: "No tienes acceso a esta lección",
-          requiresEnrollment: !lesson.is_free,
-          isFreeLessonRequiresLogin: lesson.is_free,
+          error: "Acceso denegado",
+          message: "Necesitas estar inscrito en este curso para acceder a esta lección",
         },
         { status: 403 },
       )
     }
 
-    // Log access for monitoring
-    await supabase.from("student_access_logs").insert({
-      user_id: user.id,
-      course_id: courseId,
-      lesson_id: lessonId,
-      access_type: accessType,
-      accessed_at: new Date().toISOString(),
-    })
-
     return NextResponse.json({
       lesson,
-      hasAccess: true,
       accessType,
+      hasAccess: true,
     })
   } catch (error) {
-    console.error("Error in student lesson API:", error)
+    console.error("Error en /api/student/lesson:", error)
     return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 })
   }
 }

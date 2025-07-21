@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Skeleton } from "@/components/ui/skeleton"
-import { ArrowLeft, Play, Lock, Crown, Gift } from "lucide-react"
+import { ArrowLeft, Lock, Gift, Crown, BookOpen } from "lucide-react"
 import Link from "next/link"
 
 interface Lesson {
@@ -17,8 +17,9 @@ interface Lesson {
   content: string
   video_url?: string
   duration?: number
-  is_free: boolean
   order_index: number
+  is_free: boolean
+  course_id: string
   courses: {
     id: string
     title: string
@@ -32,40 +33,35 @@ export default function LessonPage() {
   const [lesson, setLesson] = useState<Lesson | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [accessType, setAccessType] = useState<string>("")
+  const [accessType, setAccessType] = useState<string>("denied")
 
-  const courseId = params.courseId as string
   const lessonId = params.lessonId as string
+  const courseId = params.courseId as string
 
   useEffect(() => {
     fetchLesson()
-  }, [courseId, lessonId])
+  }, [lessonId])
 
   const fetchLesson = async () => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/student/lesson?lessonId=${lessonId}&courseId=${courseId}`, {
+      const response = await fetch(`/api/student/lesson?lessonId=${lessonId}`, {
         credentials: "include",
       })
 
       if (!response.ok) {
-        const errorData = await response.json()
-
         if (response.status === 401) {
           router.push("/auth/login")
           return
         }
 
         if (response.status === 403) {
-          if (errorData.isFreeLessonRequiresLogin) {
-            router.push("/auth/login")
-            return
-          }
-          setError(errorData.error || "No tienes acceso a esta lección")
+          const errorData = await response.json()
+          setError(errorData.message || "No tienes acceso a esta lección")
           return
         }
 
-        throw new Error(errorData.error || "Error al cargar la lección")
+        throw new Error("Error al cargar la lección")
       }
 
       const data = await response.json()
@@ -73,7 +69,7 @@ export default function LessonPage() {
       setAccessType(data.accessType)
     } catch (err) {
       console.error("Error fetching lesson:", err)
-      setError(err instanceof Error ? err.message : "Error al cargar la lección")
+      setError("Error al cargar la lección")
     } finally {
       setLoading(false)
     }
@@ -83,27 +79,32 @@ export default function LessonPage() {
     switch (accessType) {
       case "admin":
         return (
-          <Badge variant="secondary" className="bg-purple-100 text-purple-800">
+          <Badge variant="secondary" className="bg-purple-100 text-purple-800 border-purple-200">
             <Crown className="w-3 h-3 mr-1" />
             Acceso Admin
           </Badge>
         )
       case "free":
         return (
-          <Badge variant="secondary" className="bg-green-100 text-green-800">
+          <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200">
             <Gift className="w-3 h-3 mr-1" />
             Lección Gratuita
           </Badge>
         )
       case "enrolled":
         return (
-          <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-            <Play className="w-3 h-3 mr-1" />
+          <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-200">
+            <BookOpen className="w-3 h-3 mr-1" />
             Inscrito
           </Badge>
         )
       default:
-        return null
+        return (
+          <Badge variant="destructive">
+            <Lock className="w-3 h-3 mr-1" />
+            Acceso Denegado
+          </Badge>
+        )
     }
   }
 
@@ -111,9 +112,18 @@ export default function LessonPage() {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">
-          <Skeleton className="h-8 w-64 mb-4" />
-          <Skeleton className="h-64 w-full mb-6" />
-          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-8 w-32 mb-6" />
+          <Card>
+            <CardHeader>
+              <Skeleton className="h-8 w-3/4" />
+              <Skeleton className="h-4 w-1/2" />
+            </CardHeader>
+            <CardContent>
+              <Skeleton className="h-64 w-full mb-4" />
+              <Skeleton className="h-4 w-full mb-2" />
+              <Skeleton className="h-4 w-3/4" />
+            </CardContent>
+          </Card>
         </div>
       </div>
     )
@@ -123,21 +133,22 @@ export default function LessonPage() {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">
-          <Alert className="mb-6">
+          <Link href={`/courses/${courseId}`}>
+            <Button variant="ghost" className="mb-6">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Volver al Curso
+            </Button>
+          </Link>
+
+          <Alert variant="destructive">
             <Lock className="h-4 w-4" />
             <AlertDescription>{error}</AlertDescription>
           </Alert>
 
-          <div className="flex gap-4">
+          <div className="mt-6 text-center">
+            <p className="text-gray-600 mb-4">Para acceder a esta lección necesitas estar inscrito en el curso.</p>
             <Link href={`/courses/${courseId}`}>
-              <Button variant="outline">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Volver al Curso
-              </Button>
-            </Link>
-
-            <Link href="/courses">
-              <Button>Ver Todos los Cursos</Button>
+              <Button>Ver Curso e Inscribirse</Button>
             </Link>
           </div>
         </div>
@@ -149,7 +160,7 @@ export default function LessonPage() {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">
-          <Alert>
+          <Alert variant="destructive">
             <AlertDescription>Lección no encontrada</AlertDescription>
           </Alert>
         </div>
@@ -160,68 +171,57 @@ export default function LessonPage() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="max-w-4xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <Link href={`/courses/${courseId}`}>
-            <Button variant="outline" size="sm">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Volver al Curso
-            </Button>
-          </Link>
+        {/* Navegación */}
+        <Link href={`/courses/${courseId}`}>
+          <Button variant="ghost" className="mb-6">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Volver a {lesson.courses.title}
+          </Button>
+        </Link>
 
-          {getAccessBadge()}
-        </div>
-
-        {/* Course Info */}
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold mb-2">{lesson.title}</h1>
-          <p className="text-gray-600">
-            Curso:{" "}
-            <Link href={`/courses/${courseId}`} className="text-blue-600 hover:underline">
-              {lesson.courses.title}
-            </Link>
-          </p>
-        </div>
-
-        {/* Video Player */}
-        {lesson.video_url && (
-          <Card className="mb-6">
-            <CardContent className="p-0">
-              <div className="aspect-video bg-black rounded-lg overflow-hidden">
-                <video controls className="w-full h-full" poster="/placeholder.svg?height=400&width=600">
-                  <source src={lesson.video_url} type="video/mp4" />
-                  Tu navegador no soporta el elemento de video.
-                </video>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Lesson Content */}
+        {/* Contenido de la lección */}
         <Card>
           <CardHeader>
-            <CardTitle>Contenido de la Lección</CardTitle>
-            {lesson.description && <p className="text-gray-600">{lesson.description}</p>}
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <CardTitle className="text-2xl mb-2">{lesson.title}</CardTitle>
+                <p className="text-gray-600">{lesson.description}</p>
+              </div>
+              <div className="ml-4">{getAccessBadge()}</div>
+            </div>
+
+            {lesson.duration && (
+              <p className="text-sm text-gray-500">Duración: {Math.floor(lesson.duration / 60)} minutos</p>
+            )}
           </CardHeader>
+
           <CardContent>
-            <div
-              className="prose max-w-none"
-              dangerouslySetInnerHTML={{ __html: lesson.content || "Contenido no disponible" }}
-            />
+            {/* Video Player */}
+            {lesson.video_url && (
+              <div className="mb-6">
+                <div className="aspect-video bg-gray-100 rounded-lg flex items-center justify-center">
+                  <video controls className="w-full h-full rounded-lg" poster="/placeholder.svg?height=400&width=600">
+                    <source src={lesson.video_url} type="video/mp4" />
+                    Tu navegador no soporta el elemento de video.
+                  </video>
+                </div>
+              </div>
+            )}
+
+            {/* Contenido de la lección */}
+            <div className="prose max-w-none">
+              <div dangerouslySetInnerHTML={{ __html: lesson.content }} />
+            </div>
+
+            {/* Información adicional */}
+            <div className="mt-8 pt-6 border-t">
+              <div className="flex items-center justify-between text-sm text-gray-500">
+                <span>Lección {lesson.order_index}</span>
+                <span>Curso: {lesson.courses.title}</span>
+              </div>
+            </div>
           </CardContent>
         </Card>
-
-        {/* Lesson Info */}
-        <div className="mt-6 flex flex-wrap gap-4 text-sm text-gray-600">
-          {lesson.duration && <span>Duración: {Math.floor(lesson.duration / 60)} minutos</span>}
-          <span>Lección #{lesson.order_index}</span>
-          {lesson.is_free && (
-            <Badge variant="outline" className="text-green-600 border-green-600">
-              <Gift className="w-3 h-3 mr-1" />
-              Gratuita
-            </Badge>
-          )}
-        </div>
       </div>
     </div>
   )

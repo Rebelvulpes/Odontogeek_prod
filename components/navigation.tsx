@@ -16,7 +16,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
-export default function Navigation() {
+interface NavigationProps {
+  user: any | null
+}
+
+export function Navigation({ user: initialUser }: NavigationProps) {
   const { data: session } = useSession()
   const user = session?.user
   const [isOpen, setIsOpen] = useState(false)
