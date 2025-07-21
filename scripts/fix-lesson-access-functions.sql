@@ -1,20 +1,54 @@
--- Verificar y crear lecciones de ejemplo si no existen
+-- Verificar estructura actual de las tablas
+DO $$
+DECLARE
+    lesson_id_type TEXT;
+    course_id_type TEXT;
+BEGIN
+    -- Verificar tipo de ID en lessons
+    SELECT data_type INTO lesson_id_type
+    FROM information_schema.columns 
+    WHERE table_name = 'lessons' AND column_name = 'id';
+    
+    -- Verificar tipo de course_id en lessons
+    SELECT data_type INTO course_id_type
+    FROM information_schema.columns 
+    WHERE table_name = 'lessons' AND column_name = 'course_id';
+    
+    RAISE NOTICE 'Lesson ID type: %, Course ID type: %', lesson_id_type, course_id_type;
+END $$;
+
+-- Mostrar lecciones existentes para debug
+SELECT 
+    'Lecciones existentes:' as info,
+    l.id,
+    l.title,
+    l.course_id,
+    c.title as course_title,
+    l.is_free,
+    l.order_index
+FROM lessons l
+LEFT JOIN courses c ON l.course_id = c.id
+ORDER BY l.course_id, l.order_index
+LIMIT 20;
+
+-- Crear lecciones de ejemplo si no existen (usando UUIDs)
 DO $$
 DECLARE
     course_record RECORD;
     lesson_count INTEGER;
+    new_lesson_id UUID;
 BEGIN
-    RAISE NOTICE 'Verificando lecciones existentes...';
+    RAISE NOTICE 'Verificando y creando lecciones...';
     
-    -- Mostrar cursos existentes
+    -- Para cada curso, verificar si tiene lecciones
     FOR course_record IN 
-        SELECT id, title FROM courses ORDER BY id LIMIT 5
+        SELECT id, title FROM courses ORDER BY created_at LIMIT 10
     LOOP
         SELECT COUNT(*) INTO lesson_count 
         FROM lessons 
         WHERE course_id = course_record.id;
         
-        RAISE NOTICE 'Curso: % (ID: %) - Lecciones: %', 
+        RAISE NOTICE 'Curso: % (ID: %) - Lecciones existentes: %', 
             course_record.title, course_record.id, lesson_count;
         
         -- Si el curso no tiene lecciones, crear algunas
@@ -23,6 +57,7 @@ BEGIN
             
             -- Lección 1 - Gratuita
             INSERT INTO lessons (
+                id,
                 course_id,
                 title,
                 description,
@@ -33,19 +68,23 @@ BEGIN
                 created_at,
                 updated_at
             ) VALUES (
+                gen_random_uuid(),
                 course_record.id,
                 'Introducción - ' || course_record.title,
                 'Lección introductoria gratuita del curso',
-                '<h2>Bienvenido al curso</h2><p>Esta es una lección de introducción gratuita donde aprenderás los conceptos básicos.</p><p>Contenido incluye:</p><ul><li>Objetivos del curso</li><li>Metodología</li><li>Recursos necesarios</li></ul>',
+                '<h2>Bienvenido al curso</h2><p>Esta es una lección de introducción gratuita donde aprenderás los conceptos básicos.</p><p>Contenido incluye:</p><ul><li>Objetivos del curso</li><li>Metodología</li><li>Recursos necesarios</li></ul><p>Esta lección es completamente gratuita y está disponible para todos los usuarios registrados.</p>',
                 1,
                 true,
                 15,
                 NOW(),
                 NOW()
-            );
+            ) RETURNING id INTO new_lesson_id;
+            
+            RAISE NOTICE 'Creada lección gratuita con ID: %', new_lesson_id;
             
             -- Lección 2 - Premium
             INSERT INTO lessons (
+                id,
                 course_id,
                 title,
                 description,
@@ -56,19 +95,23 @@ BEGIN
                 created_at,
                 updated_at
             ) VALUES (
+                gen_random_uuid(),
                 course_record.id,
                 'Fundamentos - ' || course_record.title,
                 'Lección premium con contenido avanzado',
-                '<h2>Fundamentos Avanzados</h2><p>En esta lección premium profundizaremos en:</p><ul><li>Conceptos avanzados</li><li>Técnicas especializadas</li><li>Casos prácticos</li><li>Ejercicios interactivos</li></ul><p>Esta lección requiere inscripción al curso.</p>',
+                '<h2>Fundamentos Avanzados</h2><p>En esta lección premium profundizaremos en:</p><ul><li>Conceptos avanzados</li><li>Técnicas especializadas</li><li>Casos prácticos</li><li>Ejercicios interactivos</li></ul><p>Esta lección requiere inscripción al curso para acceder al contenido completo.</p>',
                 2,
                 false,
                 30,
                 NOW(),
                 NOW()
-            );
+            ) RETURNING id INTO new_lesson_id;
+            
+            RAISE NOTICE 'Creada lección premium con ID: %', new_lesson_id;
             
             -- Lección 3 - Premium
             INSERT INTO lessons (
+                id,
                 course_id,
                 title,
                 description,
@@ -79,23 +122,24 @@ BEGIN
                 created_at,
                 updated_at
             ) VALUES (
+                gen_random_uuid(),
                 course_record.id,
                 'Práctica Avanzada - ' || course_record.title,
                 'Lección práctica con casos reales',
-                '<h2>Práctica Avanzada</h2><p>Aplicaremos todo lo aprendido en casos reales:</p><ul><li>Casos de estudio</li><li>Resolución de problemas</li><li>Mejores prácticas</li><li>Tips profesionales</li></ul>',
+                '<h2>Práctica Avanzada</h2><p>Aplicaremos todo lo aprendido en casos reales:</p><ul><li>Casos de estudio</li><li>Resolución de problemas</li><li>Mejores prácticas</li><li>Tips profesionales</li></ul><p>Incluye ejercicios prácticos y evaluaciones.</p>',
                 3,
                 false,
                 45,
                 NOW(),
                 NOW()
-            );
+            ) RETURNING id INTO new_lesson_id;
             
-            RAISE NOTICE 'Creadas 3 lecciones para curso: %', course_record.title;
+            RAISE NOTICE 'Creada lección práctica con ID: %', new_lesson_id;
         END IF;
     END LOOP;
     
     -- Mostrar resumen final
-    RAISE NOTICE '=== RESUMEN DE LECCIONES ===';
+    RAISE NOTICE '=== RESUMEN DE LECCIONES CREADAS ===';
     FOR course_record IN 
         SELECT 
             c.id,
@@ -105,7 +149,7 @@ BEGIN
         FROM courses c
         LEFT JOIN lessons l ON c.id = l.course_id
         GROUP BY c.id, c.title
-        ORDER BY c.id
+        ORDER BY c.created_at
         LIMIT 10
     LOOP
         RAISE NOTICE 'Curso: % - Total: % lecciones (% gratuitas)', 
@@ -114,25 +158,25 @@ BEGIN
     
 END $$;
 
--- Crear o reemplazar función para verificar si un usuario es admin
-CREATE OR REPLACE FUNCTION is_user_admin(user_id_param TEXT)
+-- Crear función para verificar si un usuario es admin (compatible con UUIDs)
+CREATE OR REPLACE FUNCTION is_user_admin(user_id_param UUID)
 RETURNS BOOLEAN AS $$
 DECLARE
     user_role TEXT;
 BEGIN
     SELECT role INTO user_role 
     FROM users 
-    WHERE id = user_id_param::UUID;
+    WHERE id = user_id_param;
     
     RETURN COALESCE(user_role = 'admin', false);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Crear o reemplazar función para verificar acceso a lección
+-- Crear función para verificar acceso a lección (compatible con UUIDs)
 CREATE OR REPLACE FUNCTION check_lesson_access(
-    user_id_param TEXT,
-    lesson_id_param TEXT,
-    course_id_param TEXT
+    user_id_param UUID,
+    lesson_id_param UUID,
+    course_id_param UUID
 )
 RETURNS TABLE(
     has_access BOOLEAN,
@@ -147,17 +191,17 @@ DECLARE
     lesson_is_free BOOLEAN := false;
     user_is_admin BOOLEAN := false;
     user_is_enrolled BOOLEAN := false;
-    lesson_course_id TEXT;
+    lesson_course_id UUID;
 BEGIN
     -- Verificar si la lección existe y obtener información
     SELECT 
-        l.course_id::TEXT,
+        l.course_id,
         l.is_free
     INTO 
         lesson_course_id,
         lesson_is_free
     FROM lessons l
-    WHERE l.id = lesson_id_param::INTEGER;
+    WHERE l.id = lesson_id_param;
     
     lesson_exists := FOUND;
     
@@ -216,8 +260,8 @@ BEGIN
     SELECT EXISTS(
         SELECT 1 
         FROM enrollments e
-        WHERE e.user_id = user_id_param::UUID 
-        AND e.course_id = course_id_param::UUID
+        WHERE e.user_id = user_id_param 
+        AND e.course_id = course_id_param
         AND e.status = 'active'
     ) INTO user_is_enrolled;
     
@@ -246,18 +290,45 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Asegurar permisos
-GRANT EXECUTE ON FUNCTION is_user_admin(TEXT) TO authenticated;
-GRANT EXECUTE ON FUNCTION check_lesson_access(TEXT, TEXT, TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION is_user_admin(UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION check_lesson_access(UUID, UUID, UUID) TO authenticated;
 
--- Mostrar algunas lecciones de ejemplo
+-- Crear tabla de logs si no existe
+CREATE TABLE IF NOT EXISTS student_access_log (
+    id SERIAL PRIMARY KEY,
+    student_id UUID REFERENCES users(id),
+    email VARCHAR(255),
+    action VARCHAR(100) NOT NULL,
+    success BOOLEAN NOT NULL DEFAULT FALSE,
+    error_code VARCHAR(50),
+    error_message TEXT,
+    ip_address VARCHAR(45),
+    user_agent TEXT,
+    session_data JSONB,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Crear índices para mejor performance
+CREATE INDEX IF NOT EXISTS idx_student_access_log_student_id ON student_access_log(student_id);
+CREATE INDEX IF NOT EXISTS idx_student_access_log_created_at ON student_access_log(created_at);
+CREATE INDEX IF NOT EXISTS idx_student_access_log_action ON student_access_log(action);
+
+-- Asegurar permisos en la tabla de logs
+GRANT SELECT, INSERT ON student_access_log TO authenticated;
+GRANT USAGE ON SEQUENCE student_access_log_id_seq TO authenticated;
+
+-- Mostrar lecciones finales creadas
 SELECT 
+    'Lecciones disponibles:' as status,
     l.id,
     l.title,
-    l.course_id,
     c.title as course_title,
     l.is_free,
-    l.order_index
+    l.order_index,
+    l.duration_minutes
 FROM lessons l
 JOIN courses c ON l.course_id = c.id
-ORDER BY c.id, l.order_index
-LIMIT 10;
+ORDER BY c.title, l.order_index
+LIMIT 15;
+
+COMMIT;

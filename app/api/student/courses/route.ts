@@ -1,19 +1,16 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+import { getUserSessionFromCookie, getServerSupabaseClient, logStudentAccess } from "@/lib/server-utils"
 
 export async function GET(req: NextRequest) {
   try {
     console.log("=== STUDENT COURSES REQUEST ===")
 
-    // Get session from cookie
-    const sessionCookie = req.cookies.get("user-session")
-    console.log("Session cookie exists:", !!sessionCookie)
+    // Get user session from cookie
+    const cookieHeader = req.headers.get("cookie")
+    const userSession = getUserSessionFromCookie(cookieHeader)
 
-    if (!sessionCookie) {
-      console.log("❌ NO SESSION COOKIE FOUND")
+    if (!userSession) {
+      console.log("❌ No valid session found")
       return NextResponse.json(
         {
           success: false,
@@ -24,52 +21,12 @@ export async function GET(req: NextRequest) {
       )
     }
 
-    let userSession
-    try {
-      userSession = JSON.parse(sessionCookie.value)
-      console.log("✅ Session parsed successfully")
-      console.log("User ID:", userSession.id)
-      console.log("User email:", userSession.email)
-      console.log("User role:", userSession.role)
-    } catch (parseError) {
-      console.error("❌ SESSION PARSE ERROR:", parseError)
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Sesión inválida",
-          redirect: "/auth/login",
-        },
-        { status: 401 },
-      )
-    }
+    console.log("✅ User session found:", userSession.email)
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    const supabase = getServerSupabaseClient()
 
-    // Verify user still exists in database
-    console.log("=== VERIFYING USER IN DATABASE ===")
-    const { data: user, error: userError } = await supabase
-      .from("users")
-      .select("id, email, role")
-      .eq("id", userSession.id)
-      .single()
-
-    if (userError || !user) {
-      console.log("❌ USER NOT FOUND IN DATABASE:", userError)
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Usuario no encontrado",
-          redirect: "/auth/login",
-        },
-        { status: 401 },
-      )
-    }
-
-    console.log("✅ USER VERIFIED:", user.email, "Role:", user.role)
-
-    // Get courses with lessons
+    // Get courses with lessons and enrollment status
     console.log("=== FETCHING COURSES WITH LESSONS ===")
-
     const { data: courses, error: coursesError } = await supabase
       .from("courses")
       .select(`
@@ -86,78 +43,109 @@ export async function GET(req: NextRequest) {
           id,
           title,
           description,
-          duration_minutes,
           order_index,
-          is_free
+          is_free,
+          duration_minutes
         )
       `)
       .eq("status", "published")
       .order("created_at", { ascending: false })
 
     if (coursesError) {
-      console.error("❌ COURSES QUERY ERROR:", coursesError)
+      console.error("❌ Error fetching courses:", coursesError)
       return NextResponse.json(
         {
           success: false,
-          message: "Error al cargar cursos",
+          message: "Error al cargar los cursos",
         },
         { status: 500 },
       )
     }
 
-    console.log(`✅ FOUND ${courses?.length || 0} COURSES`)
+    console.log("✅ Found", courses?.length || 0, "courses")
 
     // Get user's enrollments
     const { data: enrollments, error: enrollmentsError } = await supabase
       .from("enrollments")
       .select("course_id, status, progress, enrolled_at")
-      .eq("user_id", user.id)
+      .eq("user_id", userSession.id)
+      .eq("status", "active")
 
     if (enrollmentsError) {
-      console.error("❌ ENROLLMENTS QUERY ERROR:", enrollmentsError)
+      console.log("⚠️ Error fetching enrollments:", enrollmentsError)
     }
 
-    console.log(`✅ FOUND ${enrollments?.length || 0} ENROLLMENTS`)
+    console.log("✅ Found", enrollments?.length || 0, "enrollments")
 
-    // Process courses with enrollment status
+    // Process courses with enrollment status and lesson counts
     const processedCourses =
       courses?.map((course) => {
         const enrollment = enrollments?.find((e) => e.course_id === course.id)
-        const isAdmin = user.role === "admin"
+        const lessons = course.lessons || []
 
-        // Count lessons
-        const totalLessons = course.lessons?.length || 0
-        const freeLessons = course.lessons?.filter((l) => l.is_free).length || 0
+        // Sort lessons by order_index
+        lessons.sort((a, b) => a.order_index - b.order_index)
+
+        const totalLessons = lessons.length
+        const freeLessons = lessons.filter((l) => l.is_free).length
+        const premiumLessons = totalLessons - freeLessons
 
         return {
-          ...course,
-          enrollment_status: enrollment?.status || "not_enrolled",
-          enrollment_progress: enrollment?.progress || 0,
-          enrolled_at: enrollment?.enrolled_at || null,
-          has_access: isAdmin || enrollment?.status === "active" || freeLessons > 0,
-          access_type: isAdmin
-            ? "admin"
-            : enrollment?.status === "active"
-              ? "enrolled"
-              : freeLessons > 0
-                ? "partial"
-                : "none",
-          total_lessons: totalLessons,
-          free_lessons: freeLessons,
-          lessons: course.lessons?.sort((a, b) => a.order_index - b.order_index) || [],
+          id: course.id,
+          title: course.title,
+          description: course.description,
+          instructor: course.instructor,
+          price: course.price,
+          thumbnail_url: course.thumbnail_url,
+          difficulty_level: course.difficulty_level,
+          status: course.status,
+          created_at: course.created_at,
+          lessons: lessons,
+          enrollment: enrollment
+            ? {
+                status: enrollment.status,
+                progress: enrollment.progress,
+                enrolled_at: enrollment.enrolled_at,
+              }
+            : null,
+          lesson_counts: {
+            total: totalLessons,
+            free: freeLessons,
+            premium: premiumLessons,
+          },
+          access_info: {
+            is_enrolled: !!enrollment,
+            can_access_free: true, // All logged-in users can access free lessons
+            can_access_premium: !!enrollment || userSession.role === "admin",
+            is_admin: userSession.role === "admin",
+          },
         }
       }) || []
 
-    console.log("✅ PROCESSED COURSES WITH ACCESS INFO")
+    // Log the request
+    await logStudentAccess(
+      userSession.id,
+      userSession.email,
+      "courses_list_viewed",
+      true,
+      null,
+      `Viewed courses list - ${processedCourses.length} courses available`,
+      req.headers.get("x-forwarded-for") || "unknown",
+      req.headers.get("user-agent") || "unknown",
+    )
+
+    console.log("✅ COURSES REQUEST COMPLETED")
+    console.log("Courses returned:", processedCourses.length)
+    console.log("User enrollments:", enrollments?.length || 0)
 
     return NextResponse.json({
       success: true,
       courses: processedCourses,
-      user: {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        is_admin: user.role === "admin",
+      user_info: {
+        id: userSession.id,
+        email: userSession.email,
+        role: userSession.role,
+        total_enrollments: enrollments?.length || 0,
       },
     })
   } catch (error) {

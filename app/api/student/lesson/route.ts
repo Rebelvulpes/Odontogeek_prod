@@ -29,22 +29,21 @@ export async function GET(req: NextRequest) {
       )
     }
 
-    // Validate parameter formats
-    const courseIdNum = Number.parseInt(courseId)
-    const lessonIdNum = Number.parseInt(lessonId)
+    // Validate UUID format for both IDs
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-    if (isNaN(courseIdNum) || isNaN(lessonIdNum)) {
-      console.log("❌ Invalid parameter format:", { courseId, lessonId })
+    if (!uuidRegex.test(courseId) || !uuidRegex.test(lessonId)) {
+      console.log("❌ Invalid UUID format:", { courseId, lessonId })
       return NextResponse.json(
         {
           success: false,
-          message: "IDs de curso y lección deben ser números válidos",
+          message: "IDs de curso y lección deben ser UUIDs válidos",
         },
         { status: 400 },
       )
     }
 
-    console.log("Parsed IDs:", { courseIdNum, lessonIdNum })
+    console.log("✅ Valid UUID format for both IDs")
 
     // Get user session from cookie with better error handling
     const cookieHeader = req.headers.get("cookie")
@@ -95,7 +94,7 @@ export async function GET(req: NextRequest) {
     const { data: lessonCheck, error: lessonCheckError } = await supabase
       .from("lessons")
       .select("id, title, course_id, is_free")
-      .eq("id", lessonIdNum)
+      .eq("id", lessonId)
       .single()
 
     console.log("Lesson check result:", { lessonCheck, lessonCheckError })
@@ -104,17 +103,38 @@ export async function GET(req: NextRequest) {
       console.log("❌ Lesson not found in database")
 
       // Let's see what lessons exist for debugging
-      const { data: allLessons } = await supabase.from("lessons").select("id, title, course_id").limit(10)
+      const { data: allLessons } = await supabase.from("lessons").select("id, title, course_id, is_free").limit(10)
 
       console.log("Available lessons:", allLessons)
+
+      // Also check lessons for this specific course
+      const { data: courseLessons } = await supabase
+        .from("lessons")
+        .select("id, title, order_index, is_free")
+        .eq("course_id", courseId)
+        .order("order_index")
+
+      console.log("Lessons for course", courseId, ":", courseLessons)
 
       return NextResponse.json(
         {
           success: false,
           message: `Lección ${lessonId} no encontrada`,
           debug: {
-            searchedLessonId: lessonIdNum,
-            availableLessons: allLessons?.map((l) => ({ id: l.id, title: l.title, course_id: l.course_id })),
+            searchedLessonId: lessonId,
+            searchedCourseId: courseId,
+            availableLessons: allLessons?.map((l) => ({
+              id: l.id,
+              title: l.title,
+              course_id: l.course_id,
+              is_free: l.is_free,
+            })),
+            courseLessons: courseLessons?.map((l) => ({
+              id: l.id,
+              title: l.title,
+              order_index: l.order_index,
+              is_free: l.is_free,
+            })),
           },
         },
         { status: 404 },
@@ -122,14 +142,18 @@ export async function GET(req: NextRequest) {
     }
 
     // Check if lesson belongs to the specified course
-    if (lessonCheck.course_id !== courseIdNum) {
+    if (lessonCheck.course_id !== courseId) {
       console.log("❌ Lesson doesn't belong to specified course")
-      console.log("Lesson course_id:", lessonCheck.course_id, "Requested course_id:", courseIdNum)
+      console.log("Lesson course_id:", lessonCheck.course_id, "Requested course_id:", courseId)
 
       return NextResponse.json(
         {
           success: false,
           message: "La lección no pertenece al curso especificado",
+          debug: {
+            lessonCourseId: lessonCheck.course_id,
+            requestedCourseId: courseId,
+          },
         },
         { status: 400 },
       )
@@ -156,8 +180,8 @@ export async function GET(req: NextRequest) {
           instructor
         )
       `)
-      .eq("id", lessonIdNum)
-      .eq("course_id", courseIdNum)
+      .eq("id", lessonId)
+      .eq("course_id", courseId)
       .single()
 
     console.log("Full lesson query result:", { lesson, lessonError })
@@ -185,7 +209,7 @@ export async function GET(req: NextRequest) {
 
     console.log("Access check result:", { accessResult, accessError })
 
-    let enrollment = null // Declare enrollment variable here
+    let enrollment = null
 
     if (accessError) {
       console.log("❌ Error checking access:", accessError)
@@ -215,11 +239,11 @@ export async function GET(req: NextRequest) {
           .from("enrollments")
           .select("id")
           .eq("user_id", userSession.id)
-          .eq("course_id", courseIdNum)
+          .eq("course_id", courseId)
           .eq("status", "active")
           .single()
 
-        enrollment = enrollmentData // Assign enrollmentData to enrollment variable
+        enrollment = enrollmentData
 
         if (enrollmentData) {
           hasAccess = true
