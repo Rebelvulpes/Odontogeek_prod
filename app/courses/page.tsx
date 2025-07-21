@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Clock, Users, Star, BookOpen, Filter, Search } from "lucide-react"
+import { Clock, Users, Star, BookOpen, Filter, Search, AlertCircle } from "lucide-react"
 import { Navigation } from "@/components/navigation"
 
 interface Course {
@@ -16,11 +16,16 @@ interface Course {
   description: string
   price: number
   instructor: string
+  instructor_name: string
   difficulty_level: string
   thumbnail_url: string
+  total_duration_minutes: number
+  total_lessons: number
   lessons: Array<{
     id: string
+    title: string
     duration_minutes: number
+    is_free: boolean
   }>
 }
 
@@ -50,20 +55,39 @@ export default function CoursesPage() {
 
     const getCourses = async () => {
       try {
+        console.log("🔍 Obteniendo cursos...")
         const response = await fetch("/api/student/courses", {
           credentials: "include",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
         })
+
+        console.log("📡 Response status:", response.status)
+        console.log("📡 Response headers:", Object.fromEntries(response.headers.entries()))
+
+        // Verificar si la respuesta es JSON
+        const contentType = response.headers.get("content-type")
+        if (!contentType || !contentType.includes("application/json")) {
+          const textResponse = await response.text()
+          console.error("❌ Respuesta no es JSON:", textResponse)
+          throw new Error(`Respuesta del servidor no es JSON: ${textResponse.substring(0, 100)}...`)
+        }
+
         const data = await response.json()
+        console.log("📊 Data recibida:", data)
 
         if (data.success) {
           setCourses(data.courses || [])
+          console.log(`✅ ${data.courses?.length || 0} cursos cargados`)
         } else {
           setError(data.error || "Error al obtener cursos")
-          console.error("Error cargando cursos:", data.error)
+          console.error("❌ Error en respuesta:", data.error)
         }
-      } catch (error) {
-        console.error("Error fetching courses:", error)
-        setError("Error al obtener cursos")
+      } catch (error: any) {
+        console.error("❌ Error fetching courses:", error)
+        setError(`Error al cargar cursos: ${error.message}`)
       } finally {
         setLoading(false)
       }
@@ -95,7 +119,7 @@ export default function CoursesPage() {
         <Navigation user={user} />
         <div className="container mx-auto px-4 py-8">
           <div className="text-center py-20">
-            <BookOpen className="w-16 h-16 mx-auto text-gray-400 mb-4" />
+            <AlertCircle className="w-16 h-16 mx-auto text-red-400 mb-4" />
             <h3 className="text-xl font-semibold text-gray-900 mb-2">Error cargando cursos</h3>
             <p className="text-gray-600 mb-4">{error}</p>
             <Button onClick={() => window.location.reload()}>Intentar de nuevo</Button>
@@ -142,9 +166,9 @@ export default function CoursesPage() {
                 <SelectValue placeholder="Nivel" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="beginner">Principiante</SelectItem>
-                <SelectItem value="intermediate">Intermedio</SelectItem>
-                <SelectItem value="advanced">Avanzado</SelectItem>
+                <SelectItem value="principiante">Principiante</SelectItem>
+                <SelectItem value="intermedio">Intermedio</SelectItem>
+                <SelectItem value="avanzado">Avanzado</SelectItem>
               </SelectContent>
             </Select>
             <Select>
@@ -203,9 +227,8 @@ export default function CoursesPage() {
           ) : (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
               {courses.map((course) => {
-                const totalDuration =
-                  course.lessons?.reduce((sum: number, lesson: any) => sum + (lesson.duration_minutes || 0), 0) || 0
-                const totalLessons = course.lessons?.length || 0
+                const totalHours = Math.floor(course.total_duration_minutes / 60)
+                const totalMinutes = course.total_duration_minutes % 60
 
                 return (
                   <Card key={course.id} className="overflow-hidden hover:shadow-lg transition-shadow">
@@ -245,12 +268,12 @@ export default function CoursesPage() {
                         <div className="flex items-center space-x-1">
                           <Clock className="w-4 h-4" />
                           <span>
-                            {Math.floor(totalDuration / 60)}h {totalDuration % 60}m
+                            {totalHours > 0 ? `${totalHours}h` : ""} {totalMinutes}m
                           </span>
                         </div>
                         <div className="flex items-center space-x-1">
                           <BookOpen className="w-4 h-4" />
-                          <span>{totalLessons} lecciones</span>
+                          <span>{course.total_lessons} lecciones</span>
                         </div>
                         <div className="flex items-center space-x-1">
                           <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
@@ -261,7 +284,9 @@ export default function CoursesPage() {
                       <div className="flex items-center justify-between">
                         <div className="text-sm text-gray-600">
                           <span>Por </span>
-                          <span className="font-medium">{course.instructor || "Instructor"}</span>
+                          <span className="font-medium">
+                            {course.instructor || course.instructor_name || "Instructor"}
+                          </span>
                         </div>
                         <div className="flex items-center space-x-1 text-sm text-gray-600">
                           <Users className="w-4 h-4" />
