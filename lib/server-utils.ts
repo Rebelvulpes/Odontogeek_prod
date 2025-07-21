@@ -2,22 +2,27 @@ import { createClient } from "@supabase/supabase-js"
 import { cookies } from "next/headers"
 import type { User } from "@/lib/auth-utils"
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
 // This is a singleton pattern for the server client
 let serverSupabaseClient: ReturnType<typeof createClient> | null = null
-
-if (!supabaseUrl || !supabaseServiceKey) {
-  throw new Error("Missing Supabase server environment variables")
-}
 
 // Server-side Supabase client with service role key
 export const getServerSupabaseClient = () => {
   if (serverSupabaseClient) {
     return serverSupabaseClient
   }
-  serverSupabaseClient = createClient(supabaseUrl!, supabaseServiceKey!)
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!supabaseUrl || !supabaseServiceKey) {
+    console.error("Missing Supabase environment variables:", {
+      supabaseUrl: !!supabaseUrl,
+      supabaseServiceKey: !!supabaseServiceKey,
+    })
+    throw new Error("Missing Supabase server environment variables")
+  }
+
+  serverSupabaseClient = createClient(supabaseUrl, supabaseServiceKey)
   return serverSupabaseClient
 }
 

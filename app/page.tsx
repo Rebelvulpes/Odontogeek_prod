@@ -1,487 +1,331 @@
-"use client"
-
+import { Suspense } from "react"
+import { getServerUser } from "@/lib/server-utils"
+import { getServerSupabaseClient } from "@/lib/server-utils"
+import { Navigation } from "@/components/navigation"
 import { HeroCarousel } from "@/components/hero-carousel"
 import { NewsTicker } from "@/components/news-ticker"
-import { Navigation } from "@/components/navigation"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import {
-  BookOpen,
-  Users,
-  Award,
-  Clock,
-  Star,
-  ArrowRight,
-  Play,
-  CheckCircle,
-  TrendingUp,
-  Globe,
-  Shield,
-  Sparkles,
-} from "lucide-react"
+import { BookOpen, Users, Award, TrendingUp, Star, Clock, Play, ArrowRight } from "lucide-react"
 import Link from "next/link"
-import { getServerSupabaseClient, getServerUser } from "@/lib/server-utils"
+import Image from "next/image"
 
-interface Course {
-  id: string
-  title: string
-  description: string
-  instructor_name: string
-  price: number
-  thumbnail_url: string
-  difficulty_level: string
-  duration_hours: number
-  created_at: string
-  status: string
-  studentCount: number
-  lessonCount: number
-  rating: number
+// Loading component for suspense
+function StatsLoading() {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
+      {[...Array(4)].map((_, i) => (
+        <Card key={i} className="animate-pulse">
+          <CardContent className="p-6">
+            <div className="h-4 bg-gray-200 rounded mb-2"></div>
+            <div className="h-8 bg-gray-200 rounded"></div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  )
 }
 
-async function getFeaturedCourses(): Promise<Course[]> {
+// Stats component that fetches data
+async function StatsSection() {
   try {
     const supabase = getServerSupabaseClient()
 
-    const { data: courses, error } = await supabase
-      .from("courses")
-      .select("*")
-      .eq("status", "published")
-      .neq("archived", true)
-      .order("created_at", { ascending: false })
-      .limit(6)
+    // Fetch stats with error handling
+    const [coursesResult, usersResult, enrollmentsResult] = await Promise.allSettled([
+      supabase.from("courses").select("id", { count: "exact" }),
+      supabase.from("users").select("id", { count: "exact" }),
+      supabase.from("enrollments").select("id", { count: "exact" }),
+    ])
+
+    const coursesCount = coursesResult.status === "fulfilled" ? coursesResult.value.count || 0 : 0
+    const usersCount = usersResult.status === "fulfilled" ? usersResult.value.count || 0 : 0
+    const enrollmentsCount = enrollmentsResult.status === "fulfilled" ? enrollmentsResult.value.count || 0 : 0
+
+    const stats = [
+      {
+        title: "Cursos Disponibles",
+        value: coursesCount.toString(),
+        icon: BookOpen,
+        color: "from-blue-500 to-cyan-500",
+      },
+      {
+        title: "Estudiantes Activos",
+        value: usersCount.toString(),
+        icon: Users,
+        color: "from-green-500 to-emerald-500",
+      },
+      {
+        title: "Inscripciones",
+        value: enrollmentsCount.toString(),
+        icon: Award,
+        color: "from-purple-500 to-pink-500",
+      },
+      {
+        title: "Tasa de Éxito",
+        value: "95%",
+        icon: TrendingUp,
+        color: "from-orange-500 to-red-500",
+      },
+    ]
+
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
+        {stats.map((stat, index) => (
+          <Card
+            key={index}
+            className="relative overflow-hidden backdrop-blur-sm bg-white/80 border-0 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-1"
+          >
+            <div className={`absolute inset-0 bg-gradient-to-br ${stat.color} opacity-5`}></div>
+            <CardContent className="p-6 relative">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600 mb-1">{stat.title}</p>
+                  <p className={`text-3xl font-bold bg-gradient-to-r ${stat.color} bg-clip-text text-transparent`}>
+                    {stat.value}
+                  </p>
+                </div>
+                <div className={`p-3 rounded-full bg-gradient-to-r ${stat.color}`}>
+                  <stat.icon className="h-6 w-6 text-white" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    )
+  } catch (error) {
+    console.error("Error fetching stats:", error)
+    // Fallback stats
+    const fallbackStats = [
+      { title: "Cursos Disponibles", value: "12", icon: BookOpen, color: "from-blue-500 to-cyan-500" },
+      { title: "Estudiantes Activos", value: "500+", icon: Users, color: "from-green-500 to-emerald-500" },
+      { title: "Inscripciones", value: "1,200", icon: Award, color: "from-purple-500 to-pink-500" },
+      { title: "Tasa de Éxito", value: "95%", icon: TrendingUp, color: "from-orange-500 to-red-500" },
+    ]
+
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
+        {fallbackStats.map((stat, index) => (
+          <Card
+            key={index}
+            className="relative overflow-hidden backdrop-blur-sm bg-white/80 border-0 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-1"
+          >
+            <div className={`absolute inset-0 bg-gradient-to-br ${stat.color} opacity-5`}></div>
+            <CardContent className="p-6 relative">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600 mb-1">{stat.title}</p>
+                  <p className={`text-3xl font-bold bg-gradient-to-r ${stat.color} bg-clip-text text-transparent`}>
+                    {stat.value}
+                  </p>
+                </div>
+                <div className={`p-3 rounded-full bg-gradient-to-r ${stat.color}`}>
+                  <stat.icon className="h-6 w-6 text-white" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    )
+  }
+}
+
+// Featured courses component
+async function FeaturedCourses() {
+  try {
+    const supabase = getServerSupabaseClient()
+    const { data: courses, error } = await supabase.from("courses").select("*").eq("archived", false).limit(3)
 
     if (error) {
-      console.error("Error fetching featured courses:", error)
-      return []
+      console.error("Error fetching courses:", error)
+      return <div className="text-center text-gray-500">No se pudieron cargar los cursos</div>
     }
 
-    if (!courses) {
-      return []
+    if (!courses || courses.length === 0) {
+      return <div className="text-center text-gray-500">No hay cursos disponibles</div>
     }
 
-    // Get stats for each course
-    const coursesWithStats = await Promise.all(
-      courses.map(async (course) => {
-        const { count: studentCount } = await supabase
-          .from("enrollments")
-          .select("*", { count: "exact", head: true })
-          .eq("course_id", course.id)
-
-        const { count: lessonCount } = await supabase
-          .from("lessons")
-          .select("*", { count: "exact", head: true })
-          .eq("course_id", course.id)
-          .neq("archived", true)
-
-        return {
-          ...course,
-          studentCount: studentCount || 0,
-          lessonCount: lessonCount || 0,
-          rating: 4.8, // Default rating
-        }
-      }),
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        {courses.map((course, index) => (
+          <Card
+            key={course.id}
+            className="group relative overflow-hidden backdrop-blur-sm bg-white/80 border-0 shadow-xl hover:shadow-2xl transition-all duration-500 hover:-translate-y-2"
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+            <div className="relative h-48 overflow-hidden">
+              <Image
+                src={course.thumbnail_url || "/placeholder.jpg"}
+                alt={course.title}
+                fill
+                className="object-cover transition-transform duration-500 group-hover:scale-110"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
+              <Badge className="absolute top-4 left-4 bg-gradient-to-r from-blue-500 to-purple-500 text-white border-0">
+                {course.difficulty_level || "Intermedio"}
+              </Badge>
+            </div>
+            <CardHeader className="relative">
+              <CardTitle className="text-xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
+                {course.title}
+              </CardTitle>
+              <CardDescription className="text-gray-600 line-clamp-2">{course.description}</CardDescription>
+            </CardHeader>
+            <CardContent className="relative">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-4 text-sm text-gray-500">
+                  <div className="flex items-center">
+                    <Clock className="h-4 w-4 mr-1" />
+                    <span>{course.duration || "4 semanas"}</span>
+                  </div>
+                  <div className="flex items-center">
+                    <Star className="h-4 w-4 mr-1 text-yellow-500" />
+                    <span>4.8</span>
+                  </div>
+                </div>
+                <div className="text-2xl font-bold text-green-600">${course.price || "99"}</div>
+              </div>
+              <Link href={`/courses/${course.id}`}>
+                <Button className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white border-0 group">
+                  <Play className="h-4 w-4 mr-2" />
+                  Ver Curso
+                  <ArrowRight className="h-4 w-4 ml-2 transition-transform group-hover:translate-x-1" />
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
     )
-
-    return coursesWithStats
   } catch (error) {
-    console.error("Error in getFeaturedCourses:", error)
-    return []
+    console.error("Error in FeaturedCourses:", error)
+    return <div className="text-center text-gray-500">Error al cargar los cursos</div>
   }
 }
 
 export default async function HomePage() {
   const user = await getServerUser()
-  const featuredCourses = await getFeaturedCourses()
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 relative overflow-hidden">
-      {/* Floating Elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-20 left-10 w-20 h-20 bg-blue-200/30 rounded-full animate-pulse"></div>
-        <div className="absolute top-40 right-20 w-16 h-16 bg-purple-200/30 rounded-full animate-pulse delay-1000"></div>
-        <div className="absolute bottom-40 left-20 w-24 h-24 bg-indigo-200/30 rounded-full animate-pulse delay-2000"></div>
-        <div className="absolute bottom-20 right-10 w-18 h-18 bg-pink-200/30 rounded-full animate-pulse delay-500"></div>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+      {/* Floating elements */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-gradient-to-r from-blue-400/20 to-purple-400/20 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-gradient-to-r from-purple-400/20 to-pink-400/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
       </div>
 
-      {/* Navigation */}
       <Navigation user={user} />
 
-      {/* Hero Carousel */}
-      <HeroCarousel />
-
-      {/* News Ticker */}
-      <NewsTicker />
-
-      {/* Featured Courses Section */}
-      <section className="py-20 px-4 relative">
-        <div className="container mx-auto">
-          <div className="text-center mb-16 animate-fade-in-up">
-            <Badge className="mb-4 bg-gradient-to-r from-blue-500 to-purple-500 text-white border-0">
-              <Sparkles className="w-4 h-4 mr-2" />
-              Cursos Destacados
-            </Badge>
-            <h2 className="text-4xl md:text-5xl font-bold mb-6">
-              <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                Aprende con los Mejores
-              </span>
-            </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
-              Descubre nuestra selección de cursos premium diseñados por expertos en odontología
-            </p>
-          </div>
-
-          {featuredCourses.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {featuredCourses.map((course, index) => (
-                <div key={course.id} className="group animate-fade-in-up" style={{ animationDelay: `${index * 0.1}s` }}>
-                  <Card className="h-full bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2">
-                    <div className="relative overflow-hidden rounded-t-lg">
-                      <img
-                        src={course.thumbnail_url || "/placeholder.svg?height=200&width=400"}
-                        alt={course.title}
-                        className="w-full h-48 object-cover group-hover:scale-110 transition-transform duration-500"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                        <div className="absolute bottom-4 left-4 right-4">
-                          <Button
-                            size="sm"
-                            className="w-full bg-white/20 backdrop-blur-sm text-white border-white/30 hover:bg-white/30"
-                          >
-                            <Play className="w-4 h-4 mr-2" />
-                            Vista Previa
-                          </Button>
-                        </div>
-                      </div>
-                      <Badge className="absolute top-4 left-4 bg-gradient-to-r from-green-500 to-emerald-500 text-white border-0">
-                        {course.difficulty_level || "Intermedio"}
-                      </Badge>
-                      {course.price === 0 && (
-                        <Badge className="absolute top-4 right-4 bg-gradient-to-r from-yellow-500 to-orange-500 text-white border-0">
-                          Gratis
-                        </Badge>
-                      )}
-                    </div>
-
-                    <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between mb-2">
-                        <Badge variant="outline" className="text-xs">
-                          <Clock className="w-3 h-3 mr-1" />
-                          {course.duration_hours || 2}h
-                        </Badge>
-                        <div className="flex items-center text-yellow-500">
-                          <Star className="w-4 h-4 fill-current" />
-                          <span className="text-sm ml-1">{course.rating}</span>
-                        </div>
-                      </div>
-                      <CardTitle className="text-xl group-hover:text-blue-600 transition-colors duration-300">
-                        {course.title}
-                      </CardTitle>
-                    </CardHeader>
-
-                    <CardContent className="pt-0">
-                      <p className="text-gray-600 mb-4 line-clamp-2">{course.description}</p>
-
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center text-sm text-gray-500">
-                          <Users className="w-4 h-4 mr-1" />
-                          {course.studentCount} estudiantes
-                        </div>
-                        <div className="flex items-center text-sm text-gray-500">
-                          <BookOpen className="w-4 h-4 mr-1" />
-                          {course.lessonCount} lecciones
-                        </div>
-                      </div>
-
-                      {course.instructor_name && (
-                        <p className="text-sm text-gray-600 mb-4">
-                          Por <span className="font-medium text-blue-600">{course.instructor_name}</span>
-                        </p>
-                      )}
-
-                      <div className="flex items-center justify-between">
-                        <div className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                          {course.price === 0 ? "Gratis" : `$${course.price}`}
-                        </div>
-                        <Link href={`/courses/${course.id}`}>
-                          <Button className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white border-0 group">
-                            Ver Curso
-                            <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
-                          </Button>
-                        </Link>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-12 animate-fade-in-up">
-              <BookOpen className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-              <h3 className="text-xl font-semibold text-gray-600 mb-2">No hay cursos disponibles</h3>
-              <p className="text-gray-500">Pronto tendremos nuevos cursos para ti</p>
-            </div>
-          )}
-
-          <div className="text-center mt-12 animate-fade-in-up" style={{ animationDelay: "0.6s" }}>
-            <Link href="/courses">
-              <Button
-                size="lg"
-                className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white border-0 px-8 group"
-              >
-                Ver Todos los Cursos
-                <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Stats Section */}
-      <section className="py-20 px-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white relative overflow-hidden">
-        <div className="absolute inset-0 bg-black/10"></div>
-        <div className="container mx-auto relative z-10">
-          <div className="text-center mb-16 animate-fade-in-up">
-            <Badge className="mb-4 bg-white/20 text-white border-0">
-              <TrendingUp className="w-4 h-4 mr-2" />
-              Nuestros Números
-            </Badge>
-            <h2 className="text-4xl font-bold mb-4 text-white">Impacto en Números</h2>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-            {[
-              { icon: BookOpen, number: `${featuredCourses.length}+`, label: "Cursos Disponibles" },
-              {
-                icon: Users,
-                number: `${featuredCourses.reduce((total, course) => total + course.studentCount, 0)}+`,
-                label: "Estudiantes Activos",
-              },
-              { icon: Award, number: "95%", label: "Tasa de Satisfacción" },
-              { icon: Globe, number: "50+", label: "Países" },
-            ].map((stat, index) => (
-              <div key={index} className="text-center animate-fade-in-up" style={{ animationDelay: `${index * 0.1}s` }}>
-                <div className="inline-flex items-center justify-center w-16 h-16 bg-white/20 backdrop-blur-sm rounded-full mb-4">
-                  <stat.icon className="w-8 h-8" />
-                </div>
-                <div className="text-4xl font-bold mb-2">{stat.number}</div>
-                <div className="text-blue-100">{stat.label}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Features Section */}
-      <section className="py-20 px-4 relative">
-        <div className="container mx-auto">
-          <div className="text-center mb-16 animate-fade-in-up">
-            <Badge className="mb-4 bg-gradient-to-r from-green-500 to-blue-500 text-white border-0">
-              <CheckCircle className="w-4 h-4 mr-2" />
-              ¿Por qué elegirnos?
-            </Badge>
-            <h2 className="text-4xl md:text-5xl font-bold mb-6">
-              <span className="bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent">
-                La Mejor Experiencia de Aprendizaje
-              </span>
-            </h2>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {[
-              {
-                icon: TrendingUp,
-                title: "Contenido Actualizado",
-                description: "Cursos constantemente actualizados con las últimas técnicas y tecnologías en odontología",
-                color: "from-blue-500 to-cyan-500",
-              },
-              {
-                icon: Shield,
-                title: "Certificación Oficial",
-                description: "Obtén certificados reconocidos que validen tus conocimientos y habilidades profesionales",
-                color: "from-green-500 to-emerald-500",
-              },
-              {
-                icon: Users,
-                title: "Comunidad Activa",
-                description: "Conecta con otros profesionales y comparte experiencias en nuestra comunidad global",
-                color: "from-purple-500 to-pink-500",
-              },
-            ].map((feature, index) => (
-              <div key={index} className="animate-fade-in-up" style={{ animationDelay: `${index * 0.2}s` }}>
-                <Card className="h-full bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 group">
-                  <CardContent className="p-8 text-center">
-                    <div
-                      className={`inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r ${feature.color} rounded-full mb-6 group-hover:scale-110 transition-transform duration-300`}
+      <main className="relative">
+        {/* Hero Section */}
+        <section className="relative py-20 px-4 sm:px-6 lg:px-8">
+          <div className="max-w-7xl mx-auto">
+            <div className="text-center mb-16">
+              <h1 className="text-5xl md:text-7xl font-bold mb-6">
+                <span className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent animate-pulse">
+                  OdontoGeek
+                </span>
+              </h1>
+              <p className="text-xl md:text-2xl text-gray-600 mb-8 max-w-3xl mx-auto leading-relaxed">
+                Transforma tu práctica odontológica con cursos especializados en tecnología dental de vanguardia
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <Link href="/courses">
+                  <Button
+                    size="lg"
+                    className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white px-8 py-4 text-lg border-0 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-1"
+                  >
+                    <BookOpen className="h-5 w-5 mr-2" />
+                    Explorar Cursos
+                  </Button>
+                </Link>
+                {!user && (
+                  <Link href="/auth/register">
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      className="px-8 py-4 text-lg border-2 border-purple-500 text-purple-600 hover:bg-purple-500 hover:text-white transition-all duration-300 hover:-translate-y-1 bg-transparent"
                     >
-                      <feature.icon className="w-8 h-8 text-white" />
-                    </div>
-                    <h3 className="text-2xl font-bold mb-4 group-hover:text-blue-600 transition-colors duration-300">
-                      {feature.title}
-                    </h3>
-                    <p className="text-gray-600 leading-relaxed">{feature.description}</p>
-                  </CardContent>
-                </Card>
+                      Comenzar Gratis
+                    </Button>
+                  </Link>
+                )}
               </div>
-            ))}
+            </div>
+
+            {/* Hero Carousel */}
+            <div className="mb-16">
+              <HeroCarousel />
+            </div>
+
+            {/* News Ticker */}
+            <div className="mb-16">
+              <NewsTicker />
+            </div>
+
+            {/* Stats Section */}
+            <Suspense fallback={<StatsLoading />}>
+              <StatsSection />
+            </Suspense>
+
+            {/* Featured Courses */}
+            <section className="mb-16">
+              <div className="text-center mb-12">
+                <h2 className="text-4xl font-bold mb-4">
+                  <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                    Cursos Destacados
+                  </span>
+                </h2>
+                <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+                  Descubre nuestros cursos más populares y comienza tu transformación digital hoy
+                </p>
+              </div>
+              <Suspense fallback={<div className="text-center">Cargando cursos...</div>}>
+                <FeaturedCourses />
+              </Suspense>
+            </section>
+
+            {/* CTA Section */}
+            <section className="text-center py-16">
+              <Card className="backdrop-blur-sm bg-white/80 border-0 shadow-2xl max-w-4xl mx-auto">
+                <CardContent className="p-12">
+                  <h2 className="text-4xl font-bold mb-6">
+                    <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                      ¿Listo para revolucionar tu práctica?
+                    </span>
+                  </h2>
+                  <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
+                    Únete a miles de profesionales que ya están transformando su práctica odontológica con tecnología de
+                    vanguardia
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                    <Link href="/courses">
+                      <Button
+                        size="lg"
+                        className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white px-8 py-4 text-lg border-0"
+                      >
+                        Ver Todos los Cursos
+                      </Button>
+                    </Link>
+                    <Link href="/nosotros">
+                      <Button
+                        size="lg"
+                        variant="outline"
+                        className="px-8 py-4 text-lg border-2 border-purple-500 text-purple-600 hover:bg-purple-500 hover:text-white bg-transparent"
+                      >
+                        Conoce Más
+                      </Button>
+                    </Link>
+                  </div>
+                </CardContent>
+              </Card>
+            </section>
           </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="py-20 px-4 bg-gradient-to-r from-purple-600 to-blue-600 text-white relative overflow-hidden">
-        <div className="absolute inset-0 bg-black/10"></div>
-        <div className="container mx-auto text-center relative z-10">
-          <div className="animate-fade-in-up">
-            <Badge className="mb-6 bg-white/20 text-white border-0">
-              <Sparkles className="w-4 h-4 mr-2" />
-              Únete Hoy
-            </Badge>
-            <h2 className="text-4xl md:text-5xl font-bold mb-6">¿Listo para Transformar tu Carrera?</h2>
-            <p className="text-xl mb-8 text-purple-100 max-w-2xl mx-auto">
-              Únete a miles de profesionales que ya están avanzando en sus carreras con nuestros cursos especializados
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/courses">
-                <Button size="lg" className="bg-white text-purple-600 hover:bg-gray-100 px-8 group">
-                  Explorar Cursos
-                  <BookOpen className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
-                </Button>
-              </Link>
-              <Link href="/auth/register">
-                <Button
-                  size="lg"
-                  variant="outline"
-                  className="border-white text-white hover:bg-white hover:text-purple-600 px-8 bg-transparent group"
-                >
-                  Registrarse Gratis
-                  <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="bg-gradient-to-r from-gray-900 to-gray-800 text-white py-16 px-4">
-        <div className="container mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-            <div className="animate-fade-in-up">
-              <h3 className="text-2xl font-bold mb-4 bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-                OdontoGeek
-              </h3>
-              <p className="text-gray-400 mb-4">La plataforma líder en educación odontológica online</p>
-            </div>
-
-            <div className="animate-fade-in-up" style={{ animationDelay: "200ms" }}>
-              <h4 className="font-semibold mb-4">Cursos</h4>
-              <ul className="space-y-2 text-gray-400">
-                <li>
-                  <Link href="/courses" className="hover:text-white transition-colors">
-                    Todos los Cursos
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/courses?level=beginner" className="hover:text-white transition-colors">
-                    Principiante
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/courses?level=intermediate" className="hover:text-white transition-colors">
-                    Intermedio
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/courses?level=advanced" className="hover:text-white transition-colors">
-                    Avanzado
-                  </Link>
-                </li>
-              </ul>
-            </div>
-
-            <div className="animate-fade-in-up" style={{ animationDelay: "400ms" }}>
-              <h4 className="font-semibold mb-4">Empresa</h4>
-              <ul className="space-y-2 text-gray-400">
-                <li>
-                  <Link href="/nosotros" className="hover:text-white transition-colors">
-                    Nosotros
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/contact" className="hover:text-white transition-colors">
-                    Contacto
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/blog" className="hover:text-white transition-colors">
-                    Blog
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/careers" className="hover:text-white transition-colors">
-                    Carreras
-                  </Link>
-                </li>
-              </ul>
-            </div>
-
-            <div className="animate-fade-in-up" style={{ animationDelay: "600ms" }}>
-              <h4 className="font-semibold mb-4">Soporte</h4>
-              <ul className="space-y-2 text-gray-400">
-                <li>
-                  <Link href="/help" className="hover:text-white transition-colors">
-                    Centro de Ayuda
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/faq" className="hover:text-white transition-colors">
-                    FAQ
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/privacy" className="hover:text-white transition-colors">
-                    Privacidad
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/terms" className="hover:text-white transition-colors">
-                    Términos
-                  </Link>
-                </li>
-              </ul>
-            </div>
-          </div>
-
-          <div className="border-t border-gray-700 mt-12 pt-8 text-center text-gray-400">
-            <p>&copy; 2024 OdontoGeek. Todos los derechos reservados.</p>
-          </div>
-        </div>
-      </footer>
-
-      <style jsx>{`
-        @keyframes fade-in-up {
-          from {
-            opacity: 0;
-            transform: translateY(30px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        .animate-fade-in-up {
-          animation: fade-in-up 0.6s ease-out forwards;
-        }
-
-        .line-clamp-2 {
-          display: -webkit-box;
-          -webkit-line-clamp: 2;
-          -webkit-box-orient: vertical;
-          overflow: hidden;
-        }
-      `}</style>
+        </section>
+      </main>
     </div>
   )
 }
