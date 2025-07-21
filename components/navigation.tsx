@@ -90,6 +90,13 @@ export function Navigation({ user: initialUser }: NavigationProps) {
           <div className="hidden md:flex items-center space-x-3">
             {user ? (
               <div className="flex items-center space-x-3">
+                {/* Botón Mi Dashboard */}
+                <Link href={user.role === "admin" ? "/admin" : "/dashboard"}>
+                  <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white">
+                    Mi Dashboard
+                  </Button>
+                </Link>
+
                 <span className="text-gray-700">Hola, {getUserDisplayName()}</span>
 
                 {/* User Avatar Dropdown */}
@@ -187,6 +194,13 @@ export function Navigation({ user: initialUser }: NavigationProps) {
                           <div className="text-gray-500 text-sm">{user.email}</div>
                         </div>
                       </div>
+
+                      {/* Botón Mi Dashboard para móvil */}
+                      <Link href={user.role === "admin" ? "/admin" : "/dashboard"} onClick={() => setIsOpen(false)}>
+                        <Button className="w-full justify-center bg-blue-600 hover:bg-blue-700 text-white">
+                          Mi Dashboard
+                        </Button>
+                      </Link>
 
                       <Link href={user.role === "admin" ? "/admin" : "/dashboard"} onClick={() => setIsOpen(false)}>
                         <Button variant="outline" className="w-full justify-start bg-transparent">
