@@ -1,6 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
 import bcrypt from "bcryptjs"
-import { getCookieSettings, generateSessionData } from "@/lib/server-utils"
 
 // Rate limiting storage (in production, use Redis or database)
 const loginAttempts = new Map<string, { count: number; lastAttempt: number }>()
@@ -37,10 +36,35 @@ function createSuccessResponse(data: any) {
   })
 }
 
+// Cookie configuration
+function getCookieSettings() {
+  const isProduction = process.env.NODE_ENV === "production"
+  const isVercel = !!process.env.VERCEL_URL
+
+  return {
+    httpOnly: true,
+    secure: isProduction || isVercel,
+    sameSite: "lax" as const,
+    maxAge: 30 * 24 * 60 * 60, // 30 days
+    path: "/",
+  }
+}
+
+// Generate session data
+function generateSessionData(user: any) {
+  return {
+    id: user.id,
+    email: user.email,
+    first_name: user.first_name,
+    last_name: user.last_name,
+    role: user.role,
+    created_at: new Date().toISOString(),
+  }
+}
+
 export async function POST(req: NextRequest) {
   const startTime = Date.now()
   const clientIP = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown"
-  const userAgent = req.headers.get("user-agent") || "unknown"
 
   let email = ""
   let password = ""
@@ -97,16 +121,19 @@ export async function POST(req: NextRequest) {
 
     console.log("=== DATABASE CONNECTION ===")
 
-    // Import Supabase client here to avoid issues
-    const { createClient } = await import("@supabase/supabase-js")
-
+    // Check environment variables
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
     if (!supabaseUrl || !supabaseServiceKey) {
       console.error("❌ MISSING SUPABASE ENVIRONMENT VARIABLES")
+      console.error("SUPABASE_URL exists:", !!supabaseUrl)
+      console.error("SUPABASE_SERVICE_KEY exists:", !!supabaseServiceKey)
       return createErrorResponse("Error de configuración del servidor", "MISSING_ENV_VARS", 500)
     }
+
+    // Import Supabase client
+    const { createClient } = await import("@supabase/supabase-js")
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey, {
       auth: {
@@ -117,8 +144,11 @@ export async function POST(req: NextRequest) {
 
     // Test database connection
     try {
-      const { data: testConnection } = await supabase.from("users").select("count").limit(1)
+      const { data: testConnection, error: testError } = await supabase.from("users").select("count").limit(1)
       console.log("Database connection test:", testConnection ? "SUCCESS" : "FAILED")
+      if (testError) {
+        console.error("Database test error:", testError)
+      }
     } catch (dbError) {
       console.error("❌ DATABASE CONNECTION FAILED:", dbError)
       return createErrorResponse("Error de conexión a la base de datos", "DATABASE_CONNECTION_FAILED", 500)
@@ -156,6 +186,7 @@ export async function POST(req: NextRequest) {
 
     if (userError || !user) {
       console.log("❌ USER NOT FOUND")
+      console.log("User error details:", userError)
 
       // Log failed attempt
       const currentAttempts = loginAttempts.get(clientKey) || { count: 0, lastAttempt: 0 }
@@ -304,7 +335,7 @@ export async function POST(req: NextRequest) {
 
     const response = createSuccessResponse(responseData)
 
-    // Set secure session cookie with 7-day expiration
+    // Set secure session cookie with 30-day expiration
     const cookieSettings = getCookieSettings()
     response.cookies.set("user-session", JSON.stringify(sessionData), cookieSettings)
 
@@ -313,7 +344,7 @@ export async function POST(req: NextRequest) {
     console.log("Total processing time:", endTime - startTime, "ms")
     console.log("User logged in:", email)
     console.log("User role:", user.role)
-    console.log("Session expires in:", cookieSettings.maxAge, "seconds (7 days)")
+    console.log("Session expires in:", cookieSettings.maxAge, "seconds (30 days)")
     console.log("Redirect to:", user.role === "admin" ? "/admin" : "/dashboard")
 
     return response
@@ -324,11 +355,13 @@ export async function POST(req: NextRequest) {
     console.error("Error details:", error)
     console.error("Error stack:", error instanceof Error ? error.stack : "No stack trace")
 
+    // Always return JSON, never plain text
     return NextResponse.json(
       {
         success: false,
         message: "Error interno del servidor",
         error: "INTERNAL_SERVER_ERROR",
+        details: error instanceof Error ? error.message : "Unknown error",
       },
       {
         status: 500,
