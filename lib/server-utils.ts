@@ -1,12 +1,18 @@
 import { createClient } from "@supabase/supabase-js"
 import jwt from "jsonwebtoken"
+import { createServerClient as createSupabaseServerClient } from "@supabase/auth-helpers-nextjs"
+import { cookies } from "next/headers"
+import type { User } from "@/lib/auth-utils"
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
-const jwtSecret = process.env.JWT_SECRET!
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+const jwtSecret = process.env.JWT_SECRET
+
+// This is a singleton pattern for the server client
+let serverSupabaseClient: ReturnType<typeof createClient> | null = null
 
 if (!supabaseUrl || !supabaseServiceKey) {
-  throw new Error("Missing Supabase environment variables")
+  throw new Error("Missing Supabase server environment variables")
 }
 
 if (!jwtSecret) {
@@ -15,16 +21,11 @@ if (!jwtSecret) {
 
 // Server-side Supabase client with service role key
 export const getServerSupabaseClient = () => {
-  if (typeof window !== "undefined") {
-    throw new Error("❌ SECURITY ERROR: getServerSupabaseClient called from client-side")
+  if (serverSupabaseClient) {
+    return serverSupabaseClient
   }
-
-  return createClient(supabaseUrl, supabaseServiceKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  })
+  serverSupabaseClient = createClient(supabaseUrl!, supabaseServiceKey!)
+  return serverSupabaseClient
 }
 
 // Cookie configuration - 30 days for better session persistence
@@ -81,7 +82,7 @@ export const getUserSessionFromCookie = (cookieHeader: string | null): UserSessi
 
     // Try to parse as JWT first
     try {
-      const decoded = jwt.verify(sessionCookie, jwtSecret) as any
+      const decoded = jwt.verify(sessionCookie, jwtSecret!) as any
       console.log("✅ JWT session decoded successfully")
       return {
         id: decoded.id,
@@ -211,5 +212,41 @@ export const generateSessionData = (user: any) => {
     last_name: user.last_name,
     role: user.role,
     created_at: new Date().toISOString(), // Track when session was created
+  }
+}
+
+// Get server user from Supabase session
+export const getServerUser = async (): Promise<User | null> => {
+  try {
+    const cookieStore = cookies()
+    const supabase = createSupabaseServerClient({ cookies: () => cookieStore })
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+
+    if (!session) {
+      return null
+    }
+
+    // To get full user profile, you might need another query
+    const { data: user, error } = await getServerSupabaseClient()
+      .from("users")
+      .select("*")
+      .eq("id", session.user.id)
+      .single()
+
+    if (error || !user) {
+      console.error("Error fetching user profile:", error)
+      // Fallback to basic user data from session
+      return {
+        id: session.user.id,
+        email: session.user.email,
+      } as User
+    }
+
+    return user as User
+  } catch (error) {
+    console.error("Error in getServerUser:", error)
+    return null
   }
 }

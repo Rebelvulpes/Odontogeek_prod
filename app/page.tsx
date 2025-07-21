@@ -21,10 +21,7 @@ import {
   Sparkles,
 } from "lucide-react"
 import Link from "next/link"
-import { createClient } from "@supabase/supabase-js"
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+import { getServerSupabaseClient, getServerUser } from "@/lib/server-utils"
 
 interface Course {
   id: string
@@ -37,16 +34,14 @@ interface Course {
   duration_hours: number
   created_at: string
   status: string
+  studentCount: number
+  lessonCount: number
+  rating: number
 }
 
 async function getFeaturedCourses(): Promise<Course[]> {
   try {
-    if (!supabaseUrl || !supabaseServiceKey) {
-      console.error("Missing Supabase environment variables")
-      return []
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    const supabase = getServerSupabaseClient()
 
     const { data: courses, error } = await supabase
       .from("courses")
@@ -61,58 +56,43 @@ async function getFeaturedCourses(): Promise<Course[]> {
       return []
     }
 
-    return courses || []
+    if (!courses) {
+      return []
+    }
+
+    // Get stats for each course
+    const coursesWithStats = await Promise.all(
+      courses.map(async (course) => {
+        const { count: studentCount } = await supabase
+          .from("enrollments")
+          .select("*", { count: "exact", head: true })
+          .eq("course_id", course.id)
+
+        const { count: lessonCount } = await supabase
+          .from("lessons")
+          .select("*", { count: "exact", head: true })
+          .eq("course_id", course.id)
+          .neq("archived", true)
+
+        return {
+          ...course,
+          studentCount: studentCount || 0,
+          lessonCount: lessonCount || 0,
+          rating: 4.8, // Default rating
+        }
+      }),
+    )
+
+    return coursesWithStats
   } catch (error) {
     console.error("Error in getFeaturedCourses:", error)
     return []
   }
 }
 
-async function getCourseStats(courseId: string) {
-  try {
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
-
-    // Get student count
-    const { count: studentCount } = await supabase
-      .from("enrollments")
-      .select("*", { count: "exact", head: true })
-      .eq("course_id", courseId)
-
-    // Get lesson count
-    const { count: lessonCount } = await supabase
-      .from("lessons")
-      .select("*", { count: "exact", head: true })
-      .eq("course_id", courseId)
-      .neq("archived", true)
-
-    return {
-      studentCount: studentCount || 0,
-      lessonCount: lessonCount || 0,
-      rating: 4.8, // Default rating
-    }
-  } catch (error) {
-    console.error("Error getting course stats:", error)
-    return {
-      studentCount: 0,
-      lessonCount: 0,
-      rating: 4.8,
-    }
-  }
-}
-
 export default async function HomePage() {
+  const user = await getServerUser()
   const featuredCourses = await getFeaturedCourses()
-
-  // Get stats for each course
-  const coursesWithStats = await Promise.all(
-    featuredCourses.map(async (course) => {
-      const stats = await getCourseStats(course.id)
-      return {
-        ...course,
-        ...stats,
-      }
-    }),
-  )
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 relative overflow-hidden">
@@ -125,7 +105,7 @@ export default async function HomePage() {
       </div>
 
       {/* Navigation */}
-      <Navigation />
+      <Navigation user={user} />
 
       {/* Hero Carousel */}
       <HeroCarousel />
@@ -151,9 +131,9 @@ export default async function HomePage() {
             </p>
           </div>
 
-          {coursesWithStats.length > 0 ? (
+          {featuredCourses.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {coursesWithStats.map((course, index) => (
+              {featuredCourses.map((course, index) => (
                 <div key={course.id} className="group animate-fade-in-up" style={{ animationDelay: `${index * 0.1}s` }}>
                   <Card className="h-full bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2">
                     <div className="relative overflow-hidden rounded-t-lg">
@@ -271,10 +251,10 @@ export default async function HomePage() {
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             {[
-              { icon: BookOpen, number: `${coursesWithStats.length}+`, label: "Cursos Disponibles" },
+              { icon: BookOpen, number: `${featuredCourses.length}+`, label: "Cursos Disponibles" },
               {
                 icon: Users,
-                number: `${coursesWithStats.reduce((total, course) => total + course.studentCount, 0)}+`,
+                number: `${featuredCourses.reduce((total, course) => total + course.studentCount, 0)}+`,
                 label: "Estudiantes Activos",
               },
               { icon: Award, number: "95%", label: "Tasa de Satisfacción" },
@@ -498,13 +478,6 @@ export default async function HomePage() {
         .line-clamp-2 {
           display: -webkit-box;
           -webkit-line-clamp: 2;
-          -webkit-box-orient: vertical;
-          overflow: hidden;
-        }
-
-        .line-clamp-3 {
-          display: -webkit-box;
-          -webkit-line-clamp: 3;
           -webkit-box-orient: vertical;
           overflow: hidden;
         }
