@@ -10,130 +10,84 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Eye, EyeOff, LogIn, AlertCircle } from "lucide-react"
+import { Eye, EyeOff, Loader2 } from "lucide-react"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
-  const [loading, setLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
   const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
+    setIsLoading(true)
     setError("")
 
-    console.log("=== CLIENT LOGIN ATTEMPT ===")
-    console.log("Email:", email)
-    console.log("Password length:", password.length)
-    console.log("Timestamp:", new Date().toISOString())
-
     try {
-      console.log("Sending login request...")
+      console.log("🔄 Iniciando login para:", email)
 
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Accept: "application/json",
         },
-        body: JSON.stringify({
-          email: email.trim(),
-          password: password,
-        }),
+        credentials: "include",
+        body: JSON.stringify({ email, password }),
       })
 
-      console.log("Response received:")
-      console.log("Status:", response.status)
-      console.log("Status Text:", response.statusText)
-      console.log("Content-Type:", response.headers.get("content-type"))
+      console.log("📡 Respuesta del servidor:", {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries()),
+      })
 
-      // Check if response is JSON
+      // Verificar si la respuesta es JSON
       const contentType = response.headers.get("content-type")
       if (!contentType || !contentType.includes("application/json")) {
-        console.error("❌ Response is not JSON")
-        console.error("Content-Type:", contentType)
-
-        // Try to get the text response for debugging
-        try {
-          const textResponse = await response.text()
-          console.error("Response text:", textResponse.substring(0, 500))
-
-          // Check if it's an HTML error page
-          if (textResponse.includes("<html") || textResponse.includes("<!DOCTYPE")) {
-            setError("Error del servidor - página de error recibida")
-          } else {
-            setError("Error del servidor - respuesta no válida")
-          }
-        } catch (textError) {
-          console.error("Failed to read response text:", textError)
-          setError("Error del servidor - no se pudo leer la respuesta")
-        }
-        return
-      }
-
-      let result
-      try {
         const responseText = await response.text()
-        console.log("Raw response text:", responseText)
-
-        if (!responseText) {
-          console.error("❌ Empty response")
-          setError("Respuesta vacía del servidor")
-          return
-        }
-
-        result = JSON.parse(responseText)
-        console.log("Parsed JSON result:", result)
-      } catch (jsonError) {
-        console.error("❌ JSON parsing failed:", jsonError)
-        setError("Error del servidor - respuesta JSON inválida")
-        return
+        console.error("❌ Respuesta no es JSON:", responseText)
+        throw new Error("Respuesta del servidor no válida")
       }
 
-      if (result.success) {
-        console.log("✅ Login successful")
-        console.log("User:", result.user)
-        console.log("Redirect to:", result.redirectTo)
+      const data = await response.json()
+      console.log("📦 Datos recibidos:", data)
 
-        // Small delay to ensure cookie is set
-        await new Promise((resolve) => setTimeout(resolve, 100))
+      if (!response.ok) {
+        throw new Error(data.error || "Error en el login")
+      }
 
-        // Redirect based on user role
-        if (result.redirectTo) {
-          router.push(result.redirectTo)
-        } else if (result.user?.role === "admin") {
+      if (data.success && data.user) {
+        console.log("✅ Login exitoso, redirigiendo...")
+
+        // Guardar sesión en localStorage para el cliente
+        localStorage.setItem("user-session", JSON.stringify(data.user))
+
+        // Redirigir según el rol
+        if (data.user.role === "admin") {
           router.push("/admin")
         } else {
           router.push("/dashboard")
         }
       } else {
-        console.log("❌ Login failed:", result.message)
-        setError(result.message || "Error de login")
-
-        // Show hint if available
-        if (result.hint) {
-          console.log("💡 Hint:", result.hint)
-        }
+        throw new Error("Respuesta de login inválida")
       }
-    } catch (error) {
-      console.error("❌ Login error:", error)
-      if (error instanceof TypeError && error.message.includes("fetch")) {
-        setError("Error de conexión. Verifica tu conexión a internet.")
-      } else {
-        setError("Error inesperado. Intenta de nuevo.")
-      }
+    } catch (error: any) {
+      console.error("❌ Error en login:", error)
+      setError(error.message || "Error al iniciar sesión")
     } finally {
-      setLoading(false)
+      setIsLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
+          <div className="flex justify-center mb-4">
+            <img src="/images/odontogeek-logo-new.png" alt="OdontoGeek" className="h-12 w-auto" />
+          </div>
           <CardTitle className="text-2xl font-bold text-center">Iniciar Sesión</CardTitle>
           <CardDescription className="text-center">Ingresa tus credenciales para acceder a tu cuenta</CardDescription>
         </CardHeader>
@@ -148,21 +102,20 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                disabled={loading}
+                disabled={isLoading}
               />
             </div>
-
             <div className="space-y-2">
               <Label htmlFor="password">Contraseña</Label>
               <div className="relative">
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
-                  placeholder="••••••••"
+                  placeholder="Tu contraseña"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  disabled={loading}
+                  disabled={isLoading}
                 />
                 <Button
                   type="button"
@@ -170,7 +123,7 @@ export default function LoginPage() {
                   size="sm"
                   className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                   onClick={() => setShowPassword(!showPassword)}
-                  disabled={loading}
+                  disabled={isLoading}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </Button>
@@ -179,44 +132,47 @@ export default function LoginPage() {
 
             {error && (
               <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
 
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? (
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? (
                 <>
-                  <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Iniciando sesión...
                 </>
               ) : (
-                <>
-                  <LogIn className="w-4 h-4 mr-2" />
-                  Iniciar Sesión
-                </>
+                "Iniciar Sesión"
               )}
             </Button>
           </form>
 
           <div className="mt-6 text-center text-sm">
-            <p className="text-gray-600">
-              ¿No tienes una cuenta?{" "}
-              <Link href="/auth/register" className="text-blue-600 hover:underline">
-                Regístrate aquí
-              </Link>
-            </p>
+            <span className="text-gray-600">¿No tienes una cuenta? </span>
+            <Link href="/auth/register" className="text-blue-600 hover:text-blue-500 font-medium">
+              Regístrate aquí
+            </Link>
           </div>
 
-          {/* Debug info for development */}
-          {process.env.NODE_ENV === "development" && (
-            <div className="mt-4 p-3 bg-gray-100 rounded-md text-xs">
-              <p className="font-semibold mb-2">Cuentas de prueba:</p>
-              <p>• mendozaij88@gmail.com / test123 (estudiante)</p>
-              <p>• paying.student@test.com / test123 (estudiante)</p>
-              <p className="mt-2 text-gray-600">Contraseñas de recuperación: test123, password123, admin123</p>
+          <div className="mt-4 text-center">
+            <Link href="/auth/forgot-password" className="text-sm text-blue-600 hover:text-blue-500">
+              ¿Olvidaste tu contraseña?
+            </Link>
+          </div>
+
+          {/* Credenciales de prueba */}
+          <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+            <h3 className="text-sm font-medium text-blue-900 mb-2">Credenciales de prueba:</h3>
+            <div className="text-xs text-blue-700 space-y-1">
+              <div>
+                <strong>Admin:</strong> admin@odontogeek.com / admin123
+              </div>
+              <div>
+                <strong>Usuario:</strong> usuario@test.com / test123
+              </div>
             </div>
-          )}
+          </div>
         </CardContent>
       </Card>
     </div>

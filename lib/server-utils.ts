@@ -1,176 +1,135 @@
+import type { NextRequest } from "next/server"
+import jwt from "jsonwebtoken"
 import { createClient } from "@supabase/supabase-js"
-import { cookies } from "next/headers"
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseUrl = process.env.SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 const jwtSecret = process.env.JWT_SECRET!
 
-if (!supabaseUrl || !supabaseServiceKey) {
-  throw new Error("Missing Supabase environment variables")
-}
+const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-if (!jwtSecret) {
-  throw new Error("Missing JWT_SECRET environment variable")
-}
-
-// Server-side Supabase client with service role key
-export const getServerSupabaseClient = () => {
-  if (typeof window !== "undefined") {
-    throw new Error("❌ SECURITY ERROR: getServerSupabaseClient called from client-side")
-  }
-
-  return createClient(supabaseUrl, supabaseServiceKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  })
-}
-
-// Cookie configuration - 7 days for better session persistence
-export function getCookieSettings() {
-  const isProduction = process.env.NODE_ENV === "production"
-  const maxAge = 7 * 24 * 60 * 60 // 7 days in seconds
-
-  return {
-    httpOnly: true,
-    secure: isProduction,
-    sameSite: "lax" as const,
-    maxAge,
-    path: "/",
-  }
-}
-
-// User session interface
-export interface UserSession {
+export interface User {
   id: string
   email: string
-  first_name: string
-  last_name: string
   role: string
-  loginTime: number
-  expiresAt: number
+  first_name?: string
+  last_name?: string
+  name?: string
+  avatar_url?: string
+  created_at: string
 }
 
-// Generate secure session data with creation timestamp
-export function generateSessionData(user: any): UserSession {
-  const now = Date.now()
-  return {
-    id: user.id,
-    email: user.email,
-    first_name: user.first_name,
-    last_name: user.last_name,
-    role: user.role,
-    loginTime: now,
-    expiresAt: now + 7 * 24 * 60 * 60 * 1000, // 7 days
-  }
-}
-
-// Parse user session from cookie header with improved validation
-export async function getUserSessionFromCookie(): Promise<UserSession | null> {
+export async function getUserFromRequest(request: NextRequest): Promise<User | null> {
   try {
-    const cookieStore = await cookies()
-    const sessionCookie = cookieStore.get("user-session")
+    // Intentar obtener token de la cookie
+    const token = request.cookies.get("auth-token")?.value
 
-    if (!sessionCookie?.value) {
+    if (!token) {
+      console.log("🔍 No se encontró token en cookies")
       return null
     }
 
-    const session = JSON.parse(sessionCookie.value) as UserSession
+    // Verificar y decodificar el token
+    const decoded = jwt.verify(token, jwtSecret) as any
+    console.log("🎫 Token decodificado:", { userId: decoded.userId, email: decoded.email })
 
-    // Check if session is expired
-    if (Date.now() > session.expiresAt) {
+    // Obtener usuario actualizado de la base de datos
+    const { data: user, error } = await supabase
+      .from("users")
+      .select("id, email, role, first_name, last_name, name, avatar_url, created_at")
+      .eq("id", decoded.userId)
+      .single()
+
+    if (error || !user) {
+      console.log("❌ Usuario no encontrado en BD:", error?.message)
       return null
     }
 
-    return session
-  } catch (error) {
-    console.error("Error parsing session cookie:", error)
+    console.log("✅ Usuario autenticado:", user.email)
+    return user as User
+  } catch (error: any) {
+    console.error("❌ Error verificando usuario:", error.message)
     return null
   }
 }
 
-// Export getUserFromSession as named export (alias for getUserSessionFromCookie)
-export const getUserFromSession = getUserSessionFromCookie
+export async function requireAuth(request: NextRequest): Promise<User> {
+  const user = await getUserFromRequest(request)
 
-// Log student access for monitoring and security
-export const logStudentAccess = async (
-  userId: string | null,
-  email: string,
-  action: string,
-  success: boolean,
-  errorCode: string | null = null,
-  details: string | null = null,
-  ipAddress = "unknown",
-  userAgent = "unknown",
-) => {
-  if (typeof window !== "undefined") {
-    throw new Error("❌ SECURITY ERROR: logStudentAccess called from client-side")
+  if (!user) {
+    throw new Error("No autorizado")
   }
 
+  return user
+}
+
+export async function requireAdmin(request: NextRequest): Promise<User> {
+  const user = await requireAuth(request)
+
+  if (user.role !== "admin") {
+    throw new Error("Acceso denegado - Se requieren permisos de administrador")
+  }
+
+  return user
+}
+
+// Función para obtener sesión del usuario desde cookies (solo servidor)
+export function getUserSessionFromCookie(request: NextRequest) {
   try {
-    const supabase = getServerSupabaseClient()
+    const token = request.cookies.get("auth-token")?.value
 
-    // Check if student_access_log table exists
-    const { data: tableExists } = await supabase
-      .from("information_schema.tables")
-      .select("table_name")
-      .eq("table_name", "student_access_log")
-      .single()
-
-    if (!tableExists) {
-      console.log("⚠️ student_access_log table does not exist, skipping log")
-      return
+    if (!token) {
+      return null
     }
 
-    const logEntry = {
-      student_id: userId,
-      email,
-      action,
-      success,
-      error_code: errorCode,
-      error_message: details,
-      ip_address: ipAddress,
-      user_agent: userAgent,
-      created_at: new Date().toISOString(),
-    }
-
-    const { error } = await supabase.from("student_access_log").insert([logEntry])
-
-    if (error) {
-      console.error("❌ Failed to log student access:", error)
-    } else {
-      console.log(`📝 Logged: ${action} for ${email} - ${success ? "SUCCESS" : "FAILED"}`)
+    const decoded = jwt.verify(token, jwtSecret) as any
+    return {
+      userId: decoded.userId,
+      email: decoded.email,
+      role: decoded.role,
     }
   } catch (error) {
-    console.error("❌ Error in logStudentAccess:", error)
+    console.error("Error decodificando token:", error)
+    return null
   }
 }
 
-// Validate password strength
-export const validatePassword = (password: string): { isValid: boolean; errors: string[] } => {
-  const errors: string[] = []
+// Utilidades para validación
+export function validateEmail(email: string): boolean {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  return emailRegex.test(email)
+}
 
+export function validatePassword(password: string): { valid: boolean; message?: string } {
   if (password.length < 6) {
-    errors.push("La contraseña debe tener al menos 6 caracteres")
+    return { valid: false, message: "La contraseña debe tener al menos 6 caracteres" }
   }
-
-  if (!/[A-Za-z]/.test(password)) {
-    errors.push("La contraseña debe contener al menos una letra")
-  }
-
-  if (!/[0-9]/.test(password)) {
-    errors.push("La contraseña debe contener al menos un número")
-  }
-
-  return {
-    isValid: errors.length === 0,
-    errors,
-  }
+  return { valid: true }
 }
 
-// Function to check if a session is valid
-export function isValidSession(session: UserSession | null): boolean {
-  if (!session) return false
-  return Date.now() < session.expiresAt
+// Función para formatear errores de Supabase
+export function formatSupabaseError(error: any): string {
+  if (error?.code === "23505") {
+    return "Este email ya está registrado"
+  }
+
+  if (error?.code === "23503") {
+    return "Error de referencia en la base de datos"
+  }
+
+  return error?.message || "Error desconocido"
+}
+
+// Función para logging seguro (sin datos sensibles)
+export function logSafely(message: string, data?: any) {
+  const safeData = data
+    ? {
+        ...data,
+        password: data.password ? "[REDACTED]" : undefined,
+        password_hash: data.password_hash ? "[REDACTED]" : undefined,
+        token: data.token ? "[REDACTED]" : undefined,
+      }
+    : undefined
+
+  console.log(message, safeData)
 }

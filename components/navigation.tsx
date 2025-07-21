@@ -49,12 +49,13 @@ export function Navigation({ user: initialUser }: NavigationProps) {
     if (user.name) return user.name
     if (user.first_name && user.last_name) return `${user.first_name} ${user.last_name}`
     if (user.first_name) return user.first_name
-    return user.email.split("@")[0]
+    if (user.email && typeof user.email === "string") return user.email.split("@")[0]
+    return "Usuario"
   }
 
   const getUserInitials = () => {
     const displayName = getUserDisplayName()
-    if (!displayName) return "U"
+    if (!displayName || displayName === "Usuario") return "U"
 
     const names = displayName.split(" ")
     if (names.length >= 2) {
@@ -191,7 +192,7 @@ export function Navigation({ user: initialUser }: NavigationProps) {
                         </Avatar>
                         <div>
                           <div className="text-gray-900 font-medium">{getUserDisplayName()}</div>
-                          <div className="text-gray-500 text-sm">{user.email}</div>
+                          <div className="text-gray-500 text-sm">{user.email || "Sin email"}</div>
                         </div>
                       </div>
 
