@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, Clock, BookOpen, Lock, CheckCircle } from "lucide-react"
-import { createServerClient } from "@/lib/supabase-client"
+import { getServerSupabaseClient } from "@/lib/server-utils"
 
 interface Lesson {
   id: string
@@ -26,7 +26,7 @@ interface Course {
 
 async function getLesson(courseId: string, lessonId: string): Promise<{ lesson: Lesson; course: Course } | null> {
   try {
-    const supabase = createServerClient()
+    const supabase = getServerSupabaseClient()
 
     // Get lesson details
     const { data: lesson, error: lessonError } = await supabase
@@ -65,7 +65,7 @@ async function checkUserAccess(courseId: string, userId?: string): Promise<boole
   if (!userId) return false
 
   try {
-    const supabase = createServerClient()
+    const supabase = getServerSupabaseClient()
 
     const { data: enrollment, error } = await supabase
       .from("enrollments")
@@ -141,11 +141,11 @@ export default async function LessonPage({
             {/* Video Player */}
             <div className="mb-8">
               {hasAccess || lesson.is_free ? (
-                <div className="w-full">
+                <div className="relative w-full" style={{ paddingBottom: "56.25%" }}>
                   <iframe
                     src={lesson.video_url}
                     title={lesson.title}
-                    className="w-full h-96 rounded-lg shadow-lg"
+                    className="absolute top-0 left-0 w-full h-full rounded-lg shadow-lg"
                     allowFullScreen
                   />
                 </div>
