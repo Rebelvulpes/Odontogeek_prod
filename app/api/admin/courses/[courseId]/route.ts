@@ -12,7 +12,15 @@ export async function GET(request: NextRequest, { params }: { params: { courseId
     const { data: course, error } = await supabase
       .from("courses")
       .select(`
-        *,
+        id,
+        title,
+        description,
+        price,
+        instructor_name,
+        thumbnail_url,
+        duration_hours,
+        difficulty_level,
+        created_at,
         lessons (
           id,
           title,
@@ -20,24 +28,17 @@ export async function GET(request: NextRequest, { params }: { params: { courseId
           video_url,
           duration_minutes,
           order_index,
-          is_free,
-          archived,
-          created_at
+          is_free
         )
       `)
       .eq("id", courseId)
       .single()
 
     if (error) {
-      console.error("Error obteniendo curso:", error)
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Error obteniendo curso",
-          error: error,
-        },
-        { status: 500 },
-      )
+      return NextResponse.json({
+        success: false,
+        message: `Error fetching course: ${error.message}`,
+      })
     }
 
     return NextResponse.json({
@@ -45,73 +46,42 @@ export async function GET(request: NextRequest, { params }: { params: { courseId
       data: course,
     })
   } catch (error) {
-    console.error("Error en GET curso:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Error interno del servidor",
-        error: error instanceof Error ? error.message : "Error desconocido",
-      },
-      { status: 500 },
-    )
+    console.error("Internal error in GET /api/admin/courses/[courseId]:", error)
+    return NextResponse.json({
+      success: false,
+      message: `Internal error: ${(error as Error).message}`,
+    })
   }
 }
 
-export async function PUT(req: NextRequest, { params }: { params: { courseId: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: { courseId: string } }) {
   try {
-    const { courseId } = params
-    const body = await req.json()
-    const { title, description, price, instructor, thumbnail_url, duration_hours, difficulty_level, tags, archived } =
-      body
-
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    const { courseId } = params
+    const body = await request.json()
 
-    // Update course
-    const updateData: any = {}
-    if (title !== undefined) updateData.title = title
-    if (description !== undefined) updateData.description = description
-    if (price !== undefined) updateData.price = Number.parseFloat(price)
-    if (instructor !== undefined) updateData.instructor_name = instructor
-    if (thumbnail_url !== undefined) updateData.thumbnail_url = thumbnail_url
-    if (duration_hours !== undefined)
-      updateData.duration_hours = duration_hours ? Number.parseInt(duration_hours) : null
-    if (difficulty_level !== undefined) updateData.difficulty_level = difficulty_level
-    if (archived !== undefined) updateData.archived = archived
-
-    const { data: course, error: courseError } = await supabase
+    const { data: course, error } = await supabase
       .from("courses")
-      .update(updateData)
+      .update({
+        title: body.title,
+        description: body.description,
+        price: body.price,
+        instructor_name: body.instructor,
+        thumbnail_url: body.thumbnail_url,
+        duration_hours: body.duration_hours,
+        difficulty_level: body.difficulty_level,
+        archived: body.archived || false,
+        updated_at: new Date().toISOString(),
+      })
       .eq("id", courseId)
       .select()
       .single()
 
-    if (courseError) {
-      console.error("Error updating course:", courseError)
+    if (error) {
       return NextResponse.json({
         success: false,
-        message: `Error updating course: ${courseError.message}`,
+        message: `Error updating course: ${error.message}`,
       })
-    }
-
-    // Update tags if provided
-    if (tags !== undefined) {
-      // Remove existing tags
-      await supabase.from("course_tags").delete().eq("course_id", courseId)
-
-      // Add new tags
-      if (tags.length > 0) {
-        const tagRelations = tags.map((tagId: string) => ({
-          course_id: courseId,
-          tag_id: tagId,
-        }))
-
-        const { error: tagsError } = await supabase.from("course_tags").insert(tagRelations)
-
-        if (tagsError) {
-          console.error("Error updating course tags:", tagsError)
-          // Don't fail the entire operation, just log the error
-        }
-      }
     }
 
     return NextResponse.json({
@@ -120,7 +90,7 @@ export async function PUT(req: NextRequest, { params }: { params: { courseId: st
       message: "Course updated successfully",
     })
   } catch (error) {
-    console.error("Internal error in PUT /api/admin/courses:", error)
+    console.error("Internal error in PUT /api/admin/courses/[courseId]:", error)
     return NextResponse.json({
       success: false,
       message: `Internal error: ${(error as Error).message}`,
@@ -128,37 +98,32 @@ export async function PUT(req: NextRequest, { params }: { params: { courseId: st
   }
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { courseId: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: { courseId: string } }) {
   try {
-    const { courseId } = params
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    const { courseId } = params
 
-    // Delete course tags first
+    // Delete related data first
     await supabase.from("course_tags").delete().eq("course_id", courseId)
-
-    // Delete lessons
     await supabase.from("lessons").delete().eq("course_id", courseId)
-
-    // Delete enrollments
     await supabase.from("enrollments").delete().eq("course_id", courseId)
 
     // Delete the course
-    const { error: courseError } = await supabase.from("courses").delete().eq("id", courseId)
+    const { error } = await supabase.from("courses").delete().eq("id", courseId)
 
-    if (courseError) {
-      console.error("Error deleting course:", courseError)
+    if (error) {
       return NextResponse.json({
         success: false,
-        message: `Error deleting course: ${courseError.message}`,
+        message: `Error deleting course: ${error.message}`,
       })
     }
 
     return NextResponse.json({
       success: true,
-      message: "Course and all related data deleted successfully",
+      message: "Course deleted successfully",
     })
   } catch (error) {
-    console.error("Internal error in DELETE /api/admin/courses:", error)
+    console.error("Internal error in DELETE /api/admin/courses/[courseId]:", error)
     return NextResponse.json({
       success: false,
       message: `Internal error: ${(error as Error).message}`,
