@@ -274,13 +274,13 @@ export default function LessonPage() {
             {hasAccess && lesson.video_url ? (
               <div className="mb-6">
                 <div
-                  className="relative w-full bg-black rounded-lg overflow-hidden"
+                  className="relative w-full rounded-lg overflow-hidden shadow-lg"
                   style={{ paddingBottom: "56.25%" /* 16:9 aspect ratio */ }}
                 >
                   <iframe
                     src={lesson.video_url}
                     title={lesson.title}
-                    className="absolute inset-0 w-full h-full"
+                    className="absolute inset-0 w-full h-full rounded-lg"
                     allowFullScreen
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                     style={{
@@ -291,22 +291,27 @@ export default function LessonPage() {
                 </div>
               </div>
             ) : (
-              <Card className="mb-6">
-                <CardContent className="p-8">
-                  <div className="text-center">
-                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                      {hasAccess ? (
-                        <Play className="w-8 h-8 text-gray-400" />
-                      ) : (
-                        <Lock className="w-8 h-8 text-gray-400" />
-                      )}
+              <div className="mb-6">
+                <div
+                  className="relative w-full bg-gray-100 rounded-lg overflow-hidden shadow-lg flex items-center justify-center"
+                  style={{ paddingBottom: "56.25%" /* 16:9 aspect ratio */ }}
+                >
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
+                        {hasAccess ? (
+                          <Play className="w-8 h-8 text-gray-400" />
+                        ) : (
+                          <Lock className="w-8 h-8 text-gray-400" />
+                        )}
+                      </div>
+                      <p className="text-gray-600">
+                        {hasAccess ? "Video no disponible" : "Inscríbete al curso para ver el video"}
+                      </p>
                     </div>
-                    <p className="text-gray-600">
-                      {hasAccess ? "Video no disponible" : "Inscríbete al curso para ver el video"}
-                    </p>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             )}
 
             {/* Lesson content */}
