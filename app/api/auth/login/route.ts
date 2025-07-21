@@ -21,6 +21,7 @@ function createErrorResponse(message: string, error: string, status: number, hin
     status,
     headers: {
       "Content-Type": "application/json",
+      "Cache-Control": "no-cache, no-store, must-revalidate",
     },
   })
 }
@@ -30,6 +31,7 @@ function createSuccessResponse(data: any) {
   return NextResponse.json(data, {
     headers: {
       "Content-Type": "application/json",
+      "Cache-Control": "no-cache, no-store, must-revalidate",
     },
   })
 }
@@ -48,6 +50,7 @@ export async function POST(req: NextRequest) {
     console.log("Environment:", process.env.NODE_ENV)
     console.log("Host:", req.headers.get("host"))
     console.log("Client IP:", clientIP)
+    console.log("User Agent:", userAgent.substring(0, 100))
 
     // Parse request body with error handling
     try {
@@ -102,6 +105,8 @@ export async function POST(req: NextRequest) {
 
     if (!supabaseUrl || !supabaseServiceKey) {
       console.error("❌ MISSING SUPABASE ENVIRONMENT VARIABLES")
+      console.error("SUPABASE_URL exists:", !!supabaseUrl)
+      console.error("SUPABASE_SERVICE_KEY exists:", !!supabaseServiceKey)
       return createErrorResponse("Error de configuración del servidor", "MISSING_ENV_VARS", 500)
     }
 
@@ -114,8 +119,11 @@ export async function POST(req: NextRequest) {
 
     // Test database connection
     try {
-      const { data: testConnection } = await supabase.from("users").select("count").limit(1)
+      const { data: testConnection, error: testError } = await supabase.from("users").select("count").limit(1)
       console.log("Database connection test:", testConnection ? "SUCCESS" : "FAILED")
+      if (testError) {
+        console.error("Database test error:", testError)
+      }
     } catch (dbError) {
       console.error("❌ DATABASE CONNECTION FAILED:", dbError)
       return createErrorResponse("Error de conexión a la base de datos", "DATABASE_CONNECTION_FAILED", 500)
@@ -153,6 +161,7 @@ export async function POST(req: NextRequest) {
 
     if (userError || !user) {
       console.log("❌ USER NOT FOUND")
+      console.log("User error details:", userError)
 
       // Log failed attempt
       const currentAttempts = loginAttempts.get(clientKey) || { count: 0, lastAttempt: 0 }

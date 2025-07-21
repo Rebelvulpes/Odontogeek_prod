@@ -57,24 +57,38 @@ export default function LoginPage() {
         console.error("Content-Type:", contentType)
 
         // Try to get the text response for debugging
-        const textResponse = await response.text()
-        console.error("Response text:", textResponse.substring(0, 500))
+        try {
+          const textResponse = await response.text()
+          console.error("Response text:", textResponse.substring(0, 500))
 
-        setError("Error del servidor - respuesta no válida")
+          // Check if it's an HTML error page
+          if (textResponse.includes("<html") || textResponse.includes("<!DOCTYPE")) {
+            setError("Error del servidor - página de error recibida")
+          } else {
+            setError("Error del servidor - respuesta no válida")
+          }
+        } catch (textError) {
+          console.error("Failed to read response text:", textError)
+          setError("Error del servidor - no se pudo leer la respuesta")
+        }
         return
       }
 
       let result
       try {
-        result = await response.json()
+        const responseText = await response.text()
+        console.log("Raw response text:", responseText)
+
+        if (!responseText) {
+          console.error("❌ Empty response")
+          setError("Respuesta vacía del servidor")
+          return
+        }
+
+        result = JSON.parse(responseText)
         console.log("Parsed JSON result:", result)
       } catch (jsonError) {
         console.error("❌ JSON parsing failed:", jsonError)
-
-        // Try to get the text response for debugging
-        const textResponse = await response.text()
-        console.error("Response text that failed to parse:", textResponse.substring(0, 500))
-
         setError("Error del servidor - respuesta JSON inválida")
         return
       }
@@ -83,6 +97,9 @@ export default function LoginPage() {
         console.log("✅ Login successful")
         console.log("User:", result.user)
         console.log("Redirect to:", result.redirectTo)
+
+        // Small delay to ensure cookie is set
+        await new Promise((resolve) => setTimeout(resolve, 100))
 
         // Redirect based on user role
         if (result.redirectTo) {
@@ -103,7 +120,11 @@ export default function LoginPage() {
       }
     } catch (error) {
       console.error("❌ Login error:", error)
-      setError("Error de conexión. Verifica tu conexión a internet.")
+      if (error instanceof TypeError && error.message.includes("fetch")) {
+        setError("Error de conexión. Verifica tu conexión a internet.")
+      } else {
+        setError("Error inesperado. Intenta de nuevo.")
+      }
     } finally {
       setLoading(false)
     }

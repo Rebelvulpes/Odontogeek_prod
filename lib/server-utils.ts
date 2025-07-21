@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js"
-import jwt from "jsonwebtoken"
+import { cookies } from "next/headers"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -27,19 +27,16 @@ export const getServerSupabaseClient = () => {
   })
 }
 
-// Cookie configuration - 30 days for better session persistence
-export const getCookieSettings = () => {
+// Cookie configuration - 7 days for better session persistence
+export function getCookieSettings() {
   const isProduction = process.env.NODE_ENV === "production"
-  const isVercel = !!process.env.VERCEL_URL
-
-  // 30 days = 30 * 24 * 60 * 60 seconds
-  const THIRTY_DAYS_IN_SECONDS = 30 * 24 * 60 * 60
+  const maxAge = 7 * 24 * 60 * 60 // 7 days in seconds
 
   return {
     httpOnly: true,
-    secure: isProduction || isVercel, // Secure in production or Vercel
+    secure: isProduction,
     sameSite: "lax" as const,
-    maxAge: THIRTY_DAYS_IN_SECONDS, // 30 days for better persistence
+    maxAge,
     path: "/",
   }
 }
@@ -48,77 +45,47 @@ export const getCookieSettings = () => {
 export interface UserSession {
   id: string
   email: string
+  first_name: string
+  last_name: string
   role: string
-  first_name?: string
-  last_name?: string
-  created_at?: string
+  loginTime: number
+  expiresAt: number
+}
+
+// Generate secure session data with creation timestamp
+export function generateSessionData(user: any): UserSession {
+  const now = Date.now()
+  return {
+    id: user.id,
+    email: user.email,
+    first_name: user.first_name,
+    last_name: user.last_name,
+    role: user.role,
+    loginTime: now,
+    expiresAt: now + 7 * 24 * 60 * 60 * 1000, // 7 days
+  }
 }
 
 // Parse user session from cookie header with improved validation
-export const getUserSessionFromCookie = (cookieHeader: string | null): UserSession | null => {
-  if (!cookieHeader) {
-    console.log("❌ No cookie header provided")
-    return null
-  }
-
+export async function getUserSessionFromCookie(): Promise<UserSession | null> {
   try {
-    const cookies = cookieHeader.split(";").reduce(
-      (acc, cookie) => {
-        const [key, value] = cookie.trim().split("=")
-        if (key && value) {
-          acc[key] = decodeURIComponent(value)
-        }
-        return acc
-      },
-      {} as Record<string, string>,
-    )
+    const cookieStore = await cookies()
+    const sessionCookie = cookieStore.get("user-session")
 
-    const sessionCookie = cookies["user-session"]
-    if (!sessionCookie) {
-      console.log("❌ No user-session cookie found")
+    if (!sessionCookie?.value) {
       return null
     }
 
-    // Try to parse as JWT first
-    try {
-      const decoded = jwt.verify(sessionCookie, jwtSecret) as any
-      console.log("✅ JWT session decoded successfully")
-      return {
-        id: decoded.id,
-        email: decoded.email,
-        role: decoded.role,
-        first_name: decoded.first_name,
-        last_name: decoded.last_name,
-        created_at: decoded.created_at,
-      }
-    } catch (jwtError) {
-      console.log("⚠️ JWT decode failed, trying JSON parse")
-      // Fallback to JSON parsing
-      const userSession = JSON.parse(sessionCookie)
+    const session = JSON.parse(sessionCookie.value) as UserSession
 
-      // Validate session structure
-      if (!userSession.id || !userSession.email) {
-        console.log("❌ Invalid session structure - missing id or email")
-        return null
-      }
-
-      // Check if session is expired (30 days from creation)
-      if (userSession.created_at) {
-        const sessionCreated = new Date(userSession.created_at).getTime()
-        const now = Date.now()
-        const thirtyDaysInMs = 30 * 24 * 60 * 60 * 1000 // 30 days in milliseconds
-
-        if (now - sessionCreated > thirtyDaysInMs) {
-          console.log("❌ Session expired - older than 30 days")
-          return null
-        }
-      }
-
-      console.log("✅ Valid session found for user:", userSession.email)
-      return userSession
+    // Check if session is expired
+    if (Date.now() > session.expiresAt) {
+      return null
     }
+
+    return session
   } catch (error) {
-    console.error("❌ Error parsing session cookie:", error)
+    console.error("Error parsing session cookie:", error)
     return null
   }
 }
@@ -202,14 +169,8 @@ export const validatePassword = (password: string): { isValid: boolean; errors: 
   }
 }
 
-// Generate secure session data with creation timestamp
-export const generateSessionData = (user: any) => {
-  return {
-    id: user.id,
-    email: user.email,
-    first_name: user.first_name,
-    last_name: user.last_name,
-    role: user.role,
-    created_at: new Date().toISOString(), // Track when session was created
-  }
+// Function to check if a session is valid
+export function isValidSession(session: UserSession | null): boolean {
+  if (!session) return false
+  return Date.now() < session.expiresAt
 }
