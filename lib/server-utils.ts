@@ -21,26 +21,29 @@ export const getServerSupabaseClient = () => {
   })
 }
 
-// Cookie configuration - 7 days natural maximum
+// Cookie configuration - 30 days for better session persistence
 export const getCookieSettings = () => {
   const isProduction = process.env.NODE_ENV === "production"
   const isVercel = !!process.env.VERCEL_URL
 
-  // 7 days natural = 7 * 24 * 60 * 60 seconds
-  const SEVEN_DAYS_IN_SECONDS = 7 * 24 * 60 * 60
+  // 30 days = 30 * 24 * 60 * 60 seconds
+  const THIRTY_DAYS_IN_SECONDS = 30 * 24 * 60 * 60
 
   return {
     httpOnly: true,
     secure: isProduction || isVercel, // Secure in production or Vercel
     sameSite: "lax" as const,
-    maxAge: SEVEN_DAYS_IN_SECONDS, // Exactly 7 natural days
+    maxAge: THIRTY_DAYS_IN_SECONDS, // 30 days for better persistence
     path: "/",
   }
 }
 
-// Parse user session from cookie header with expiration validation
+// Parse user session from cookie header with improved validation
 export const getUserSessionFromCookie = (cookieHeader: string | null) => {
-  if (!cookieHeader) return null
+  if (!cookieHeader) {
+    console.log("❌ No cookie header provided")
+    return null
+  }
 
   try {
     const cookies = cookieHeader.split(";").reduce(
@@ -55,28 +58,32 @@ export const getUserSessionFromCookie = (cookieHeader: string | null) => {
     )
 
     const sessionCookie = cookies["user-session"]
-    if (!sessionCookie) return null
+    if (!sessionCookie) {
+      console.log("❌ No user-session cookie found")
+      return null
+    }
 
     const userSession = JSON.parse(sessionCookie)
 
     // Validate session structure
     if (!userSession.id || !userSession.email) {
-      console.log("❌ Invalid session structure")
+      console.log("❌ Invalid session structure - missing id or email")
       return null
     }
 
-    // Check if session is expired (7 days from creation)
+    // Check if session is expired (30 days from creation)
     if (userSession.created_at) {
       const sessionCreated = new Date(userSession.created_at).getTime()
       const now = Date.now()
-      const sevenDaysInMs = 7 * 24 * 60 * 60 * 1000 // 7 days in milliseconds
+      const thirtyDaysInMs = 30 * 24 * 60 * 60 * 1000 // 30 days in milliseconds
 
-      if (now - sessionCreated > sevenDaysInMs) {
-        console.log("❌ Session expired - older than 7 days")
+      if (now - sessionCreated > thirtyDaysInMs) {
+        console.log("❌ Session expired - older than 30 days")
         return null
       }
     }
 
+    console.log("✅ Valid session found for user:", userSession.email)
     return userSession
   } catch (error) {
     console.error("❌ Error parsing session cookie:", error)

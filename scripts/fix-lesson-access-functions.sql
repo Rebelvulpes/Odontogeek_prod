@@ -1,259 +1,259 @@
--- Fix lesson access functions and create proper lesson data
--- This script ensures lessons exist and access functions work correctly
-
--- First, let's check what lessons exist
+-- Verificar y crear lecciones de ejemplo si no existen
 DO $$
+DECLARE
+    course_record RECORD;
+    lesson_count INTEGER;
 BEGIN
-    RAISE NOTICE 'Current lessons in database:';
+    RAISE NOTICE 'Verificando lecciones existentes...';
+    
+    -- Mostrar cursos existentes
+    FOR course_record IN 
+        SELECT id, title FROM courses ORDER BY id LIMIT 5
+    LOOP
+        SELECT COUNT(*) INTO lesson_count 
+        FROM lessons 
+        WHERE course_id = course_record.id;
+        
+        RAISE NOTICE 'Curso: % (ID: %) - Lecciones: %', 
+            course_record.title, course_record.id, lesson_count;
+        
+        -- Si el curso no tiene lecciones, crear algunas
+        IF lesson_count = 0 THEN
+            RAISE NOTICE 'Creando lecciones para curso: %', course_record.title;
+            
+            -- Lección 1 - Gratuita
+            INSERT INTO lessons (
+                course_id,
+                title,
+                description,
+                content,
+                order_index,
+                is_free,
+                duration_minutes,
+                created_at,
+                updated_at
+            ) VALUES (
+                course_record.id,
+                'Introducción - ' || course_record.title,
+                'Lección introductoria gratuita del curso',
+                '<h2>Bienvenido al curso</h2><p>Esta es una lección de introducción gratuita donde aprenderás los conceptos básicos.</p><p>Contenido incluye:</p><ul><li>Objetivos del curso</li><li>Metodología</li><li>Recursos necesarios</li></ul>',
+                1,
+                true,
+                15,
+                NOW(),
+                NOW()
+            );
+            
+            -- Lección 2 - Premium
+            INSERT INTO lessons (
+                course_id,
+                title,
+                description,
+                content,
+                order_index,
+                is_free,
+                duration_minutes,
+                created_at,
+                updated_at
+            ) VALUES (
+                course_record.id,
+                'Fundamentos - ' || course_record.title,
+                'Lección premium con contenido avanzado',
+                '<h2>Fundamentos Avanzados</h2><p>En esta lección premium profundizaremos en:</p><ul><li>Conceptos avanzados</li><li>Técnicas especializadas</li><li>Casos prácticos</li><li>Ejercicios interactivos</li></ul><p>Esta lección requiere inscripción al curso.</p>',
+                2,
+                false,
+                30,
+                NOW(),
+                NOW()
+            );
+            
+            -- Lección 3 - Premium
+            INSERT INTO lessons (
+                course_id,
+                title,
+                description,
+                content,
+                order_index,
+                is_free,
+                duration_minutes,
+                created_at,
+                updated_at
+            ) VALUES (
+                course_record.id,
+                'Práctica Avanzada - ' || course_record.title,
+                'Lección práctica con casos reales',
+                '<h2>Práctica Avanzada</h2><p>Aplicaremos todo lo aprendido en casos reales:</p><ul><li>Casos de estudio</li><li>Resolución de problemas</li><li>Mejores prácticas</li><li>Tips profesionales</li></ul>',
+                3,
+                false,
+                45,
+                NOW(),
+                NOW()
+            );
+            
+            RAISE NOTICE 'Creadas 3 lecciones para curso: %', course_record.title;
+        END IF;
+    END LOOP;
+    
+    -- Mostrar resumen final
+    RAISE NOTICE '=== RESUMEN DE LECCIONES ===';
+    FOR course_record IN 
+        SELECT 
+            c.id,
+            c.title,
+            COUNT(l.id) as total_lessons,
+            COUNT(CASE WHEN l.is_free = true THEN 1 END) as free_lessons
+        FROM courses c
+        LEFT JOIN lessons l ON c.id = l.course_id
+        GROUP BY c.id, c.title
+        ORDER BY c.id
+        LIMIT 10
+    LOOP
+        RAISE NOTICE 'Curso: % - Total: % lecciones (% gratuitas)', 
+            course_record.title, course_record.total_lessons, course_record.free_lessons;
+    END LOOP;
+    
 END $$;
 
-SELECT 
-    l.id,
-    l.title,
-    l.course_id,
-    c.title as course_title,
-    l.is_free,
-    l.order_index
-FROM lessons l
-LEFT JOIN courses c ON l.course_id = c.id
-ORDER BY l.course_id, l.order_index;
+-- Crear o reemplazar función para verificar si un usuario es admin
+CREATE OR REPLACE FUNCTION is_user_admin(user_id_param TEXT)
+RETURNS BOOLEAN AS $$
+DECLARE
+    user_role TEXT;
+BEGIN
+    SELECT role INTO user_role 
+    FROM users 
+    WHERE id = user_id_param::UUID;
+    
+    RETURN COALESCE(user_role = 'admin', false);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Create some sample lessons if none exist
-INSERT INTO lessons (
-    course_id,
-    title,
-    description,
-    content,
-    video_url,
-    duration_minutes,
-    order_index,
-    is_free,
-    created_at,
-    updated_at
-) 
-SELECT 
-    c.id,
-    'Introducción a ' || c.title,
-    'Lección introductoria del curso ' || c.title,
-    '<h2>Bienvenido al curso</h2><p>En esta lección aprenderás los conceptos básicos de ' || c.title || '.</p><p>Esta es una lección de ejemplo que te ayudará a familiarizarte con la plataforma.</p>',
-    NULL,
-    15,
-    1,
-    true, -- Make first lesson free
-    NOW(),
-    NOW()
-FROM courses c
-WHERE NOT EXISTS (
-    SELECT 1 FROM lessons l WHERE l.course_id = c.id
-)
-LIMIT 5;
-
--- Add a second lesson for each course
-INSERT INTO lessons (
-    course_id,
-    title,
-    description,
-    content,
-    video_url,
-    duration_minutes,
-    order_index,
-    is_free,
-    created_at,
-    updated_at
-) 
-SELECT 
-    c.id,
-    'Conceptos Fundamentales - ' || c.title,
-    'Segunda lección del curso ' || c.title,
-    '<h2>Conceptos Fundamentales</h2><p>En esta lección profundizaremos en los conceptos fundamentales de ' || c.title || '.</p><p>Aprenderás técnicas avanzadas y mejores prácticas.</p>',
-    NULL,
-    25,
-    2,
-    false, -- Make second lesson premium
-    NOW(),
-    NOW()
-FROM courses c
-WHERE EXISTS (
-    SELECT 1 FROM lessons l WHERE l.course_id = c.id AND l.order_index = 1
-)
-AND NOT EXISTS (
-    SELECT 1 FROM lessons l WHERE l.course_id = c.id AND l.order_index = 2
-)
-LIMIT 5;
-
--- Create or replace the lesson access check function
+-- Crear o reemplazar función para verificar acceso a lección
 CREATE OR REPLACE FUNCTION check_lesson_access(
-    p_user_id INTEGER,
-    p_lesson_id INTEGER,
-    p_course_id INTEGER DEFAULT NULL
+    user_id_param TEXT,
+    lesson_id_param TEXT,
+    course_id_param TEXT
 )
 RETURNS TABLE(
     has_access BOOLEAN,
+    access_type TEXT,
     is_admin BOOLEAN,
     is_free BOOLEAN,
     is_enrolled BOOLEAN,
     access_reason TEXT
-) 
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
+) AS $$
 DECLARE
-    v_user_role TEXT;
-    v_lesson_free BOOLEAN;
-    v_enrollment_active BOOLEAN;
-    v_lesson_exists BOOLEAN;
-    v_actual_course_id INTEGER;
+    lesson_exists BOOLEAN := false;
+    lesson_is_free BOOLEAN := false;
+    user_is_admin BOOLEAN := false;
+    user_is_enrolled BOOLEAN := false;
+    lesson_course_id TEXT;
 BEGIN
-    -- Check if lesson exists and get its course_id
+    -- Verificar si la lección existe y obtener información
     SELECT 
-        l.is_free, 
-        l.course_id,
-        true
+        l.course_id::TEXT,
+        l.is_free
     INTO 
-        v_lesson_free, 
-        v_actual_course_id,
-        v_lesson_exists
-    FROM lessons l 
-    WHERE l.id = p_lesson_id;
+        lesson_course_id,
+        lesson_is_free
+    FROM lessons l
+    WHERE l.id = lesson_id_param::INTEGER;
     
-    -- If lesson doesn't exist, return no access
-    IF NOT v_lesson_exists THEN
+    lesson_exists := FOUND;
+    
+    -- Si la lección no existe, retornar sin acceso
+    IF NOT lesson_exists THEN
         RETURN QUERY SELECT 
-            false::BOOLEAN, 
-            false::BOOLEAN, 
-            false::BOOLEAN, 
-            false::BOOLEAN, 
-            'Lesson not found'::TEXT;
+            false,
+            'not_found'::TEXT,
+            false,
+            false,
+            false,
+            'Lección no encontrada'::TEXT;
         RETURN;
     END IF;
     
-    -- Validate course_id if provided
-    IF p_course_id IS NOT NULL AND v_actual_course_id != p_course_id THEN
+    -- Verificar si la lección pertenece al curso correcto
+    IF lesson_course_id != course_id_param THEN
         RETURN QUERY SELECT 
-            false::BOOLEAN, 
-            false::BOOLEAN, 
-            false::BOOLEAN, 
-            false::BOOLEAN, 
-            'Lesson does not belong to specified course'::TEXT;
+            false,
+            'wrong_course'::TEXT,
+            false,
+            lesson_is_free,
+            false,
+            'La lección no pertenece a este curso'::TEXT;
         RETURN;
     END IF;
     
-    -- Get user role
-    SELECT role INTO v_user_role FROM users WHERE id = p_user_id;
+    -- Verificar si el usuario es admin
+    user_is_admin := is_user_admin(user_id_param);
     
-    -- Check if user is admin
-    IF v_user_role = 'admin' THEN
+    -- Si es admin, tiene acceso completo
+    IF user_is_admin THEN
         RETURN QUERY SELECT 
-            true::BOOLEAN, 
-            true::BOOLEAN, 
-            v_lesson_free::BOOLEAN, 
-            false::BOOLEAN, 
-            'Admin access'::TEXT;
+            true,
+            'admin'::TEXT,
+            true,
+            lesson_is_free,
+            false,
+            'Acceso de administrador'::TEXT;
         RETURN;
     END IF;
     
-    -- Check if lesson is free
-    IF v_lesson_free THEN
+    -- Si la lección es gratuita, permitir acceso
+    IF lesson_is_free THEN
         RETURN QUERY SELECT 
-            true::BOOLEAN, 
-            false::BOOLEAN, 
-            true::BOOLEAN, 
-            false::BOOLEAN, 
-            'Free lesson access'::TEXT;
+            true,
+            'free'::TEXT,
+            false,
+            true,
+            false,
+            'Lección gratuita'::TEXT;
         RETURN;
     END IF;
     
-    -- Check enrollment for paid lessons
-    SELECT 
-        CASE WHEN e.status = 'active' THEN true ELSE false END
-    INTO v_enrollment_active
-    FROM enrollments e
-    WHERE e.user_id = p_user_id 
-    AND e.course_id = v_actual_course_id;
+    -- Verificar si el usuario está inscrito en el curso
+    SELECT EXISTS(
+        SELECT 1 
+        FROM enrollments e
+        WHERE e.user_id = user_id_param::UUID 
+        AND e.course_id = course_id_param::UUID
+        AND e.status = 'active'
+    ) INTO user_is_enrolled;
     
-    IF v_enrollment_active THEN
+    -- Si está inscrito, permitir acceso
+    IF user_is_enrolled THEN
         RETURN QUERY SELECT 
-            true::BOOLEAN, 
-            false::BOOLEAN, 
-            false::BOOLEAN, 
-            true::BOOLEAN, 
-            'Enrolled access'::TEXT;
+            true,
+            'enrolled'::TEXT,
+            false,
+            false,
+            true,
+            'Usuario inscrito en el curso'::TEXT;
         RETURN;
     END IF;
     
-    -- No access
+    -- Sin acceso
     RETURN QUERY SELECT 
-        false::BOOLEAN, 
-        false::BOOLEAN, 
-        v_lesson_free::BOOLEAN, 
-        false::BOOLEAN, 
-        'No access - enrollment required'::TEXT;
+        false,
+        'no_access'::TEXT,
+        false,
+        false,
+        false,
+        'Requiere inscripción al curso'::TEXT;
+    RETURN;
 END;
-$$;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Create simple admin check function
-CREATE OR REPLACE FUNCTION is_user_admin(p_user_id INTEGER)
-RETURNS BOOLEAN
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-DECLARE
-    v_role TEXT;
-BEGIN
-    SELECT role INTO v_role FROM users WHERE id = p_user_id;
-    RETURN COALESCE(v_role = 'admin', false);
-END;
-$$;
+-- Asegurar permisos
+GRANT EXECUTE ON FUNCTION is_user_admin(TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION check_lesson_access(TEXT, TEXT, TEXT) TO authenticated;
 
--- Grant permissions
-GRANT EXECUTE ON FUNCTION check_lesson_access(INTEGER, INTEGER, INTEGER) TO anon, authenticated;
-GRANT EXECUTE ON FUNCTION is_user_admin(INTEGER) TO anon, authenticated;
-
--- Create student access log table if it doesn't exist
-CREATE TABLE IF NOT EXISTS student_access_log (
-    id SERIAL PRIMARY KEY,
-    student_id INTEGER REFERENCES users(id),
-    email TEXT,
-    action TEXT NOT NULL,
-    success BOOLEAN NOT NULL DEFAULT false,
-    error_code TEXT,
-    error_message TEXT,
-    ip_address TEXT,
-    user_agent TEXT,
-    session_data JSONB,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Create indexes for better performance
-CREATE INDEX IF NOT EXISTS idx_student_access_log_student_id ON student_access_log(student_id);
-CREATE INDEX IF NOT EXISTS idx_student_access_log_created_at ON student_access_log(created_at);
-CREATE INDEX IF NOT EXISTS idx_student_access_log_action ON student_access_log(action);
-
--- Grant permissions on the log table
-GRANT SELECT, INSERT ON student_access_log TO anon, authenticated;
-GRANT USAGE ON SEQUENCE student_access_log_id_seq TO anon, authenticated;
-
--- Show final lesson count
-DO $$
-DECLARE
-    lesson_count INTEGER;
-    course_count INTEGER;
-BEGIN
-    SELECT COUNT(*) INTO lesson_count FROM lessons;
-    SELECT COUNT(*) INTO course_count FROM courses;
-    
-    RAISE NOTICE 'Database setup complete:';
-    RAISE NOTICE '- Courses: %', course_count;
-    RAISE NOTICE '- Lessons: %', lesson_count;
-    RAISE NOTICE '- Functions created: check_lesson_access, is_user_admin';
-    RAISE NOTICE '- Log table: student_access_log';
-END $$;
-
--- Show sample lessons created
+-- Mostrar algunas lecciones de ejemplo
 SELECT 
-    'Sample lessons:' as info,
     l.id,
     l.title,
+    l.course_id,
     c.title as course_title,
     l.is_free,
     l.order_index
