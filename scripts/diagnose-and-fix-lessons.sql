@@ -27,7 +27,83 @@ FROM information_schema.columns
 WHERE table_name = 'lessons' 
 ORDER BY ordinal_position;
 
--- 2. Mostrar datos actuales
+-- 2. Corregir estructura de la tabla lessons si es necesario
+DO $$
+BEGIN
+    -- Agregar columna content si no existe
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'lessons' AND column_name = 'content'
+    ) THEN
+        ALTER TABLE lessons ADD COLUMN content TEXT;
+        RAISE NOTICE '✅ Agregada columna content a lessons';
+    END IF;
+
+    -- Agregar columna description si no existe
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'lessons' AND column_name = 'description'
+    ) THEN
+        ALTER TABLE lessons ADD COLUMN description TEXT;
+        RAISE NOTICE '✅ Agregada columna description a lessons';
+    END IF;
+
+    -- Agregar columna duration_minutes si no existe
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'lessons' AND column_name = 'duration_minutes'
+    ) THEN
+        ALTER TABLE lessons ADD COLUMN duration_minutes INTEGER;
+        RAISE NOTICE '✅ Agregada columna duration_minutes a lessons';
+    END IF;
+
+    -- Agregar columna video_url si no existe
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'lessons' AND column_name = 'video_url'
+    ) THEN
+        ALTER TABLE lessons ADD COLUMN video_url TEXT;
+        RAISE NOTICE '✅ Agregada columna video_url a lessons';
+    END IF;
+
+    -- Agregar columna order_index si no existe
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'lessons' AND column_name = 'order_index'
+    ) THEN
+        ALTER TABLE lessons ADD COLUMN order_index INTEGER DEFAULT 1;
+        RAISE NOTICE '✅ Agregada columna order_index a lessons';
+    END IF;
+
+    -- Agregar columna is_free si no existe
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'lessons' AND column_name = 'is_free'
+    ) THEN
+        ALTER TABLE lessons ADD COLUMN is_free BOOLEAN DEFAULT false;
+        RAISE NOTICE '✅ Agregada columna is_free a lessons';
+    END IF;
+
+    -- Agregar timestamps si no existen
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'lessons' AND column_name = 'created_at'
+    ) THEN
+        ALTER TABLE lessons ADD COLUMN created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+        RAISE NOTICE '✅ Agregada columna created_at a lessons';
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'lessons' AND column_name = 'updated_at'
+    ) THEN
+        ALTER TABLE lessons ADD COLUMN updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+        RAISE NOTICE '✅ Agregada columna updated_at a lessons';
+    END IF;
+
+END $$;
+
+-- 3. Mostrar datos actuales
 SELECT 
     'CURSOS EXISTENTES:' as info,
     id,
@@ -43,16 +119,16 @@ SELECT
     id,
     title,
     course_id,
-    is_free,
-    order_index
+    COALESCE(is_free, false) as is_free,
+    COALESCE(order_index, 1) as order_index
 FROM lessons 
-ORDER BY course_id, order_index 
+ORDER BY course_id, COALESCE(order_index, 1)
 LIMIT 20;
 
--- 3. Limpiar lecciones existentes si hay problemas
+-- 4. Limpiar lecciones existentes si hay problemas
 DELETE FROM lessons WHERE title LIKE '%Introducción -%' OR title LIKE '%Fundamentos -%' OR title LIKE '%Práctica Avanzada -%';
 
--- 4. Crear lecciones de prueba para TODOS los cursos
+-- 5. Crear lecciones de prueba para TODOS los cursos
 DO $$
 DECLARE
     course_record RECORD;
@@ -231,7 +307,7 @@ BEGIN
     
 END $$;
 
--- 5. Verificar lecciones creadas
+-- 6. Verificar lecciones creadas
 SELECT 
     'LECCIONES CREADAS:' as status,
     l.id,
@@ -244,7 +320,7 @@ FROM lessons l
 JOIN courses c ON l.course_id = c.id
 ORDER BY c.title, l.order_index;
 
--- 6. Crear/actualizar funciones de acceso
+-- 7. Crear/actualizar funciones de acceso
 CREATE OR REPLACE FUNCTION is_user_admin(user_id_param UUID)
 RETURNS BOOLEAN AS $$
 DECLARE
@@ -286,7 +362,7 @@ BEGIN
         l.id,
         l.title,
         l.course_id,
-        l.is_free,
+        COALESCE(l.is_free, false) as is_free,
         c.title as course_title
     INTO lesson_record
     FROM lessons l
@@ -402,11 +478,17 @@ EXCEPTION
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- 7. Asegurar permisos
+-- 8. Asegurar permisos
 GRANT EXECUTE ON FUNCTION is_user_admin(UUID) TO authenticated, anon;
 GRANT EXECUTE ON FUNCTION check_lesson_access(UUID, UUID, UUID) TO authenticated, anon;
 
--- 8. Mostrar estadísticas finales
+-- 9. Crear índices para mejor performance
+CREATE INDEX IF NOT EXISTS idx_lessons_course_id ON lessons(course_id);
+CREATE INDEX IF NOT EXISTS idx_lessons_order_index ON lessons(order_index);
+CREATE INDEX IF NOT EXISTS idx_lessons_is_free ON lessons(is_free);
+CREATE INDEX IF NOT EXISTS idx_enrollments_user_course ON enrollments(user_id, course_id);
+
+-- 10. Mostrar estadísticas finales
 DO $$
 DECLARE
     total_courses INTEGER;
@@ -416,8 +498,8 @@ DECLARE
 BEGIN
     SELECT COUNT(*) INTO total_courses FROM courses;
     SELECT COUNT(*) INTO total_lessons FROM lessons;
-    SELECT COUNT(*) INTO free_lessons FROM lessons WHERE is_free = true;
-    SELECT COUNT(*) INTO premium_lessons FROM lessons WHERE is_free = false;
+    SELECT COUNT(*) INTO free_lessons FROM lessons WHERE COALESCE(is_free, false) = true;
+    SELECT COUNT(*) INTO premium_lessons FROM lessons WHERE COALESCE(is_free, false) = false;
     
     RAISE NOTICE '=== ESTADÍSTICAS FINALES ===';
     RAISE NOTICE 'Total de cursos: %', total_courses;
