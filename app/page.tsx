@@ -146,7 +146,7 @@ export default function HomePage() {
         <div className="absolute bottom-20 right-10 w-18 h-18 bg-pink-200/30 rounded-full animate-pulse delay-500"></div>
       </div>
 
-      <Navigation user={user} loading={authLoading} />
+      <Navigation user={user} />
 
       {/* Hero Carousel */}
       <section className="relative">
@@ -343,6 +343,67 @@ export default function HomePage() {
                 <p className="text-gray-600">Satisfacción</p>
               </CardContent>
             </Card>
+          </div>
+        </div>
+      </section>
+
+      {/* Features Section */}
+      <section className="py-20 relative">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-16 animate-fade-in-up">
+            <h2 className="text-4xl font-bold mb-4 text-gray-900">
+              ¿Por qué elegir{" "}
+              <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                OdontoGeek?
+              </span>
+            </h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
+              La plataforma líder en educación odontológica con las mejores herramientas y contenido
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8">
+            {[
+              {
+                icon: BookOpen,
+                title: "Contenido Actualizado",
+                description: "Cursos actualizados con las últimas técnicas y tecnologías odontológicas",
+                color: "from-blue-500 to-blue-600",
+                iconColor: "text-blue-600",
+              },
+              {
+                icon: Award,
+                title: "Certificación Oficial",
+                description: "Obtén certificados reconocidos que validen tus conocimientos profesionales",
+                color: "from-green-500 to-green-600",
+                iconColor: "text-green-600",
+              },
+              {
+                icon: TrendingUp,
+                title: "Progreso Personalizado",
+                description: "Sigue tu progreso y recibe recomendaciones personalizadas de aprendizaje",
+                color: "from-purple-500 to-purple-600",
+                iconColor: "text-purple-600",
+              },
+            ].map((feature, index) => (
+              <Card
+                key={index}
+                className="group hover:shadow-xl transition-all duration-300 hover:-translate-y-2 border-0 bg-white/80 backdrop-blur-sm animate-fade-in-up shadow-lg"
+                style={{ animationDelay: `${index * 200}ms` }}
+              >
+                <CardContent className="p-8 text-center">
+                  <div
+                    className={`w-16 h-16 mx-auto mb-6 rounded-full bg-gradient-to-br ${feature.color} flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-lg`}
+                  >
+                    <feature.icon className="w-8 h-8 text-white" />
+                  </div>
+                  <h3 className="text-xl font-bold mb-4 text-gray-900 group-hover:text-blue-600 transition-colors">
+                    {feature.title}
+                  </h3>
+                  <p className="text-gray-600 leading-relaxed">{feature.description}</p>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         </div>
       </section>
