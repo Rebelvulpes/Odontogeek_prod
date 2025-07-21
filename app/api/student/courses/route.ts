@@ -44,19 +44,6 @@ export async function GET(req: NextRequest) {
       )
     }
 
-    // Verify user is a student
-    if (userSession.role !== "student") {
-      console.log("❌ USER IS NOT A STUDENT")
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Acceso no autorizado - solo estudiantes",
-          error: "UNAUTHORIZED_ROLE",
-        },
-        { status: 403 },
-      )
-    }
-
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
     // Verify user still exists
@@ -79,13 +66,94 @@ export async function GET(req: NextRequest) {
       )
     }
 
+    // Admin users get access to ALL courses automatically
+    if (user.role === "admin") {
+      console.log("=== ADMIN USER - FETCHING ALL COURSES ===")
+
+      const { data: allCourses, error: coursesError } = await supabase
+        .from("courses")
+        .select(`
+          id,
+          title,
+          description,
+          thumbnail_url,
+          price,
+          duration_hours,
+          level,
+          instructor,
+          created_at,
+          updated_at,
+          status
+        `)
+        .order("created_at", { ascending: false })
+
+      if (coursesError) {
+        console.error("❌ ERROR FETCHING COURSES FOR ADMIN:", coursesError)
+        return NextResponse.json(
+          {
+            success: false,
+            message: "Error cargando cursos",
+            error: "COURSES_FETCH_ERROR",
+          },
+          { status: 500 },
+        )
+      }
+
+      // Transform courses data for admin (full access)
+      const courses = (allCourses || []).map((course) => ({
+        id: course.id,
+        title: course.title,
+        description: course.description,
+        thumbnail_url: course.thumbnail_url || "/placeholder.svg",
+        price: course.price || 0,
+        duration_hours: course.duration_hours || 0,
+        level: course.level || "Principiante",
+        instructor: course.instructor || "Instructor",
+        progress: 100, // Admin has full access
+        enrolled_at: new Date().toISOString(),
+        completed_at: null,
+        last_accessed_at: null,
+        enrollment_id: `admin-${course.id}`,
+        status: "admin_access",
+        is_admin_access: true,
+      }))
+
+      console.log("✅ Admin courses loaded:", courses.length)
+
+      // Log admin access
+      try {
+        await supabase.from("student_access_log").insert([
+          {
+            student_id: user.id,
+            email: user.email,
+            action: "admin_courses_access",
+            success: true,
+            error_message: `Admin accessed all courses - ${courses.length} courses available`,
+            ip_address: req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown",
+            user_agent: req.headers.get("user-agent") || "unknown",
+            session_data: JSON.stringify({ coursesCount: courses.length, adminAccess: true }),
+          },
+        ])
+      } catch (logError) {
+        console.error("Failed to log admin access:", logError)
+      }
+
+      return NextResponse.json({
+        success: true,
+        courses: courses,
+        message: `Acceso de administrador - ${courses.length} cursos disponibles`,
+        isAdmin: true,
+      })
+    }
+
+    // For students, verify they have student role
     if (user.role !== "student") {
-      console.log("❌ USER ROLE CHANGED - NOT A STUDENT")
+      console.log("❌ USER IS NOT A STUDENT")
       return NextResponse.json(
         {
           success: false,
-          message: "Acceso no autorizado - rol de usuario inválido",
-          error: "INVALID_USER_ROLE",
+          message: "Acceso no autorizado - solo estudiantes",
+          error: "UNAUTHORIZED_ROLE",
         },
         { status: 403 },
       )
@@ -172,6 +240,7 @@ export async function GET(req: NextRequest) {
         last_accessed_at: enrollment.last_accessed_at,
         enrollment_id: enrollment.id,
         status: enrollment.status,
+        is_admin_access: false,
       }
     })
 
@@ -240,6 +309,7 @@ export async function GET(req: NextRequest) {
               last_accessed_at: null,
               enrollment_id: newEnrollment.id,
               status: "active",
+              is_admin_access: false,
             })
           } else {
             console.log("❌ Failed to create default enrollment:", enrollmentError)
@@ -278,6 +348,7 @@ export async function GET(req: NextRequest) {
       success: true,
       courses: courses,
       message: courses.length > 0 ? "Cursos cargados exitosamente" : "No tienes cursos inscritos aún",
+      isAdmin: false,
     })
   } catch (error) {
     console.error("=== COURSES ACCESS ERROR ===")

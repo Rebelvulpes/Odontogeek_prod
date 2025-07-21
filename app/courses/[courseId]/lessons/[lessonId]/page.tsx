@@ -1,230 +1,299 @@
-"use client"
-
-import { useState, useEffect } from "react"
-import { useParams } from "next/navigation"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { ChevronLeft, ChevronRight, Clock, BookOpen, AlertCircle } from "lucide-react"
+import { createClient } from "@supabase/supabase-js"
+import { notFound, redirect } from "next/navigation"
 import Link from "next/link"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { ArrowLeft, Play, Clock, CheckCircle, User } from "lucide-react"
 
-interface LessonData {
-  lesson: {
-    id: string
-    title: string
-    description: string
-    content: string
-    video_url: string | null
-    duration_minutes: number
-    order_index: number
-    course_id: string
-    courses: {
-      id: string
-      title: string
-      description: string
-      instructor: string
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+
+async function getLesson(courseId: string, lessonId: string) {
+  const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+  const { data: lesson, error } = await supabase
+    .from("lessons")
+    .select(`
+      *,
+      courses:courses(
+        id,
+        title,
+        instructor,
+        price
+      )
+    `)
+    .eq("id", lessonId)
+    .eq("course_id", courseId)
+    .single()
+
+  if (error || !lesson) {
+    return null
+  }
+
+  return lesson
+}
+
+async function getUserFromCookie(cookieHeader: string | null) {
+  if (!cookieHeader) return null
+
+  try {
+    const cookies = cookieHeader.split(";").reduce(
+      (acc, cookie) => {
+        const [key, value] = cookie.trim().split("=")
+        if (key && value) {
+          acc[key] = decodeURIComponent(value)
+        }
+        return acc
+      },
+      {} as Record<string, string>,
+    )
+
+    const sessionCookie = cookies["user-session"]
+    if (!sessionCookie) return null
+
+    const userSession = JSON.parse(sessionCookie)
+
+    // Validate session structure
+    if (!userSession.id || !userSession.email) {
+      return null
     }
-  }
-  enrollment: {
-    id: string
-    progress: number
-  }
-  navigation: {
-    previous: { id: string; title: string } | null
-    next: { id: string; title: string } | null
-    currentIndex: number
-    totalLessons: number
+
+    return userSession
+  } catch (error) {
+    console.error("Error parsing session cookie:", error)
+    return null
   }
 }
 
-export default function LessonPage() {
-  const params = useParams()
-  const courseId = params.courseId as string
-  const lessonId = params.lessonId as string
+async function checkLessonAccess(
+  userId: string,
+  userRole: string,
+  courseId: string,
+  lessonId: string,
+  isFreLesson: boolean,
+) {
+  const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-  const [data, setData] = useState<LessonData | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState("")
-
-  useEffect(() => {
-    const fetchLessonData = async () => {
-      try {
-        const response = await fetch(`/api/student/lesson?courseId=${courseId}&lessonId=${lessonId}`, {
-          credentials: "include",
-        })
-
-        const result = await response.json()
-
-        if (result.success) {
-          setData(result.data)
-        } else {
-          if (result.error === "NO_SESSION") {
-            // Redirect to login if no session
-            window.location.assign("/auth/login")
-            return
-          }
-          setError(result.message || "Error al cargar la lección")
-        }
-      } catch (err) {
-        console.error("Lesson fetch error:", err)
-        setError("Error de conexión. Por favor, recarga la página.")
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    if (courseId && lessonId) {
-      fetchLessonData()
-    }
-  }, [courseId, lessonId])
-
-  if (loading) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="space-y-6">
-          <div className="flex items-center space-x-2">
-            <Skeleton className="h-4 w-4" />
-            <Skeleton className="h-4 w-32" />
-            <Skeleton className="h-4 w-4" />
-            <Skeleton className="h-4 w-48" />
-          </div>
-
-          <Card>
-            <CardHeader>
-              <Skeleton className="h-8 w-3/4" />
-              <Skeleton className="h-4 w-1/2" />
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Skeleton className="h-64 w-full" />
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-4 w-3/4" />
-              <Skeleton className="h-4 w-1/2" />
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    )
+  // Admin users have access to ALL lessons
+  if (userRole === "admin") {
+    return { hasAccess: true, reason: "admin_access" }
   }
 
-  if (error) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      </div>
-    )
+  // Free lessons are accessible to ALL logged-in users
+  if (isFreLesson) {
+    return { hasAccess: true, reason: "free_lesson" }
   }
 
-  if (!data) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <Alert>
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>No se pudieron cargar los datos de la lección.</AlertDescription>
-        </Alert>
-      </div>
-    )
+  // For paid lessons, check enrollment
+  const { data: enrollment, error } = await supabase
+    .from("enrollments")
+    .select("id, status")
+    .eq("user_id", userId)
+    .eq("course_id", courseId)
+    .single()
+
+  if (enrollment && !error && enrollment.status === "active") {
+    return { hasAccess: true, reason: "enrolled" }
+  }
+
+  return { hasAccess: false, reason: "not_enrolled" }
+}
+
+export default async function LessonPage({
+  params,
+}: {
+  params: { courseId: string; lessonId: string }
+}) {
+  const lesson = await getLesson(params.courseId, params.lessonId)
+
+  if (!lesson) {
+    notFound()
+  }
+
+  // Get user from cookie
+  const { headers } = await import("next/headers")
+  const cookieHeader = (await headers()).get("cookie")
+  const user = await getUserFromCookie(cookieHeader)
+
+  // Check if user is logged in
+  if (!user) {
+    // If it's a free lesson, redirect to login with return URL
+    if (lesson.is_free) {
+      redirect(`/auth/login?returnUrl=/courses/${params.courseId}/lessons/${params.lessonId}`)
+    } else {
+      // For paid lessons, redirect to course page
+      redirect(`/courses/${params.courseId}`)
+    }
+  }
+
+  // Check lesson access
+  const accessCheck = await checkLessonAccess(user.id, user.role, params.courseId, params.lessonId, lesson.is_free)
+
+  if (!accessCheck.hasAccess) {
+    // Redirect to course page if no access
+    redirect(`/courses/${params.courseId}`)
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="space-y-6">
-        {/* Breadcrumb */}
-        <nav className="flex items-center space-x-2 text-sm text-muted-foreground">
-          <Link href="/dashboard" className="hover:text-foreground">
-            Dashboard
-          </Link>
-          <ChevronRight className="h-4 w-4" />
-          <Link href={`/courses/${data.lesson.course_id}`} className="hover:text-foreground">
-            {data.lesson.courses.title}
-          </Link>
-          <ChevronRight className="h-4 w-4" />
-          <span className="text-foreground">{data.lesson.title}</span>
-        </nav>
-
-        {/* Lesson Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">{data.lesson.title}</h1>
-            <p className="text-muted-foreground mt-2">{data.lesson.description}</p>
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-white border-b sticky top-0 z-40">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <Link href="/" className="flex items-center space-x-2">
+                <img src="/images/odontogeek-logo-new.png" alt="OdontoGeek" className="h-8 w-auto" />
+              </Link>
+              <div className="hidden md:block text-sm text-gray-600">
+                <Link href={`/courses/${params.courseId}`} className="hover:text-blue-600">
+                  {lesson.courses.title}
+                </Link>
+                <span className="mx-2">•</span>
+                <span>{lesson.title}</span>
+              </div>
+            </div>
+            <div className="flex items-center space-x-3">
+              {user.role === "admin" ? (
+                <Link href="/admin">
+                  <Button variant="ghost" size="sm">
+                    Panel Admin
+                  </Button>
+                </Link>
+              ) : (
+                <Link href="/dashboard">
+                  <Button variant="ghost" size="sm">
+                    Mi Dashboard
+                  </Button>
+                </Link>
+              )}
+              <div className="flex items-center space-x-2 text-sm">
+                <User className="w-4 h-4" />
+                <span>{user.first_name || user.email}</span>
+              </div>
+            </div>
           </div>
-          <Badge variant="secondary">
-            Lección {data.navigation.currentIndex} de {data.navigation.totalLessons}
-          </Badge>
         </div>
+      </header>
 
-        {/* Video Player */}
-        {data.lesson.video_url && (
-          <Card>
+      <div className="container mx-auto px-4 py-8">
+        <div className="max-w-4xl mx-auto">
+          {/* Back Button */}
+          <div className="mb-6">
+            <Link href={`/courses/${params.courseId}`}>
+              <Button variant="ghost" className="flex items-center">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Volver al Curso
+              </Button>
+            </Link>
+          </div>
+
+          {/* Lesson Header */}
+          <Card className="mb-6">
+            <CardHeader>
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <Badge
+                      variant={lesson.is_free ? "secondary" : "default"}
+                      className={lesson.is_free ? "bg-green-100 text-green-800" : "bg-blue-100 text-blue-800"}
+                    >
+                      {lesson.is_free ? "Lección Gratuita" : "Lección Premium"}
+                    </Badge>
+                    {accessCheck.reason === "admin_access" && (
+                      <Badge variant="outline" className="bg-purple-100 text-purple-800">
+                        Acceso Admin
+                      </Badge>
+                    )}
+                  </div>
+                  <CardTitle className="text-2xl mb-2">{lesson.title}</CardTitle>
+                  <CardDescription className="text-base">{lesson.description}</CardDescription>
+                </div>
+                <div className="text-right">
+                  <div className="flex items-center text-sm text-gray-600 mb-1">
+                    <Clock className="w-4 h-4 mr-1" />
+                    {lesson.duration_minutes} minutos
+                  </div>
+                  <div className="text-sm text-gray-600">Lección {lesson.order_index}</div>
+                </div>
+              </div>
+            </CardHeader>
+          </Card>
+
+          {/* Video Player */}
+          <Card className="mb-6">
             <CardContent className="p-0">
               <div className="aspect-video bg-black rounded-lg overflow-hidden">
-                <video controls className="w-full h-full" poster="/placeholder.jpg">
-                  <source src={data.lesson.video_url} type="video/mp4" />
-                  Tu navegador no soporta el elemento de video.
-                </video>
+                {lesson.video_url ? (
+                  <video controls className="w-full h-full" poster="/placeholder.svg?height=400&width=600">
+                    <source src={lesson.video_url} type="video/mp4" />
+                    Tu navegador no soporta el elemento de video.
+                  </video>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-white">
+                    <div className="text-center">
+                      <Play className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                      <p className="text-lg">Video no disponible</p>
+                      <p className="text-sm opacity-75">El contenido se agregará pronto</p>
+                    </div>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
-        )}
 
-        {/* Lesson Content */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <BookOpen className="h-5 w-5 mr-2" />
-              Contenido de la Lección
-            </CardTitle>
-            <CardDescription className="flex items-center">
-              <Clock className="h-4 w-4 mr-1" />
-              Duración: {data.lesson.duration_minutes} minutos
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: data.lesson.content }} />
-          </CardContent>
-        </Card>
+          {/* Course Info */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <CheckCircle className="w-5 h-5 mr-2 text-green-600" />
+                Información del Curso
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <h3 className="font-medium text-gray-900 mb-1">Curso</h3>
+                  <p className="text-gray-600">{lesson.courses.title}</p>
+                </div>
+                <div>
+                  <h3 className="font-medium text-gray-900 mb-1">Instructor</h3>
+                  <p className="text-gray-600">{lesson.courses.instructor}</p>
+                </div>
+                <div>
+                  <h3 className="font-medium text-gray-900 mb-1">Tipo de Acceso</h3>
+                  <p className="text-gray-600">
+                    {accessCheck.reason === "admin_access" && "Acceso de Administrador"}
+                    {accessCheck.reason === "free_lesson" && "Lección Gratuita"}
+                    {accessCheck.reason === "enrolled" && "Curso Inscrito"}
+                  </p>
+                </div>
+                <div>
+                  <h3 className="font-medium text-gray-900 mb-1">Estado</h3>
+                  <div className="flex items-center">
+                    <CheckCircle className="w-4 h-4 text-green-600 mr-1" />
+                    <span className="text-green-600">Acceso Concedido</span>
+                  </div>
+                </div>
+              </div>
 
-        {/* Navigation */}
-        <div className="flex justify-between items-center">
-          <div>
-            {data.navigation.previous ? (
-              <Button variant="outline" asChild>
-                <Link href={`/courses/${courseId}/lessons/${data.navigation.previous.id}`}>
-                  <ChevronLeft className="h-4 w-4 mr-2" />
-                  Anterior: {data.navigation.previous.title}
-                </Link>
-              </Button>
-            ) : (
-              <Button variant="outline" disabled>
-                <ChevronLeft className="h-4 w-4 mr-2" />
-                Lección Anterior
-              </Button>
-            )}
-          </div>
-
-          <Button asChild>
-            <Link href={`/courses/${courseId}`}>Ver Curso Completo</Link>
-          </Button>
-
-          <div>
-            {data.navigation.next ? (
-              <Button asChild>
-                <Link href={`/courses/${courseId}/lessons/${data.navigation.next.id}`}>
-                  Siguiente: {data.navigation.next.title}
-                  <ChevronRight className="h-4 w-4 ml-2" />
-                </Link>
-              </Button>
-            ) : (
-              <Button disabled>
-                Siguiente Lección
-                <ChevronRight className="h-4 w-4 ml-2" />
-              </Button>
-            )}
-          </div>
+              <div className="mt-6 pt-6 border-t">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-medium text-gray-900 mb-1">¿Te gusta este contenido?</h3>
+                    <p className="text-sm text-gray-600">
+                      {lesson.is_free
+                        ? "Inscríbete al curso completo para acceder a todas las lecciones"
+                        : "Continúa aprendiendo con el resto del curso"}
+                    </p>
+                  </div>
+                  <Link href={`/courses/${params.courseId}`}>
+                    <Button>{lesson.is_free ? "Ver Curso Completo" : "Continuar Curso"}</Button>
+                  </Link>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>
