@@ -1,6 +1,5 @@
 import { createClient } from "@supabase/supabase-js"
 import jwt from "jsonwebtoken"
-import { createServerClient as createSupabaseServerClient } from "@supabase/auth-helpers-nextjs"
 import { cookies } from "next/headers"
 import type { User } from "@/lib/auth-utils"
 
@@ -215,32 +214,35 @@ export const generateSessionData = (user: any) => {
   }
 }
 
-// Get server user from Supabase session
+// Get server user from cookies (simplified approach)
 export const getServerUser = async (): Promise<User | null> => {
   try {
     const cookieStore = cookies()
-    const supabase = createSupabaseServerClient({ cookies: () => cookieStore })
-    const {
-      data: { session },
-    } = await supabase.auth.getSession()
+    const sessionCookie = cookieStore.get("user-session")
 
-    if (!session) {
+    if (!sessionCookie) {
       return null
     }
 
-    // To get full user profile, you might need another query
-    const { data: user, error } = await getServerSupabaseClient()
-      .from("users")
-      .select("*")
-      .eq("id", session.user.id)
-      .single()
+    const userSession = getUserSessionFromCookie(`user-session=${sessionCookie.value}`)
+
+    if (!userSession) {
+      return null
+    }
+
+    // Get full user profile from database
+    const supabase = getServerSupabaseClient()
+    const { data: user, error } = await supabase.from("users").select("*").eq("id", userSession.id).single()
 
     if (error || !user) {
       console.error("Error fetching user profile:", error)
       // Fallback to basic user data from session
       return {
-        id: session.user.id,
-        email: session.user.email,
+        id: userSession.id,
+        email: userSession.email,
+        first_name: userSession.first_name,
+        last_name: userSession.last_name,
+        role: userSession.role,
       } as User
     }
 
