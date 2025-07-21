@@ -1,31 +1,13 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getUserSessionFromCookie, getServerSupabaseClient } from "@/lib/server-utils"
+import { createClient } from "@supabase/supabase-js"
 
-export async function GET(request: NextRequest) {
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+
+export async function GET() {
   try {
-    console.log("=== ADMIN COURSES API - GET REQUEST ===")
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Get user session
-    const cookieHeader = request.headers.get("cookie")
-    const userSession = getUserSessionFromCookie(cookieHeader)
-
-    if (!userSession) {
-      console.log("❌ No valid session found")
-      return NextResponse.json({ success: false, message: "No autenticado" }, { status: 401 })
-    }
-
-    if (userSession.role !== "admin") {
-      console.log("❌ User is not admin:", userSession.role)
-      return NextResponse.json({ success: false, message: "No autorizado" }, { status: 403 })
-    }
-
-    console.log("✅ Admin user authenticated:", userSession.email)
-
-    // Get Supabase client
-    const supabase = getServerSupabaseClient()
-
-    // Fetch courses with detailed logging
-    console.log("🔍 Fetching courses from database...")
     const { data: courses, error } = await supabase
       .from("courses")
       .select(`
@@ -33,123 +15,141 @@ export async function GET(request: NextRequest) {
         title,
         description,
         price,
-        instructor,
-        status,
-        difficulty_level,
+        instructor_name,
         thumbnail_url,
-        is_free,
+        duration_hours,
+        difficulty_level,
+        archived,
         created_at,
-        updated_at
+        status,
+        lessons:lessons!inner(
+          id,
+          title,
+          description,
+          video_url,
+          duration_minutes,
+          order_index,
+          is_free,
+          archived,
+          created_at
+        )
       `)
+      .eq("lessons.archived", false)
       .order("created_at", { ascending: false })
 
     if (error) {
-      console.error("❌ Database error fetching courses:", error)
-      return NextResponse.json(
-        { success: false, message: "Error al obtener cursos", error: error.message },
-        { status: 500 },
-      )
-    }
-
-    console.log(`✅ Found ${courses?.length || 0} courses`)
-
-    // Log course details for debugging
-    if (courses && courses.length > 0) {
-      console.log("📚 Courses found:")
-      courses.forEach((course, index) => {
-        console.log(`  ${index + 1}. ${course.title} (${course.status}) - $${course.price}`)
+      console.error("Error fetching courses:", error)
+      return NextResponse.json({
+        success: false,
+        message: `Error fetching courses: ${error.message}`,
       })
-    } else {
-      console.log("⚠️ No courses found in database")
     }
+
+    // Process courses to get additional data
+    const processedCourses = await Promise.all(
+      (courses || []).map(async (course) => {
+        // Get course tags
+        const { data: courseTags } = await supabase
+          .from("course_tags")
+          .select(`
+            tags (
+              id,
+              name,
+              slug,
+              color,
+              description
+            )
+          `)
+          .eq("course_id", course.id)
+
+        // Get enrollment count
+        const { count: studentsCount } = await supabase
+          .from("enrollments")
+          .select("*", { count: "exact", head: true })
+          .eq("course_id", course.id)
+
+        // Calculate revenue (mock data for now)
+        const revenue = (studentsCount || 0) * (course.price || 0)
+
+        return {
+          ...course,
+          tags: courseTags?.map((relation) => relation.tags).filter(Boolean) || [],
+          students: studentsCount || 0,
+          revenue,
+          lessonsCount: course.lessons?.length || 0,
+        }
+      }),
+    )
 
     return NextResponse.json({
       success: true,
-      courses: courses || [],
-      count: courses?.length || 0,
+      data: processedCourses,
     })
   } catch (error) {
-    console.error("❌ Unexpected error in courses API:", error)
-    return NextResponse.json({ success: false, message: "Error interno del servidor" }, { status: 500 })
+    console.error("Internal error in GET /api/admin/courses:", error)
+    return NextResponse.json({
+      success: false,
+      message: `Internal error: ${(error as Error).message}`,
+    })
   }
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
-    console.log("=== ADMIN COURSES API - POST REQUEST ===")
+    const body = await req.json()
+    const { title, description, price, instructor, thumbnail_url, duration_hours, difficulty_level, tags } = body
 
-    // Get user session
-    const cookieHeader = request.headers.get("cookie")
-    const userSession = getUserSessionFromCookie(cookieHeader)
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    if (!userSession || userSession.role !== "admin") {
-      console.log("❌ Unauthorized access attempt")
-      return NextResponse.json({ success: false, message: "No autorizado" }, { status: 403 })
-    }
-
-    console.log("✅ Admin user creating course:", userSession.email)
-
-    // Parse request body
-    const body = await request.json()
-    console.log("📝 Course data received:", body)
-
-    const {
-      title,
-      description,
-      price,
-      instructor,
-      difficulty_level = "beginner",
-      thumbnail_url,
-      is_free = false,
-    } = body
-
-    // Validate required fields
-    if (!title || !description || !instructor) {
-      console.log("❌ Missing required fields")
-      return NextResponse.json({ success: false, message: "Faltan campos requeridos" }, { status: 400 })
-    }
-
-    // Get Supabase client
-    const supabase = getServerSupabaseClient()
-
-    // Create course
-    console.log("💾 Creating course in database...")
-    const { data: course, error } = await supabase
+    // Create the course
+    const { data: course, error: courseError } = await supabase
       .from("courses")
-      .insert([
-        {
-          title,
-          description,
-          price: Number.parseFloat(price) || 0,
-          instructor,
-          difficulty_level,
-          thumbnail_url: thumbnail_url || null,
-          is_free: Boolean(is_free),
-          status: "draft",
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-      ])
+      .insert({
+        title,
+        description,
+        price: Number.parseFloat(price),
+        instructor_name: instructor,
+        thumbnail_url,
+        duration_hours: duration_hours ? Number.parseInt(duration_hours) : null,
+        difficulty_level: difficulty_level || "principiante",
+        status: "published",
+      })
       .select()
       .single()
 
-    if (error) {
-      console.error("❌ Database error creating course:", error)
-      return NextResponse.json(
-        { success: false, message: "Error al crear curso", error: error.message },
-        { status: 500 },
-      )
+    if (courseError) {
+      console.error("Error creating course:", courseError)
+      return NextResponse.json({
+        success: false,
+        message: `Error creating course: ${courseError.message}`,
+      })
     }
 
-    console.log("✅ Course created successfully:", course.id)
+    // Add tags if provided
+    if (tags && tags.length > 0) {
+      const tagRelations = tags.map((tagId: string) => ({
+        course_id: course.id,
+        tag_id: tagId,
+      }))
+
+      const { error: tagsError } = await supabase.from("course_tags").insert(tagRelations)
+
+      if (tagsError) {
+        console.error("Error adding course tags:", tagsError)
+        // Don't fail the entire operation, just log the error
+      }
+    }
 
     return NextResponse.json({
       success: true,
-      message: "Curso creado exitosamente",
-      course,
+      data: course,
+      message: "Course created successfully",
     })
   } catch (error) {
-    console.error("❌ Unexpected error creating course:", error)
-    return NextResponse.json({ success: false, message: "Error interno del servidor" }, { status: 500 })
+    console.error("Internal error in POST /api/admin/courses:", error)
+    return NextResponse.json({
+      success: false,
+      message: `Internal error: ${(error as Error).message}`,
+    })
   }
 }

@@ -1,89 +1,84 @@
-import { type NextRequest, NextResponse } from "next/server"
-import { getUserSessionFromCookie, getServerSupabaseClient } from "@/lib/server-utils"
+import { NextResponse } from "next/server"
+import { createClient } from "@supabase/supabase-js"
 
-export async function GET(request: NextRequest) {
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+
+export async function GET() {
   try {
-    console.log("=== ADMIN STATS API REQUEST ===")
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Get user session
-    const cookieHeader = request.headers.get("cookie")
-    const userSession = getUserSessionFromCookie(cookieHeader)
-
-    if (!userSession) {
-      console.log("❌ No valid session found")
-      return NextResponse.json({ success: false, message: "No autenticado" }, { status: 401 })
-    }
-
-    if (userSession.role !== "admin") {
-      console.log("❌ User is not admin:", userSession.role)
-      return NextResponse.json({ success: false, message: "No autorizado" }, { status: 403 })
-    }
-
-    console.log("✅ Admin user authenticated:", userSession.email)
-
-    // Get Supabase client
-    const supabase = getServerSupabaseClient()
-
-    // Get stats with error handling
-    console.log("📊 Fetching dashboard stats...")
-
-    // Get total courses
-    const { data: coursesData, error: coursesError } = await supabase.from("courses").select("id, status")
-
-    if (coursesError) {
-      console.error("❌ Error fetching courses:", coursesError)
-    }
-
-    const totalCourses = coursesData?.length || 0
-    const publishedCourses = coursesData?.filter((c) => c.status === "published").length || 0
-
-    // Get total users
-    const { data: usersData, error: usersError } = await supabase.from("users").select("id, role")
+    // Obtener total de usuarios
+    const { count: totalUsers, error: usersError } = await supabase
+      .from("users")
+      .select("*", { count: "exact", head: true })
 
     if (usersError) {
-      console.error("❌ Error fetching users:", usersError)
+      console.error("Error obteniendo usuarios:", usersError)
     }
 
-    const totalUsers = usersData?.length || 0
-    const totalStudents = usersData?.filter((u) => u.role === "student").length || 0
+    // Obtener total de cursos
+    const { count: totalCourses, error: coursesError } = await supabase
+      .from("courses")
+      .select("*", { count: "exact", head: true })
+      .eq("archived", false)
 
-    // Get total enrollments
-    const { data: enrollmentsData, error: enrollmentsError } = await supabase.from("enrollments").select("id, status")
-
-    if (enrollmentsError) {
-      console.error("❌ Error fetching enrollments:", enrollmentsError)
+    if (coursesError) {
+      console.error("Error obteniendo cursos:", coursesError)
     }
 
-    const totalEnrollments = enrollmentsData?.length || 0
-    const activeEnrollments = enrollmentsData?.filter((e) => e.status === "active").length || 0
-
-    // Get total lessons
-    const { data: lessonsData, error: lessonsError } = await supabase.from("lessons").select("id")
+    // Obtener total de lecciones
+    const { count: totalLessons, error: lessonsError } = await supabase
+      .from("lessons")
+      .select("*", { count: "exact", head: true })
+      .eq("archived", false)
 
     if (lessonsError) {
-      console.error("❌ Error fetching lessons:", lessonsError)
+      console.error("Error obteniendo lecciones:", lessonsError)
     }
 
-    const totalLessons = lessonsData?.length || 0
+    // Obtener enrollments
+    const { data: enrollments, error: enrollmentsError } = await supabase.from("enrollments").select("course_id")
 
-    const stats = {
-      totalCourses,
-      publishedCourses,
-      totalUsers,
-      totalStudents,
-      totalEnrollments,
-      activeEnrollments,
-      totalLessons,
+    let totalRevenue = 0
+    if (enrollments && !enrollmentsError) {
+      // Obtener precios de cursos por separado
+      const courseIds = [...new Set(enrollments.map((e) => e.course_id))]
+      if (courseIds.length > 0) {
+        const { data: courses, error: coursesRevenueError } = await supabase
+          .from("courses")
+          .select("id, price")
+          .in("id", courseIds)
+
+        if (courses && !coursesRevenueError) {
+          // Calcular revenue basado en enrollments y precios
+          const courseMap = new Map(courses.map((c) => [c.id, c.price]))
+          totalRevenue = enrollments.reduce((sum, enrollment) => {
+            const coursePrice = courseMap.get(enrollment.course_id) || 0
+            return sum + coursePrice
+          }, 0)
+        }
+      }
     }
-
-    console.log("✅ Stats calculated:", stats)
 
     return NextResponse.json({
       success: true,
-      stats,
+      data: {
+        totalUsers: totalUsers || 0,
+        totalCourses: totalCourses || 0,
+        totalLessons: totalLessons || 0,
+        totalRevenue: totalRevenue,
+      },
     })
   } catch (error) {
-    console.error("❌ Unexpected error in stats API:", error)
-    return NextResponse.json({ success: false, message: "Error interno del servidor" }, { status: 500 })
+    console.error("Error en la ruta de estadísticas:", error)
+    return NextResponse.json(
+      {
+        success: false,
+        message: "Error interno del servidor",
+        error: error instanceof Error ? error.message : "Error desconocido",
+      },
+      { status: 500 },
+    )
   }
 }

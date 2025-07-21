@@ -2,18 +2,28 @@
 -- SCRIPT COMPLETO PARA CORREGIR LA BASE DE DATOS
 -- =====================================================
 
--- Primero, verificamos y creamos las extensiones necesarias
+-- 1. Crear extensiones necesarias
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
--- =====================================================
--- TABLA USERS - Verificar y corregir estructura
--- =====================================================
+-- 2. Crear o actualizar tabla de usuarios
+CREATE TABLE IF NOT EXISTS users (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    first_name VARCHAR(100),
+    last_name VARCHAR(100),
+    role VARCHAR(20) DEFAULT 'student' CHECK (role IN ('admin', 'instructor', 'student')),
+    avatar_url TEXT,
+    bio TEXT,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
 
--- Verificar si la tabla users existe y tiene las columnas correctas
-DO $$
+-- Agregar columnas faltantes si no existen
+DO $$ 
 BEGIN
-    -- Agregar columnas faltantes si no existen
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'bio') THEN
         ALTER TABLE users ADD COLUMN bio TEXT;
     END IF;
@@ -22,50 +32,35 @@ BEGIN
         ALTER TABLE users ADD COLUMN avatar_url TEXT;
     END IF;
     
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'phone') THEN
-        ALTER TABLE users ADD COLUMN phone VARCHAR(20);
-    END IF;
-    
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'date_of_birth') THEN
-        ALTER TABLE users ADD COLUMN date_of_birth DATE;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'is_active') THEN
+        ALTER TABLE users ADD COLUMN is_active BOOLEAN DEFAULT true;
     END IF;
 END $$;
 
--- =====================================================
--- TABLA COURSES - Verificar y corregir estructura
--- =====================================================
+-- 3. Crear o actualizar tabla de cursos
+CREATE TABLE IF NOT EXISTS courses (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    price DECIMAL(10,2) DEFAULT 0,
+    instructor VARCHAR(255),
+    instructor_id UUID REFERENCES users(id),
+    duration_hours INTEGER DEFAULT 0,
+    total_lessons INTEGER DEFAULT 0,
+    difficulty_level VARCHAR(20) DEFAULT 'beginner' CHECK (difficulty_level IN ('beginner', 'intermediate', 'advanced')),
+    thumbnail_url TEXT,
+    status VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft', 'published', 'archived')),
+    is_free BOOLEAN DEFAULT false,
+    archived BOOLEAN DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
 
--- Verificar si la tabla courses existe
-DO $$
+-- Agregar columnas faltantes a courses
+DO $$ 
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'courses') THEN
-        CREATE TABLE courses (
-            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-            title VARCHAR(255) NOT NULL,
-            description TEXT,
-            content TEXT,
-            price DECIMAL(10,2) DEFAULT 0,
-            instructor VARCHAR(255),
-            difficulty_level VARCHAR(50) DEFAULT 'beginner',
-            thumbnail_url TEXT,
-            status VARCHAR(50) DEFAULT 'draft',
-            archived BOOLEAN DEFAULT FALSE,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-        );
-    END IF;
-    
-    -- Agregar columnas faltantes si no existen
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'courses' AND column_name = 'content') THEN
-        ALTER TABLE courses ADD COLUMN content TEXT;
-    END IF;
-    
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'courses' AND column_name = 'instructor') THEN
-        ALTER TABLE courses ADD COLUMN instructor VARCHAR(255);
-    END IF;
-    
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'courses' AND column_name = 'difficulty_level') THEN
-        ALTER TABLE courses ADD COLUMN difficulty_level VARCHAR(50) DEFAULT 'beginner';
+        ALTER TABLE courses ADD COLUMN difficulty_level VARCHAR(20) DEFAULT 'beginner' CHECK (difficulty_level IN ('beginner', 'intermediate', 'advanced'));
     END IF;
     
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'courses' AND column_name = 'thumbnail_url') THEN
@@ -73,34 +68,37 @@ BEGIN
     END IF;
     
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'courses' AND column_name = 'archived') THEN
-        ALTER TABLE courses ADD COLUMN archived BOOLEAN DEFAULT FALSE;
+        ALTER TABLE courses ADD COLUMN archived BOOLEAN DEFAULT false;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'courses' AND column_name = 'is_free') THEN
+        ALTER TABLE courses ADD COLUMN is_free BOOLEAN DEFAULT false;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'courses' AND column_name = 'instructor_id') THEN
+        ALTER TABLE courses ADD COLUMN instructor_id UUID REFERENCES users(id);
     END IF;
 END $$;
 
--- =====================================================
--- TABLA LESSONS - Verificar y corregir estructura
--- =====================================================
+-- 4. Crear o actualizar tabla de lecciones
+CREATE TABLE IF NOT EXISTS lessons (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    content TEXT,
+    video_url TEXT,
+    duration_minutes INTEGER DEFAULT 0,
+    order_index INTEGER DEFAULT 0,
+    is_free BOOLEAN DEFAULT false,
+    status VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft', 'published')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
 
--- Verificar si la tabla lessons existe
-DO $$
+-- Agregar columnas faltantes a lessons
+DO $$ 
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'lessons') THEN
-        CREATE TABLE lessons (
-            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-            course_id UUID REFERENCES courses(id) ON DELETE CASCADE,
-            title VARCHAR(255) NOT NULL,
-            description TEXT,
-            content TEXT,
-            video_url TEXT,
-            duration_minutes INTEGER DEFAULT 0,
-            order_index INTEGER DEFAULT 0,
-            is_free BOOLEAN DEFAULT FALSE,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-        );
-    END IF;
-    
-    -- Agregar columnas faltantes si no existen
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'lessons' AND column_name = 'content') THEN
         ALTER TABLE lessons ADD COLUMN content TEXT;
     END IF;
@@ -118,298 +116,333 @@ BEGIN
     END IF;
     
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'lessons' AND column_name = 'is_free') THEN
-        ALTER TABLE lessons ADD COLUMN is_free BOOLEAN DEFAULT FALSE;
+        ALTER TABLE lessons ADD COLUMN is_free BOOLEAN DEFAULT false;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'lessons' AND column_name = 'status') THEN
+        ALTER TABLE lessons ADD COLUMN status VARCHAR(20) DEFAULT 'published' CHECK (status IN ('draft', 'published'));
     END IF;
 END $$;
 
--- =====================================================
--- TABLA ENROLLMENTS - Verificar y corregir estructura
--- =====================================================
+-- 5. Crear tabla de inscripciones
+CREATE TABLE IF NOT EXISTS enrollments (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    enrolled_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    progress DECIMAL(5,2) DEFAULT 0.00,
+    completed_at TIMESTAMP WITH TIME ZONE,
+    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'completed', 'cancelled')),
+    UNIQUE(user_id, course_id)
+);
 
--- Verificar si la tabla enrollments existe
-DO $$
+-- Agregar columnas faltantes a enrollments
+DO $$ 
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'enrollments') THEN
-        CREATE TABLE enrollments (
-            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-            user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-            course_id UUID REFERENCES courses(id) ON DELETE CASCADE,
-            status VARCHAR(50) DEFAULT 'active',
-            progress INTEGER DEFAULT 0,
-            enrolled_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-            completed_at TIMESTAMP WITH TIME ZONE,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-            UNIQUE(user_id, course_id)
-        );
-    END IF;
-    
-    -- Agregar columnas faltantes si no existen
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'enrollments' AND column_name = 'progress') THEN
-        ALTER TABLE enrollments ADD COLUMN progress INTEGER DEFAULT 0;
-    END IF;
-    
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'enrollments' AND column_name = 'enrolled_at') THEN
-        ALTER TABLE enrollments ADD COLUMN enrolled_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+        ALTER TABLE enrollments ADD COLUMN progress DECIMAL(5,2) DEFAULT 0.00;
     END IF;
     
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'enrollments' AND column_name = 'completed_at') THEN
         ALTER TABLE enrollments ADD COLUMN completed_at TIMESTAMP WITH TIME ZONE;
     END IF;
-END $$;
-
--- =====================================================
--- TABLA STUDENT_ACCESS_LOG - Para monitoreo
--- =====================================================
-
--- Crear tabla de logs si no existe
-DO $$
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'student_access_log') THEN
-        CREATE TABLE student_access_log (
-            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-            student_id UUID,
-            email VARCHAR(255),
-            action VARCHAR(100),
-            success BOOLEAN,
-            error_code VARCHAR(50),
-            error_message TEXT,
-            ip_address VARCHAR(45),
-            user_agent TEXT,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-        );
-        
-        -- Crear índices para mejor rendimiento
-        CREATE INDEX idx_student_access_log_student_id ON student_access_log(student_id);
-        CREATE INDEX idx_student_access_log_email ON student_access_log(email);
-        CREATE INDEX idx_student_access_log_created_at ON student_access_log(created_at);
-    END IF;
-END $$;
-
--- =====================================================
--- INSERTAR DATOS DE EJEMPLO
--- =====================================================
-
--- Insertar cursos de ejemplo si no existen
-INSERT INTO courses (id, title, description, content, price, instructor, difficulty_level, thumbnail_url, status)
-SELECT 
-    uuid_generate_v4(),
-    'Fundamentos de Odontología Digital',
-    'Aprende los conceptos básicos de la odontología digital moderna',
-    '<h2>Bienvenido al Curso de Fundamentos de Odontología Digital</h2><p>En este curso aprenderás los conceptos fundamentales de la odontología digital moderna.</p>',
-    299.99,
-    'Dr. María González',
-    'beginner',
-    '/placeholder.svg?height=300&width=400',
-    'published'
-WHERE NOT EXISTS (SELECT 1 FROM courses WHERE title = 'Fundamentos de Odontología Digital');
-
-INSERT INTO courses (id, title, description, content, price, instructor, difficulty_level, thumbnail_url, status)
-SELECT 
-    uuid_generate_v4(),
-    'Radiología Dental Avanzada',
-    'Técnicas avanzadas de interpretación radiológica en odontología',
-    '<h2>Radiología Dental Avanzada</h2><p>Domina las técnicas más avanzadas de radiología dental.</p>',
-    499.99,
-    'Dr. Carlos Rodríguez',
-    'advanced',
-    '/placeholder.svg?height=300&width=400',
-    'published'
-WHERE NOT EXISTS (SELECT 1 FROM courses WHERE title = 'Radiología Dental Avanzada');
-
--- Insertar lecciones de ejemplo con contenido completo
-DO $$
-DECLARE
-    course_id_1 UUID;
-    course_id_2 UUID;
-BEGIN
-    -- Obtener IDs de los cursos
-    SELECT id INTO course_id_1 FROM courses WHERE title = 'Fundamentos de Odontología Digital' LIMIT 1;
-    SELECT id INTO course_id_2 FROM courses WHERE title = 'Radiología Dental Avanzada' LIMIT 1;
     
-    -- Lecciones para el primer curso
-    IF course_id_1 IS NOT NULL THEN
-        -- Lección gratuita
-        INSERT INTO lessons (id, course_id, title, description, content, video_url, duration_minutes, order_index, is_free)
-        SELECT 
-            uuid_generate_v4(),
-            course_id_1,
-            'Introducción a la Odontología Digital',
-            'Una introducción completa a los conceptos básicos',
-            '<div class="lesson-content">
-                <h2>Introducción a la Odontología Digital</h2>
-                <p>La odontología digital ha revolucionado la práctica dental moderna. En esta lección aprenderás:</p>
-                <ul>
-                    <li>Qué es la odontología digital</li>
-                    <li>Principales tecnologías utilizadas</li>
-                    <li>Beneficios para pacientes y profesionales</li>
-                    <li>Tendencias futuras</li>
-                </ul>
-                <h3>Conceptos Clave</h3>
-                <p>La digitalización en odontología incluye:</p>
-                <ol>
-                    <li><strong>Radiografía Digital:</strong> Imágenes de alta calidad con menor radiación</li>
-                    <li><strong>Escáneres Intraorales:</strong> Impresiones digitales precisas</li>
-                    <li><strong>CAD/CAM:</strong> Diseño y fabricación asistida por computadora</li>
-                    <li><strong>Planificación Digital:</strong> Software especializado para tratamientos</li>
-                </ol>
-                <div class="video-placeholder" style="background: #f0f0f0; padding: 20px; text-align: center; margin: 20px 0;">
-                    <p>🎥 Video: Introducción a la Odontología Digital (15 min)</p>
-                </div>
-                <h3>Ejercicio Práctico</h3>
-                <p>Identifica 3 tecnologías digitales que hayas observado en tu consulta dental.</p>
-            </div>',
-            'https://example.com/video1.mp4',
-            15,
-            1,
-            true
-        WHERE NOT EXISTS (SELECT 1 FROM lessons WHERE course_id = course_id_1 AND title = 'Introducción a la Odontología Digital');
-        
-        -- Lección premium
-        INSERT INTO lessons (id, course_id, title, description, content, video_url, duration_minutes, order_index, is_free)
-        SELECT 
-            uuid_generate_v4(),
-            course_id_1,
-            'Escáneres Intraorales: Técnicas Avanzadas',
-            'Aprende a utilizar escáneres intraorales de manera profesional',
-            '<div class="lesson-content">
-                <h2>Escáneres Intraorales: Técnicas Avanzadas</h2>
-                <p>Los escáneres intraorales son una herramienta fundamental en la odontología digital moderna.</p>
-                <h3>Tipos de Escáneres</h3>
-                <ul>
-                    <li><strong>Escáneres de Luz Estructurada:</strong> Alta precisión para restauraciones</li>
-                    <li><strong>Escáneres de Triangulación Láser:</strong> Ideales para ortodoncia</li>
-                    <li><strong>Escáneres de Luz Blanca:</strong> Versatilidad en diferentes tratamientos</li>
-                </ul>
-                <div class="video-placeholder" style="background: #f0f0f0; padding: 20px; text-align: center; margin: 20px 0;">
-                    <p>🎥 Video: Técnicas de Escaneo Intraoral (25 min)</p>
-                </div>
-                <h3>Protocolo de Escaneo</h3>
-                <ol>
-                    <li>Preparación del paciente</li>
-                    <li>Calibración del equipo</li>
-                    <li>Secuencia de escaneo</li>
-                    <li>Verificación de calidad</li>
-                    <li>Procesamiento de datos</li>
-                </ol>
-                <div class="important-note" style="background: #fff3cd; padding: 15px; border-left: 4px solid #ffc107; margin: 20px 0;">
-                    <strong>Nota Importante:</strong> La precisión del escaneo depende de la técnica utilizada y las condiciones del ambiente.
-                </div>
-            </div>',
-            'https://example.com/video2.mp4',
-            25,
-            2,
-            false
-        WHERE NOT EXISTS (SELECT 1 FROM lessons WHERE course_id = course_id_1 AND title = 'Escáneres Intraorales: Técnicas Avanzadas');
-    END IF;
-    
-    -- Lecciones para el segundo curso
-    IF course_id_2 IS NOT NULL THEN
-        INSERT INTO lessons (id, course_id, title, description, content, video_url, duration_minutes, order_index, is_free)
-        SELECT 
-            uuid_generate_v4(),
-            course_id_2,
-            'Fundamentos de Radiología Dental',
-            'Conceptos básicos de radiología aplicada a la odontología',
-            '<div class="lesson-content">
-                <h2>Fundamentos de Radiología Dental</h2>
-                <p>La radiología dental es esencial para el diagnóstico y planificación de tratamientos.</p>
-                <h3>Tipos de Radiografías Dentales</h3>
-                <ul>
-                    <li><strong>Periapicales:</strong> Visualización completa del diente</li>
-                    <li><strong>Bitewing:</strong> Detección de caries interproximales</li>
-                    <li><strong>Panorámicas:</strong> Vista general de toda la dentición</li>
-                    <li><strong>CBCT:</strong> Imágenes tridimensionales de alta resolución</li>
-                </ul>
-                <div class="video-placeholder" style="background: #f0f0f0; padding: 20px; text-align: center; margin: 20px 0;">
-                    <p>🎥 Video: Tipos de Radiografías Dentales (20 min)</p>
-                </div>
-                <h3>Principios de Radioprotección</h3>
-                <p>Es fundamental seguir los principios ALARA (As Low As Reasonably Achievable):</p>
-                <ol>
-                    <li>Justificación del examen</li>
-                    <li>Optimización de la técnica</li>
-                    <li>Limitación de la dosis</li>
-                </ol>
-            </div>',
-            'https://example.com/video3.mp4',
-            20,
-            1,
-            true
-        WHERE NOT EXISTS (SELECT 1 FROM lessons WHERE course_id = course_id_2 AND title = 'Fundamentos de Radiología Dental');
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'enrollments' AND column_name = 'status') THEN
+        ALTER TABLE enrollments ADD COLUMN status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'completed', 'cancelled'));
     END IF;
 END $$;
 
--- =====================================================
--- CREAR ÍNDICES PARA MEJOR RENDIMIENTO
--- =====================================================
+-- 6. Crear tabla de progreso de lecciones
+CREATE TABLE IF NOT EXISTS lesson_progress (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    lesson_id UUID NOT NULL REFERENCES lessons(id) ON DELETE CASCADE,
+    completed BOOLEAN DEFAULT false,
+    completed_at TIMESTAMP WITH TIME ZONE,
+    watch_time_seconds INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(user_id, lesson_id)
+);
 
--- Índices para la tabla courses
+-- 7. Crear tabla de tags para cursos
+CREATE TABLE IF NOT EXISTS course_tags (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(100) UNIQUE NOT NULL,
+    color VARCHAR(7) DEFAULT '#3B82F6',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 8. Crear tabla de relación curso-tags
+CREATE TABLE IF NOT EXISTS course_tag_relations (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    tag_id UUID NOT NULL REFERENCES course_tags(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(course_id, tag_id)
+);
+
+-- 9. Crear tabla de carousel
+CREATE TABLE IF NOT EXISTS carousel_slides (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    title VARCHAR(255) NOT NULL,
+    subtitle TEXT,
+    image_url TEXT,
+    link_url TEXT,
+    order_index INTEGER DEFAULT 0,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 10. Crear tabla de logs de acceso
+CREATE TABLE IF NOT EXISTS student_access_log (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    student_id UUID REFERENCES users(id),
+    email VARCHAR(255),
+    action VARCHAR(100) NOT NULL,
+    success BOOLEAN NOT NULL,
+    error_code VARCHAR(50),
+    error_message TEXT,
+    ip_address VARCHAR(45),
+    user_agent TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 11. Crear índices para mejorar rendimiento
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
 CREATE INDEX IF NOT EXISTS idx_courses_status ON courses(status);
-CREATE INDEX IF NOT EXISTS idx_courses_created_at ON courses(created_at);
-
--- Índices para la tabla lessons
+CREATE INDEX IF NOT EXISTS idx_courses_archived ON courses(archived);
 CREATE INDEX IF NOT EXISTS idx_lessons_course_id ON lessons(course_id);
-CREATE INDEX IF NOT EXISTS idx_lessons_order_index ON lessons(order_index);
-CREATE INDEX IF NOT EXISTS idx_lessons_is_free ON lessons(is_free);
-
--- Índices para la tabla enrollments
+CREATE INDEX IF NOT EXISTS idx_lessons_order ON lessons(course_id, order_index);
 CREATE INDEX IF NOT EXISTS idx_enrollments_user_id ON enrollments(user_id);
 CREATE INDEX IF NOT EXISTS idx_enrollments_course_id ON enrollments(course_id);
-CREATE INDEX IF NOT EXISTS idx_enrollments_status ON enrollments(status);
+CREATE INDEX IF NOT EXISTS idx_lesson_progress_user_id ON lesson_progress(user_id);
+CREATE INDEX IF NOT EXISTS idx_lesson_progress_lesson_id ON lesson_progress(lesson_id);
+CREATE INDEX IF NOT EXISTS idx_student_access_log_email ON student_access_log(email);
+CREATE INDEX IF NOT EXISTS idx_student_access_log_created_at ON student_access_log(created_at);
 
--- =====================================================
--- FUNCIONES DE UTILIDAD
--- =====================================================
-
--- Función para verificar acceso a lecciones
-CREATE OR REPLACE FUNCTION check_lesson_access(
-    p_user_id UUID,
-    p_lesson_id UUID,
-    p_user_role VARCHAR DEFAULT 'student'
-) RETURNS BOOLEAN AS $$
-DECLARE
-    lesson_is_free BOOLEAN;
-    user_enrolled BOOLEAN;
+-- 12. Crear función para auto-inscribir administradores
+CREATE OR REPLACE FUNCTION auto_enroll_admin()
+RETURNS TRIGGER AS $$
 BEGIN
-    -- Los administradores tienen acceso completo
-    IF p_user_role = 'admin' THEN
-        RETURN TRUE;
+    -- Si es un admin, inscribirlo automáticamente en todos los cursos
+    IF NEW.role = 'admin' THEN
+        INSERT INTO enrollments (user_id, course_id, enrolled_at, status)
+        SELECT NEW.id, c.id, NOW(), 'active'
+        FROM courses c
+        WHERE NOT EXISTS (
+            SELECT 1 FROM enrollments e 
+            WHERE e.user_id = NEW.id AND e.course_id = c.id
+        );
     END IF;
-    
-    -- Verificar si la lección es gratuita
-    SELECT is_free INTO lesson_is_free
-    FROM lessons
-    WHERE id = p_lesson_id;
-    
-    -- Si la lección es gratuita, permitir acceso
-    IF lesson_is_free THEN
-        RETURN TRUE;
-    END IF;
-    
-    -- Verificar si el usuario está inscrito en el curso
-    SELECT EXISTS(
-        SELECT 1
-        FROM enrollments e
-        JOIN lessons l ON l.course_id = e.course_id
-        WHERE e.user_id = p_user_id
-        AND l.id = p_lesson_id
-        AND e.status = 'active'
-    ) INTO user_enrolled;
-    
-    RETURN user_enrolled;
+    RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
--- =====================================================
--- MENSAJE DE CONFIRMACIÓN
--- =====================================================
+-- Crear trigger para auto-inscripción de admins
+DROP TRIGGER IF EXISTS trigger_auto_enroll_admin ON users;
+CREATE TRIGGER trigger_auto_enroll_admin
+    AFTER INSERT OR UPDATE OF role ON users
+    FOR EACH ROW
+    EXECUTE FUNCTION auto_enroll_admin();
 
-DO $$
+-- 13. Crear función para verificar acceso a lecciones
+CREATE OR REPLACE FUNCTION check_lesson_access(
+    p_user_id UUID,
+    p_lesson_id UUID
+) RETURNS TABLE (
+    has_access BOOLEAN,
+    lesson_title TEXT,
+    course_title TEXT,
+    is_free BOOLEAN,
+    user_role TEXT
+) AS $$
 BEGIN
-    RAISE NOTICE '✅ Base de datos corregida exitosamente';
-    RAISE NOTICE '📊 Tablas verificadas: users, courses, lessons, enrollments, student_access_log';
-    RAISE NOTICE '🔧 Columnas agregadas: content, video_url, duration_minutes, order_index, is_free';
-    RAISE NOTICE '📚 Cursos de ejemplo insertados con lecciones completas';
-    RAISE NOTICE '🚀 Sistema listo para usar';
+    RETURN QUERY
+    SELECT 
+        CASE 
+            WHEN u.role = 'admin' THEN true
+            WHEN l.is_free = true THEN true
+            WHEN EXISTS (
+                SELECT 1 FROM enrollments e 
+                WHERE e.user_id = p_user_id 
+                AND e.course_id = l.course_id 
+                AND e.status = 'active'
+            ) THEN true
+            ELSE false
+        END as has_access,
+        l.title as lesson_title,
+        c.title as course_title,
+        l.is_free,
+        u.role as user_role
+    FROM lessons l
+    JOIN courses c ON l.course_id = c.id
+    CROSS JOIN users u
+    WHERE l.id = p_lesson_id AND u.id = p_user_id;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 14. Limpiar lecciones existentes y crear nuevas con contenido
+DELETE FROM lessons;
+
+-- 15. Insertar lecciones de ejemplo con contenido completo
+INSERT INTO lessons (id, course_id, title, description, content, video_url, duration_minutes, order_index, is_free, status) 
+SELECT 
+    uuid_generate_v4(),
+    c.id,
+    'Introducción a ' || c.title,
+    'Lección introductoria del curso ' || c.title,
+    '<h2>Bienvenido al curso: ' || c.title || '</h2>
+    <p>En esta lección introductoria aprenderás los conceptos fundamentales que necesitas para dominar este tema.</p>
+    <h3>Objetivos de aprendizaje:</h3>
+    <ul>
+        <li>Comprender los conceptos básicos</li>
+        <li>Identificar las herramientas necesarias</li>
+        <li>Establecer una base sólida para el aprendizaje</li>
+    </ul>
+    <h3>Contenido de la lección:</h3>
+    <p>Esta es una lección de ejemplo con contenido HTML completo. Aquí puedes incluir texto, imágenes, videos y cualquier otro contenido educativo.</p>
+    <blockquote>
+        <p><strong>Nota importante:</strong> Esta es una lección de demostración. El contenido real debe ser proporcionado por el instructor del curso.</p>
+    </blockquote>',
+    'https://www.youtube.com/embed/dQw4w9WgXcQ',
+    15,
+    1,
+    true,
+    'published'
+FROM courses c
+WHERE c.status = 'published';
+
+-- Insertar segunda lección para cada curso
+INSERT INTO lessons (id, course_id, title, description, content, video_url, duration_minutes, order_index, is_free, status) 
+SELECT 
+    uuid_generate_v4(),
+    c.id,
+    'Conceptos Fundamentales - ' || c.title,
+    'Segunda lección del curso ' || c.title,
+    '<h2>Conceptos Fundamentales</h2>
+    <p>En esta segunda lección profundizaremos en los conceptos fundamentales del tema.</p>
+    <h3>Temas a cubrir:</h3>
+    <ol>
+        <li>Definiciones importantes</li>
+        <li>Principios básicos</li>
+        <li>Aplicaciones prácticas</li>
+        <li>Casos de estudio</li>
+    </ol>
+    <h3>Ejercicios prácticos:</h3>
+    <p>Al final de esta lección podrás realizar los siguientes ejercicios:</p>
+    <ul>
+        <li>Ejercicio 1: Identificación de conceptos</li>
+        <li>Ejercicio 2: Aplicación práctica</li>
+        <li>Ejercicio 3: Análisis de casos</li>
+    </ul>
+    <div style="background-color: #f0f9ff; padding: 1rem; border-left: 4px solid #0ea5e9; margin: 1rem 0;">
+        <h4>💡 Consejo del instructor:</h4>
+        <p>Tómate tu tiempo para entender cada concepto antes de avanzar a la siguiente sección.</p>
+    </div>',
+    'https://www.youtube.com/embed/dQw4w9WgXcQ',
+    25,
+    2,
+    false,
+    'published'
+FROM courses c
+WHERE c.status = 'published';
+
+-- Insertar tercera lección para cada curso
+INSERT INTO lessons (id, course_id, title, description, content, video_url, duration_minutes, order_index, is_free, status) 
+SELECT 
+    uuid_generate_v4(),
+    c.id,
+    'Práctica Avanzada - ' || c.title,
+    'Lección avanzada del curso ' || c.title,
+    '<h2>Práctica Avanzada</h2>
+    <p>Esta lección está diseñada para estudiantes que han completado las lecciones anteriores y están listos para contenido más avanzado.</p>
+    <h3>Prerrequisitos:</h3>
+    <ul>
+        <li>Haber completado la lección de introducción</li>
+        <li>Entender los conceptos fundamentales</li>
+        <li>Tener experiencia práctica básica</li>
+    </ul>
+    <h3>Contenido avanzado:</h3>
+    <p>En esta sección cubriremos técnicas avanzadas y casos de uso complejos.</p>
+    <table style="width: 100%; border-collapse: collapse; margin: 1rem 0;">
+        <thead>
+            <tr style="background-color: #f8fafc;">
+                <th style="border: 1px solid #e2e8f0; padding: 0.5rem;">Técnica</th>
+                <th style="border: 1px solid #e2e8f0; padding: 0.5rem;">Dificultad</th>
+                <th style="border: 1px solid #e2e8f0; padding: 0.5rem;">Tiempo estimado</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td style="border: 1px solid #e2e8f0; padding: 0.5rem;">Técnica A</td>
+                <td style="border: 1px solid #e2e8f0; padding: 0.5rem;">Intermedio</td>
+                <td style="border: 1px solid #e2e8f0; padding: 0.5rem;">30 min</td>
+            </tr>
+            <tr>
+                <td style="border: 1px solid #e2e8f0; padding: 0.5rem;">Técnica B</td>
+                <td style="border: 1px solid #e2e8f0; padding: 0.5rem;">Avanzado</td>
+                <td style="border: 1px solid #e2e8f0; padding: 0.5rem;">45 min</td>
+            </tr>
+        </tbody>
+    </table>
+    <div style="background-color: #fef3c7; padding: 1rem; border-left: 4px solid #f59e0b; margin: 1rem 0;">
+        <h4>⚠️ Advertencia:</h4>
+        <p>Este contenido requiere conocimientos previos. Asegúrate de haber completado las lecciones anteriores.</p>
+    </div>',
+    'https://www.youtube.com/embed/dQw4w9WgXcQ',
+    35,
+    3,
+    false,
+    'published'
+FROM courses c
+WHERE c.status = 'published';
+
+-- 16. Actualizar el conteo de lecciones en los cursos
+UPDATE courses 
+SET total_lessons = (
+    SELECT COUNT(*) 
+    FROM lessons l 
+    WHERE l.course_id = courses.id
+);
+
+-- 17. Crear algunos tags de ejemplo
+INSERT INTO course_tags (name, color) VALUES
+('Principiante', '#10B981'),
+('Intermedio', '#F59E0B'),
+('Avanzado', '#EF4444'),
+('Práctico', '#8B5CF6'),
+('Teórico', '#06B6D4')
+ON CONFLICT (name) DO NOTHING;
+
+-- 18. Verificar que todo esté correcto
+DO $$
+DECLARE
+    user_count INTEGER;
+    course_count INTEGER;
+    lesson_count INTEGER;
+    enrollment_count INTEGER;
+BEGIN
+    SELECT COUNT(*) INTO user_count FROM users;
+    SELECT COUNT(*) INTO course_count FROM courses;
+    SELECT COUNT(*) INTO lesson_count FROM lessons;
+    SELECT COUNT(*) INTO enrollment_count FROM enrollments;
+    
+    RAISE NOTICE '✅ Base de datos configurada correctamente:';
+    RAISE NOTICE '   - Usuarios: %', user_count;
+    RAISE NOTICE '   - Cursos: %', course_count;
+    RAISE NOTICE '   - Lecciones: %', lesson_count;
+    RAISE NOTICE '   - Inscripciones: %', enrollment_count;
 END $$;
+
+-- 19. Mensaje final
+SELECT 
+    '✅ Base de datos completamente configurada y lista para usar' as status,
+    COUNT(DISTINCT c.id) as total_courses,
+    COUNT(l.id) as total_lessons,
+    COUNT(DISTINCT u.id) as total_users
+FROM courses c
+LEFT JOIN lessons l ON c.id = l.course_id
+CROSS JOIN users u;
