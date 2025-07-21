@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, Play, Clock, BookOpen, Lock } from "lucide-react"
+import { Navigation } from "@/components/navigation"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -64,12 +65,19 @@ async function getCourseLessons(courseId: string) {
   return lessons || []
 }
 
+async function getCurrentUser() {
+  // This would normally get the user from session/cookies
+  // For now, return null to show logged-out state
+  return null
+}
+
 export default async function LessonPage({
   params,
 }: {
   params: { courseId: string; lessonId: string }
 }) {
   const lesson = await getLessonData(params.lessonId)
+  const user = await getCurrentUser()
 
   if (!lesson) {
     notFound()
@@ -82,40 +90,21 @@ export default async function LessonPage({
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b sticky top-0 z-40">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Link href={`/courses/${params.courseId}`}>
-                <Button variant="ghost" size="sm" className="flex items-center space-x-2">
-                  <ArrowLeft className="w-4 h-4" />
-                  <span>Volver al Curso</span>
-                </Button>
-              </Link>
-              <div className="hidden md:block">
-                <h1 className="text-lg font-semibold text-gray-900">{lesson.courses.title}</h1>
-                <p className="text-sm text-gray-600">por {lesson.courses.instructor}</p>
-              </div>
-            </div>
-            <div className="flex items-center space-x-3">
-              <Link href="/auth/login">
-                <Button variant="ghost" size="sm">
-                  Iniciar Sesión
-                </Button>
-              </Link>
-              <Link href="/auth/register">
-                <Button size="sm">Registrarse</Button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </header>
+      {/* Navigation with user state */}
+      <Navigation user={user} />
 
       <div className="container mx-auto px-4 py-8">
         <div className="grid lg:grid-cols-4 gap-8">
           {/* Main Content */}
           <div className="lg:col-span-3 space-y-6">
+            {/* Back Button */}
+            <Link href={`/courses/${params.courseId}`}>
+              <Button variant="ghost" size="sm" className="flex items-center space-x-2">
+                <ArrowLeft className="w-4 h-4" />
+                <span>Volver al Curso</span>
+              </Button>
+            </Link>
+
             {/* Lesson Header */}
             <Card>
               <CardHeader>

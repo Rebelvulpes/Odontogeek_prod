@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Play, Clock, Award, CheckCircle, Lock } from "lucide-react"
+import { Navigation } from "@/components/navigation"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -33,8 +34,15 @@ async function getCourse(courseId: string) {
   return course
 }
 
+async function getCurrentUser() {
+  // This would normally get the user from session/cookies
+  // For now, return null to show logged-out state
+  return null
+}
+
 export default async function CoursePage({ params }: { params: { courseId: string } }) {
   const course = await getCourse(params.courseId)
+  const user = await getCurrentUser()
 
   if (!course) {
     notFound()
@@ -46,26 +54,8 @@ export default async function CoursePage({ params }: { params: { courseId: strin
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b sticky top-0 z-40">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <Link href="/" className="flex items-center space-x-2">
-              <img src="/images/odontogeek-logo-new.png" alt="OdontoGeek" className="h-8 w-auto" />
-            </Link>
-            <div className="flex items-center space-x-3">
-              <Link href="/auth/login">
-                <Button variant="ghost" size="sm">
-                  Iniciar Sesión
-                </Button>
-              </Link>
-              <Link href="/auth/register">
-                <Button size="sm">Registrarse</Button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </header>
+      {/* Navigation with user state */}
+      <Navigation user={user} />
 
       <div className="container mx-auto px-4 py-8">
         <div className="grid lg:grid-cols-3 gap-8">
@@ -248,7 +238,11 @@ export default async function CoursePage({ params }: { params: { courseId: strin
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Nivel:</span>
-                  <span className="font-medium">Intermedio</span>
+                  <span className="font-medium capitalize">{course.difficulty_level || "Intermedio"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Instructor:</span>
+                  <span className="font-medium">{course.instructor}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Idioma:</span>

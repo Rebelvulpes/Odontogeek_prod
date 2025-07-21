@@ -15,7 +15,9 @@ BEGIN
             status VARCHAR(50) DEFAULT 'published',
             archived BOOLEAN DEFAULT FALSE,
             created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            is_free BOOLEAN DEFAULT false,
+            instructor VARCHAR(255) DEFAULT 'Instructor'
         );
         
         RAISE NOTICE 'Created courses table';
@@ -28,12 +30,12 @@ BEGIN
     END IF;
 
     IF NOT EXISTS (SELECT FROM information_schema.columns WHERE table_name = 'courses' AND column_name = 'status') THEN
-        ALTER TABLE courses ADD COLUMN status VARCHAR(50) DEFAULT 'published';
+        ALTER TABLE courses ADD COLUMN status VARCHAR(20) DEFAULT 'draft';
         RAISE NOTICE 'Added status column to courses';
     END IF;
 
     IF NOT EXISTS (SELECT FROM information_schema.columns WHERE table_name = 'courses' AND column_name = 'difficulty_level') THEN
-        ALTER TABLE courses ADD COLUMN difficulty_level VARCHAR(50) DEFAULT 'principiante';
+        ALTER TABLE courses ADD COLUMN difficulty_level VARCHAR(20) DEFAULT 'beginner';
         RAISE NOTICE 'Added difficulty_level column to courses';
     END IF;
 
@@ -50,6 +52,21 @@ BEGIN
     IF NOT EXISTS (SELECT FROM information_schema.columns WHERE table_name = 'courses' AND column_name = 'instructor_name') THEN
         ALTER TABLE courses ADD COLUMN instructor_name VARCHAR(255);
         RAISE NOTICE 'Added instructor_name column to courses';
+    END IF;
+
+    IF NOT EXISTS (SELECT FROM information_schema.columns WHERE table_name = 'courses' AND column_name = 'is_free') THEN
+        ALTER TABLE courses ADD COLUMN is_free BOOLEAN DEFAULT false;
+        RAISE NOTICE 'Added is_free column to courses';
+    END IF;
+
+    IF NOT EXISTS (SELECT FROM information_schema.columns WHERE table_name = 'courses' AND column_name = 'instructor') THEN
+        ALTER TABLE courses ADD COLUMN instructor VARCHAR(255) DEFAULT 'Instructor';
+        RAISE NOTICE 'Added instructor column to courses';
+    END IF;
+
+    IF NOT EXISTS (SELECT FROM information_schema.columns WHERE table_name = 'courses' AND column_name = 'updated_at') THEN
+        ALTER TABLE courses ADD COLUMN updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+        RAISE NOTICE 'Added updated_at column to courses';
     END IF;
 
     -- Ensure lessons table exists
@@ -150,14 +167,57 @@ BEGIN
     UPDATE courses SET 
         status = 'published' WHERE status IS NULL,
         archived = FALSE WHERE archived IS NULL,
-        difficulty_level = 'principiante' WHERE difficulty_level IS NULL,
-        price = 0 WHERE price IS NULL;
+        difficulty_level = 'beginner' WHERE difficulty_level IS NULL,
+        price = 0 WHERE price IS NULL,
+        is_free = false WHERE is_free IS NULL,
+        instructor = 'Instructor' WHERE instructor IS NULL,
+        updated_at = COALESCE(updated_at, created_at, NOW());
 
     UPDATE lessons SET 
         archived = FALSE WHERE archived IS NULL,
         is_free = FALSE WHERE is_free IS NULL,
         duration_minutes = 0 WHERE duration_minutes IS NULL,
         order_index = 0 WHERE order_index IS NULL;
+
+    -- Create some sample courses if none exist
+    INSERT INTO courses (title, description, price, instructor, difficulty_level, status, is_free, created_at, updated_at)
+    SELECT 
+        'Curso de Odontología Básica',
+        'Aprende los fundamentos de la odontología moderna con técnicas actualizadas y casos prácticos.',
+        299.99,
+        'Dr. María González',
+        'beginner',
+        'published',
+        false,
+        NOW() - INTERVAL '2 days',
+        NOW() - INTERVAL '1 day'
+    WHERE NOT EXISTS (SELECT 1 FROM courses WHERE title = 'Curso de Odontología Básica');
+
+    INSERT INTO courses (title, description, price, instructor, difficulty_level, status, is_free, created_at, updated_at)
+    SELECT 
+        'Endodoncia Avanzada',
+        'Técnicas avanzadas de endodoncia para profesionales con experiencia.',
+        499.99,
+        'Dr. Carlos Rodríguez',
+        'advanced',
+        'published',
+        false,
+        NOW() - INTERVAL '1 day',
+        NOW()
+    WHERE NOT EXISTS (SELECT 1 FROM courses WHERE title = 'Endodoncia Avanzada');
+
+    INSERT INTO courses (title, description, price, instructor, difficulty_level, status, is_free, created_at, updated_at)
+    SELECT 
+        'Introducción Gratuita',
+        'Una introducción gratuita a nuestros cursos de odontología.',
+        0,
+        'Dr. Ana Martínez',
+        'beginner',
+        'published',
+        true,
+        NOW() - INTERVAL '3 days',
+        NOW() - INTERVAL '2 days'
+    WHERE NOT EXISTS (SELECT 1 FROM courses WHERE title = 'Introducción Gratuita');
 
     RAISE NOTICE 'Database structure verification completed successfully';
 
@@ -166,18 +226,13 @@ END $$;
 -- Verify the structure
 SELECT 
     'courses' as table_name,
-    COUNT(*) as total_records,
-    COUNT(CASE WHEN archived = FALSE THEN 1 END) as active_records
-FROM courses
-UNION ALL
-SELECT 
-    'lessons' as table_name,
-    COUNT(*) as total_records,
-    COUNT(CASE WHEN archived = FALSE THEN 1 END) as active_records
-FROM lessons
-UNION ALL
-SELECT 
-    'enrollments' as table_name,
-    COUNT(*) as total_records,
-    COUNT(*) as active_records
-FROM enrollments;
+    COUNT(*) as total_courses,
+    COUNT(CASE WHEN status = 'published' THEN 1 END) as published_courses,
+    COUNT(CASE WHEN is_free = true THEN 1 END) as free_courses
+FROM courses;
+
+-- Show sample of courses
+SELECT id, title, instructor, price, status, difficulty_level, is_free, created_at
+FROM courses 
+ORDER BY created_at DESC 
+LIMIT 5;
