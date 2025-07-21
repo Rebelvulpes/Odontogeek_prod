@@ -11,27 +11,33 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 async function getCourse(courseId: string) {
-  const supabase = createClient(supabaseUrl, supabaseServiceKey)
+  try {
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-  const { data: course, error } = await supabase
-    .from("courses")
-    .select(`
-      *,
-      lessons:lessons(*)
-    `)
-    .eq("id", courseId)
-    .single()
+    const { data: course, error } = await supabase
+      .from("courses")
+      .select(`
+        *,
+        lessons:lessons(*)
+      `)
+      .eq("id", courseId)
+      .single()
 
-  if (error || !course) {
+    if (error) {
+      console.error("Error fetching course:", error)
+      return null
+    }
+
+    // Ordenar lecciones por order_index
+    if (course?.lessons) {
+      course.lessons.sort((a: any, b: any) => (a.order_index || 0) - (b.order_index || 0))
+    }
+
+    return course
+  } catch (error) {
+    console.error("Error in getCourse:", error)
     return null
   }
-
-  // Ordenar lecciones por order_index
-  if (course.lessons) {
-    course.lessons.sort((a: any, b: any) => a.order_index - b.order_index)
-  }
-
-  return course
 }
 
 export default async function CoursePage({ params }: { params: { courseId: string } }) {
@@ -43,7 +49,8 @@ export default async function CoursePage({ params }: { params: { courseId: strin
 
   const freeLessons = course.lessons?.filter((lesson: any) => lesson.is_free) || []
   const paidLessons = course.lessons?.filter((lesson: any) => !lesson.is_free) || []
-  const totalDuration = course.lessons?.reduce((sum: number, lesson: any) => sum + lesson.duration_minutes, 0) || 0
+  const totalDuration =
+    course.lessons?.reduce((sum: number, lesson: any) => sum + (lesson.duration_minutes || 0), 0) || 0
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -80,7 +87,7 @@ export default async function CoursePage({ params }: { params: { courseId: strin
                   <div className="text-sm text-gray-600">Gratis</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-orange-600">${course.price}</div>
+                  <div className="text-2xl font-bold text-orange-600">${course.price || 0}</div>
                   <div className="text-sm text-gray-600">Precio</div>
                 </div>
               </div>
@@ -103,7 +110,7 @@ export default async function CoursePage({ params }: { params: { courseId: strin
                         <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
                           <div className="flex items-center space-x-3">
                             <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                              <span className="text-sm font-medium text-green-600">{lesson.order_index}</span>
+                              <span className="text-sm font-medium text-green-600">{lesson.order_index || 1}</span>
                             </div>
                             <div>
                               <h3 className="font-medium">{lesson.title}</h3>
@@ -113,7 +120,7 @@ export default async function CoursePage({ params }: { params: { courseId: strin
                           <div className="flex items-center space-x-2">
                             <div className="flex items-center text-sm text-gray-500">
                               <Clock className="w-4 h-4 mr-1" />
-                              {lesson.duration_minutes} min
+                              {lesson.duration_minutes || 0} min
                             </div>
                             <Badge variant="secondary" className="bg-green-100 text-green-800">
                               Gratis
@@ -146,7 +153,7 @@ export default async function CoursePage({ params }: { params: { courseId: strin
                       >
                         <div className="flex items-center space-x-3">
                           <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
-                            <span className="text-sm font-medium text-gray-600">{lesson.order_index}</span>
+                            <span className="text-sm font-medium text-gray-600">{lesson.order_index || 1}</span>
                           </div>
                           <div>
                             <h3 className="font-medium text-gray-700">{lesson.title}</h3>
@@ -156,7 +163,7 @@ export default async function CoursePage({ params }: { params: { courseId: strin
                         <div className="flex items-center space-x-2">
                           <div className="flex items-center text-sm text-gray-500">
                             <Clock className="w-4 h-4 mr-1" />
-                            {lesson.duration_minutes} min
+                            {lesson.duration_minutes || 0} min
                           </div>
                           <Lock className="w-4 h-4 text-gray-400" />
                         </div>
@@ -180,7 +187,7 @@ export default async function CoursePage({ params }: { params: { courseId: strin
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="text-center">
-                  <div className="text-3xl font-bold text-blue-600">${course.price}</div>
+                  <div className="text-3xl font-bold text-blue-600">${course.price || 0}</div>
                   <div className="text-sm text-gray-600">Acceso completo de por vida</div>
                 </div>
 
@@ -235,7 +242,7 @@ export default async function CoursePage({ params }: { params: { courseId: strin
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Instructor:</span>
-                  <span className="font-medium">{course.instructor}</span>
+                  <span className="font-medium">{course.instructor || "Instructor"}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Idioma:</span>

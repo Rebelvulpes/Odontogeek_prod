@@ -12,23 +12,28 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 async function getCourses() {
-  const supabase = createClient(supabaseUrl, supabaseServiceKey)
+  try {
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-  const { data: courses, error } = await supabase
-    .from("courses")
-    .select(`
-      *,
-      lessons:lessons(id, duration_minutes)
-    `)
-    .eq("status", "published")
-    .order("created_at", { ascending: false })
+    const { data: courses, error } = await supabase
+      .from("courses")
+      .select(`
+        *,
+        lessons:lessons(id, duration_minutes)
+      `)
+      .eq("status", "published")
+      .order("created_at", { ascending: false })
 
-  if (error) {
-    console.error("Error fetching courses:", error)
+    if (error) {
+      console.error("Error fetching courses:", error)
+      return []
+    }
+
+    return courses || []
+  } catch (error) {
+    console.error("Error in getCourses:", error)
     return []
   }
-
-  return courses || []
 }
 
 export default async function CoursesPage() {
@@ -133,7 +138,7 @@ export default async function CoursesPage() {
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
               {courses.map((course) => {
                 const totalDuration =
-                  course.lessons?.reduce((sum: number, lesson: any) => sum + lesson.duration_minutes, 0) || 0
+                  course.lessons?.reduce((sum: number, lesson: any) => sum + (lesson.duration_minutes || 0), 0) || 0
                 const totalLessons = course.lessons?.length || 0
 
                 return (
@@ -144,6 +149,10 @@ export default async function CoursesPage() {
                           src={course.thumbnail_url || "/placeholder.svg"}
                           alt={course.title}
                           className="w-full h-full object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement
+                            target.style.display = "none"
+                          }}
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-white">
@@ -156,7 +165,7 @@ export default async function CoursesPage() {
                         </Badge>
                       </div>
                       <div className="absolute top-4 right-4">
-                        <Badge className="bg-green-600">${course.price}</Badge>
+                        <Badge className="bg-green-600">${course.price || 0}</Badge>
                       </div>
                     </div>
 
@@ -186,7 +195,7 @@ export default async function CoursesPage() {
                       <div className="flex items-center justify-between">
                         <div className="text-sm text-gray-600">
                           <span>Por </span>
-                          <span className="font-medium">{course.instructor}</span>
+                          <span className="font-medium">{course.instructor || "Instructor"}</span>
                         </div>
                         <div className="flex items-center space-x-1 text-sm text-gray-600">
                           <Users className="w-4 h-4" />

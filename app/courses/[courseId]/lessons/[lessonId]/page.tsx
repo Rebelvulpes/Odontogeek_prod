@@ -6,76 +6,78 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, Play, Clock, BookOpen, Lock } from "lucide-react"
 import { ClientNavigation } from "@/components/client-navigation"
-import { getUserSessionFromCookie } from "@/lib/server-utils"
-import { cookies } from "next/headers"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 async function getLessonData(lessonId: string) {
-  const supabase = createClient(supabaseUrl, supabaseServiceKey)
+  try {
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-  const { data: lesson, error } = await supabase
-    .from("lessons")
-    .select(`
-      id,
-      title,
-      description,
-      content,
-      video_url,
-      duration_minutes,
-      order_index,
-      is_free,
-      created_at,
-      course_id,
-      courses (
+    const { data: lesson, error } = await supabase
+      .from("lessons")
+      .select(`
         id,
         title,
         description,
-        price,
-        instructor,
-        difficulty_level,
-        thumbnail_url
-      )
-    `)
-    .eq("id", lessonId)
-    .single()
+        content,
+        video_url,
+        duration_minutes,
+        order_index,
+        is_free,
+        created_at,
+        course_id,
+        courses (
+          id,
+          title,
+          description,
+          price,
+          instructor,
+          difficulty_level,
+          thumbnail_url
+        )
+      `)
+      .eq("id", lessonId)
+      .single()
 
-  if (error || !lesson) {
+    if (error) {
+      console.error("Error fetching lesson:", error)
+      return null
+    }
+
+    return lesson
+  } catch (error) {
+    console.error("Error in getLessonData:", error)
     return null
   }
-
-  return lesson
 }
 
 async function getCourseLessons(courseId: string) {
-  const supabase = createClient(supabaseUrl, supabaseServiceKey)
-
-  const { data: lessons, error } = await supabase
-    .from("lessons")
-    .select(`
-      id,
-      title,
-      description,
-      duration_minutes,
-      order_index,
-      is_free
-    `)
-    .eq("course_id", courseId)
-    .order("order_index", { ascending: true })
-
-  return lessons || []
-}
-
-async function getCurrentUser() {
   try {
-    const cookieStore = await cookies()
-    const cookieHeader = cookieStore.toString()
-    const userSession = getUserSessionFromCookie(cookieHeader)
-    return userSession
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+    const { data: lessons, error } = await supabase
+      .from("lessons")
+      .select(`
+        id,
+        title,
+        description,
+        duration_minutes,
+        order_index,
+        is_free
+      `)
+      .eq("course_id", courseId)
+      .order("order_index", { ascending: true })
+
+    if (error) {
+      console.error("Error fetching course lessons:", error)
+      return []
+    }
+
+    return lessons || []
   } catch (error) {
-    console.error("Error getting current user:", error)
-    return null
+    console.error("Error in getCourseLessons:", error)
+    return []
   }
 }
 
@@ -85,7 +87,6 @@ export default async function LessonPage({
   params: { courseId: string; lessonId: string }
 }) {
   const lesson = await getLessonData(params.lessonId)
-  // const user = await getCurrentUser() // REMOVED
 
   if (!lesson) {
     notFound()
@@ -142,28 +143,26 @@ export default async function LessonPage({
             </Card>
 
             {/* Video Player */}
-            {lesson.video_url && (
-              <Card>
-                <CardContent className="p-0">
-                  <div className="aspect-video bg-black rounded-lg overflow-hidden">
-                    <div className="w-full h-full flex items-center justify-center bg-gray-900">
-                      <div className="text-center text-white">
-                        <Play className="w-16 h-16 mx-auto mb-4 opacity-70" />
-                        <p className="text-lg mb-2">Video de la Lección</p>
-                        <p className="text-sm opacity-70">Duración: {lesson.duration_minutes} minutos</p>
-                        {!lesson.is_free && (
-                          <div className="mt-4 p-4 bg-yellow-900/50 rounded-lg">
-                            <Lock className="w-6 h-6 mx-auto mb-2" />
-                            <p className="text-sm">Contenido Premium</p>
-                            <p className="text-xs opacity-70">Inscríbete al curso para acceder</p>
-                          </div>
-                        )}
-                      </div>
+            <Card>
+              <CardContent className="p-0">
+                <div className="aspect-video bg-black rounded-lg overflow-hidden">
+                  <div className="w-full h-full flex items-center justify-center bg-gray-900">
+                    <div className="text-center text-white">
+                      <Play className="w-16 h-16 mx-auto mb-4 opacity-70" />
+                      <p className="text-lg mb-2">Video de la Lección</p>
+                      <p className="text-sm opacity-70">Duración: {lesson.duration_minutes} minutos</p>
+                      {!lesson.is_free && (
+                        <div className="mt-4 p-4 bg-yellow-900/50 rounded-lg">
+                          <Lock className="w-6 h-6 mx-auto mb-2" />
+                          <p className="text-sm">Contenido Premium</p>
+                          <p className="text-xs opacity-70">Inscríbete al curso para acceder</p>
+                        </div>
+                      )}
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            )}
+                </div>
+              </CardContent>
+            </Card>
 
             {/* Lesson Content */}
             <Card>
@@ -187,7 +186,7 @@ export default async function LessonPage({
                     <h3 className="text-xl font-semibold mb-2">Contenido Premium</h3>
                     <p className="text-gray-600 mb-6">Esta lección es parte del contenido premium del curso.</p>
                     <Link href={`/courses/${params.courseId}/checkout`}>
-                      <Button size="lg">Inscribirse al Curso - ${lesson.courses.price}</Button>
+                      <Button size="lg">Inscribirse al Curso - ${lesson.courses?.price || 0}</Button>
                     </Link>
                   </div>
                 )}
@@ -231,21 +230,21 @@ export default async function LessonPage({
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <h3 className="font-medium">{lesson.courses.title}</h3>
-                  <p className="text-sm text-gray-600">{lesson.courses.description}</p>
+                  <h3 className="font-medium">{lesson.courses?.title || "Curso"}</h3>
+                  <p className="text-sm text-gray-600">{lesson.courses?.description || "Descripción del curso"}</p>
                 </div>
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Instructor:</span>
-                    <span className="font-medium">{lesson.courses.instructor}</span>
+                    <span className="font-medium">{lesson.courses?.instructor || "Instructor"}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Nivel:</span>
-                    <span className="font-medium capitalize">{lesson.courses.difficulty_level}</span>
+                    <span className="font-medium capitalize">{lesson.courses?.difficulty_level || "Intermedio"}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Precio:</span>
-                    <span className="font-medium">${lesson.courses.price}</span>
+                    <span className="font-medium">${lesson.courses?.price || 0}</span>
                   </div>
                 </div>
                 <Link href={`/courses/${params.courseId}/checkout`} className="block">
