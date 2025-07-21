@@ -278,8 +278,8 @@ export default function LessonPage() {
                   title={lesson.title}
                   className="w-full rounded-lg shadow-lg"
                   style={{
-                    height: "400px",
-                    minHeight: "300px",
+                    height: "1080px",
+                    minHeight: "1920px",
                   }}
                   allowFullScreen
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
