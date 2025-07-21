@@ -280,7 +280,7 @@ export default function LessonPage() {
                   <iframe
                     src={lesson.video_url}
                     title={lesson.title}
-                    className="absolute inset-0 w-full h-full rounded-lg"
+                    className="absolute inset-0 w-full h-full"
                     allowFullScreen
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                     style={{
