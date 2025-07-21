@@ -7,11 +7,11 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Skeleton } from "@/components/ui/skeleton"
-import { ArrowLeft, Lock, Gift, Crown, BookOpen } from "lucide-react"
+import { ArrowLeft, Play, Lock, Gift, Crown, User, AlertCircle } from "lucide-react"
 import Link from "next/link"
 
 interface Lesson {
-  id: string
+  id: number
   title: string
   description: string
   content: string
@@ -19,12 +19,14 @@ interface Lesson {
   duration?: number
   order_index: number
   is_free: boolean
-  course_id: string
-  courses: {
-    id: string
-    title: string
-    price: number
-  }
+  course_id: number
+}
+
+interface AccessDetails {
+  is_admin: boolean
+  is_free: boolean
+  is_enrolled: boolean
+  has_access: boolean
 }
 
 export default function LessonPage() {
@@ -33,79 +35,82 @@ export default function LessonPage() {
   const [lesson, setLesson] = useState<Lesson | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [accessType, setAccessType] = useState<string>("denied")
+  const [accessType, setAccessType] = useState<string>("")
+  const [accessDetails, setAccessDetails] = useState<AccessDetails | null>(null)
 
-  const lessonId = params.lessonId as string
   const courseId = params.courseId as string
+  const lessonId = params.lessonId as string
 
   useEffect(() => {
-    fetchLesson()
-  }, [lessonId])
+    fetchLessonData()
+  }, [courseId, lessonId])
 
-  const fetchLesson = async () => {
+  const fetchLessonData = async () => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/student/lesson?lessonId=${lessonId}`, {
+      setError(null)
+
+      const response = await fetch(`/api/student/lesson?courseId=${courseId}&lessonId=${lessonId}`, {
         credentials: "include",
       })
 
+      const data = await response.json()
+
       if (!response.ok) {
-        if (response.status === 401) {
-          router.push("/auth/login")
+        if (data.redirect) {
+          router.push(data.redirect)
           return
         }
-
-        if (response.status === 403) {
-          const errorData = await response.json()
-          setError(errorData.message || "No tienes acceso a esta lección")
-          return
-        }
-
-        throw new Error("Error al cargar la lección")
+        throw new Error(data.message || "Error al cargar la lección")
       }
 
-      const data = await response.json()
       setLesson(data.lesson)
-      setAccessType(data.accessType)
-    } catch (err) {
-      console.error("Error fetching lesson:", err)
-      setError("Error al cargar la lección")
+      setAccessType(data.access_type)
+      setAccessDetails(data.access_details)
+    } catch (error) {
+      console.error("Error fetching lesson:", error)
+      setError(error instanceof Error ? error.message : "Error desconocido")
     } finally {
       setLoading(false)
     }
   }
 
   const getAccessBadge = () => {
-    switch (accessType) {
-      case "admin":
-        return (
-          <Badge variant="secondary" className="bg-purple-100 text-purple-800 border-purple-200">
-            <Crown className="w-3 h-3 mr-1" />
-            Acceso Admin
-          </Badge>
-        )
-      case "free":
-        return (
-          <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200">
-            <Gift className="w-3 h-3 mr-1" />
-            Lección Gratuita
-          </Badge>
-        )
-      case "enrolled":
-        return (
-          <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-200">
-            <BookOpen className="w-3 h-3 mr-1" />
-            Inscrito
-          </Badge>
-        )
-      default:
-        return (
-          <Badge variant="destructive">
-            <Lock className="w-3 h-3 mr-1" />
-            Acceso Denegado
-          </Badge>
-        )
+    if (!accessDetails) return null
+
+    if (accessDetails.is_admin) {
+      return (
+        <Badge className="bg-purple-100 text-purple-800 border-purple-200">
+          <Crown className="w-3 h-3 mr-1" />
+          Acceso Admin
+        </Badge>
+      )
     }
+
+    if (accessDetails.is_free) {
+      return (
+        <Badge className="bg-green-100 text-green-800 border-green-200">
+          <Gift className="w-3 h-3 mr-1" />
+          Lección Gratuita
+        </Badge>
+      )
+    }
+
+    if (accessDetails.is_enrolled) {
+      return (
+        <Badge className="bg-blue-100 text-blue-800 border-blue-200">
+          <User className="w-3 h-3 mr-1" />
+          Inscrito
+        </Badge>
+      )
+    }
+
+    return (
+      <Badge className="bg-red-100 text-red-800 border-red-200">
+        <Lock className="w-3 h-3 mr-1" />
+        Acceso Denegado
+      </Badge>
+    )
   }
 
   if (loading) {
@@ -140,17 +145,10 @@ export default function LessonPage() {
             </Button>
           </Link>
 
-          <Alert variant="destructive">
-            <Lock className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
+          <Alert className="border-red-200 bg-red-50">
+            <AlertCircle className="h-4 w-4 text-red-600" />
+            <AlertDescription className="text-red-800">{error}</AlertDescription>
           </Alert>
-
-          <div className="mt-6 text-center">
-            <p className="text-gray-600 mb-4">Para acceder a esta lección necesitas estar inscrito en el curso.</p>
-            <Link href={`/courses/${courseId}`}>
-              <Button>Ver Curso e Inscribirse</Button>
-            </Link>
-          </div>
         </div>
       </div>
     )
@@ -160,7 +158,15 @@ export default function LessonPage() {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">
-          <Alert variant="destructive">
+          <Link href={`/courses/${courseId}`}>
+            <Button variant="ghost" className="mb-6">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Volver al Curso
+            </Button>
+          </Link>
+
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
             <AlertDescription>Lección no encontrada</AlertDescription>
           </Alert>
         </div>
@@ -171,27 +177,30 @@ export default function LessonPage() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="max-w-4xl mx-auto">
-        {/* Navegación */}
+        {/* Navigation */}
         <Link href={`/courses/${courseId}`}>
           <Button variant="ghost" className="mb-6">
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Volver a {lesson.courses.title}
+            Volver al Curso
           </Button>
         </Link>
 
-        {/* Contenido de la lección */}
+        {/* Lesson Content */}
         <Card>
           <CardHeader>
             <div className="flex items-start justify-between">
               <div className="flex-1">
                 <CardTitle className="text-2xl mb-2">{lesson.title}</CardTitle>
-                <p className="text-gray-600">{lesson.description}</p>
+                <p className="text-gray-600 mb-4">{lesson.description}</p>
               </div>
               <div className="ml-4">{getAccessBadge()}</div>
             </div>
 
             {lesson.duration && (
-              <p className="text-sm text-gray-500">Duración: {Math.floor(lesson.duration / 60)} minutos</p>
+              <div className="flex items-center text-sm text-gray-500">
+                <Play className="w-4 h-4 mr-1" />
+                {Math.floor(lesson.duration / 60)} min
+              </div>
             )}
           </CardHeader>
 
@@ -199,8 +208,8 @@ export default function LessonPage() {
             {/* Video Player */}
             {lesson.video_url && (
               <div className="mb-6">
-                <div className="aspect-video bg-gray-100 rounded-lg flex items-center justify-center">
-                  <video controls className="w-full h-full rounded-lg" poster="/placeholder.svg?height=400&width=600">
+                <div className="aspect-video bg-black rounded-lg overflow-hidden">
+                  <video controls className="w-full h-full" poster="/placeholder.svg?height=400&width=600&text=Video">
                     <source src={lesson.video_url} type="video/mp4" />
                     Tu navegador no soporta el elemento de video.
                   </video>
@@ -208,16 +217,19 @@ export default function LessonPage() {
               </div>
             )}
 
-            {/* Contenido de la lección */}
+            {/* Lesson Content */}
             <div className="prose max-w-none">
               <div dangerouslySetInnerHTML={{ __html: lesson.content }} />
             </div>
 
-            {/* Información adicional */}
-            <div className="mt-8 pt-6 border-t">
-              <div className="flex items-center justify-between text-sm text-gray-500">
-                <span>Lección {lesson.order_index}</span>
-                <span>Curso: {lesson.courses.title}</span>
+            {/* Access Information */}
+            <div className="mt-8 p-4 bg-gray-50 rounded-lg">
+              <h4 className="font-semibold mb-2">Información de Acceso</h4>
+              <div className="flex items-center space-x-4 text-sm text-gray-600">
+                <span>Tipo de acceso: {accessType}</span>
+                {accessDetails?.is_free && <span>• Lección gratuita</span>}
+                {accessDetails?.is_admin && <span>• Acceso de administrador</span>}
+                {accessDetails?.is_enrolled && <span>• Inscrito al curso</span>}
               </div>
             </div>
           </CardContent>
