@@ -6,79 +6,75 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 export async function GET() {
   try {
+    console.log("=== GET /api/admin/stats ===")
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Obtener total de usuarios
+    // Get total users
     const { count: totalUsers, error: usersError } = await supabase
       .from("users")
       .select("*", { count: "exact", head: true })
 
     if (usersError) {
-      console.error("Error obteniendo usuarios:", usersError)
+      console.error("Error fetching users count:", usersError)
     }
 
-    // Obtener total de cursos
+    // Get total courses
     const { count: totalCourses, error: coursesError } = await supabase
       .from("courses")
       .select("*", { count: "exact", head: true })
-      .eq("archived", false)
 
     if (coursesError) {
-      console.error("Error obteniendo cursos:", coursesError)
+      console.error("Error fetching courses count:", coursesError)
     }
 
-    // Obtener total de lecciones
+    // Get total lessons
     const { count: totalLessons, error: lessonsError } = await supabase
       .from("lessons")
       .select("*", { count: "exact", head: true })
-      .eq("archived", false)
 
     if (lessonsError) {
-      console.error("Error obteniendo lecciones:", lessonsError)
+      console.error("Error fetching lessons count:", lessonsError)
     }
 
-    // Obtener enrollments
-    const { data: enrollments, error: enrollmentsError } = await supabase.from("enrollments").select("course_id")
+    // Calculate total revenue (sum of all course prices * enrollments)
+    const { data: enrollments, error: enrollmentsError } = await supabase.from("enrollments").select(`
+        courses (
+          price
+        )
+      `)
 
     let totalRevenue = 0
-    if (enrollments && !enrollmentsError) {
-      // Obtener precios de cursos por separado
-      const courseIds = [...new Set(enrollments.map((e) => e.course_id))]
-      if (courseIds.length > 0) {
-        const { data: courses, error: coursesRevenueError } = await supabase
-          .from("courses")
-          .select("id, price")
-          .in("id", courseIds)
-
-        if (courses && !coursesRevenueError) {
-          // Calcular revenue basado en enrollments y precios
-          const courseMap = new Map(courses.map((c) => [c.id, c.price]))
-          totalRevenue = enrollments.reduce((sum, enrollment) => {
-            const coursePrice = courseMap.get(enrollment.course_id) || 0
-            return sum + coursePrice
-          }, 0)
-        }
-      }
+    if (!enrollmentsError && enrollments) {
+      totalRevenue = enrollments.reduce((sum, enrollment) => {
+        const coursePrice = enrollment.courses?.price || 0
+        return sum + coursePrice
+      }, 0)
     }
+
+    const stats = {
+      totalUsers: totalUsers || 0,
+      totalCourses: totalCourses || 0,
+      totalLessons: totalLessons || 0,
+      totalRevenue: totalRevenue || 0,
+    }
+
+    console.log("Stats calculated:", stats)
 
     return NextResponse.json({
       success: true,
-      data: {
-        totalUsers: totalUsers || 0,
-        totalCourses: totalCourses || 0,
-        totalLessons: totalLessons || 0,
-        totalRevenue: totalRevenue,
-      },
+      data: stats,
     })
   } catch (error) {
-    console.error("Error en la ruta de estadísticas:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Error interno del servidor",
-        error: error instanceof Error ? error.message : "Error desconocido",
+    console.error("Internal error in GET /api/admin/stats:", error)
+    return NextResponse.json({
+      success: false,
+      message: `Internal error: ${(error as Error).message}`,
+      data: {
+        totalUsers: 0,
+        totalCourses: 0,
+        totalLessons: 0,
+        totalRevenue: 0,
       },
-      { status: 500 },
-    )
+    })
   }
 }

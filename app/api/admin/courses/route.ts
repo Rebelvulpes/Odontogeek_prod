@@ -6,50 +6,44 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 export async function GET() {
   try {
+    console.log("=== GET /api/admin/courses ===")
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    const { data: courses, error } = await supabase
+    // First, get all courses
+    const { data: courses, error: coursesError } = await supabase
       .from("courses")
-      .select(`
-        id,
-        title,
-        description,
-        price,
-        instructor_name,
-        thumbnail_url,
-        duration_hours,
-        difficulty_level,
-        archived,
-        created_at,
-        status,
-        lessons:lessons!inner(
-          id,
-          title,
-          description,
-          video_url,
-          duration_minutes,
-          order_index,
-          is_free,
-          archived,
-          created_at
-        )
-      `)
-      .eq("lessons.archived", false)
+      .select("*")
       .order("created_at", { ascending: false })
 
-    if (error) {
-      console.error("Error fetching courses:", error)
+    if (coursesError) {
+      console.error("Error fetching courses:", coursesError)
       return NextResponse.json({
         success: false,
-        message: `Error fetching courses: ${error.message}`,
+        message: `Error fetching courses: ${coursesError.message}`,
       })
     }
 
-    // Process courses to get additional data
+    console.log(`Found ${courses?.length || 0} courses`)
+
+    // Process each course to get additional data
     const processedCourses = await Promise.all(
       (courses || []).map(async (course) => {
+        console.log(`Processing course: ${course.title} (${course.id})`)
+
+        // Get lessons for this course
+        const { data: lessons, error: lessonsError } = await supabase
+          .from("lessons")
+          .select("*")
+          .eq("course_id", course.id)
+          .eq("archived", false)
+          .order("order_index", { ascending: true })
+
+        if (lessonsError) {
+          console.error(`Error fetching lessons for course ${course.id}:`, lessonsError)
+        }
+
         // Get course tags
-        const { data: courseTags } = await supabase
+        const { data: courseTags, error: tagsError } = await supabase
           .from("course_tags")
           .select(`
             tags (
@@ -62,24 +56,50 @@ export async function GET() {
           `)
           .eq("course_id", course.id)
 
+        if (tagsError) {
+          console.error(`Error fetching tags for course ${course.id}:`, tagsError)
+        }
+
         // Get enrollment count
-        const { count: studentsCount } = await supabase
+        const { count: studentsCount, error: enrollmentError } = await supabase
           .from("enrollments")
           .select("*", { count: "exact", head: true })
           .eq("course_id", course.id)
 
+        if (enrollmentError) {
+          console.error(`Error fetching enrollments for course ${course.id}:`, enrollmentError)
+        }
+
         // Calculate revenue (mock data for now)
         const revenue = (studentsCount || 0) * (course.price || 0)
 
-        return {
-          ...course,
+        const processedCourse = {
+          id: course.id,
+          title: course.title || "Sin título",
+          description: course.description || "",
+          price: course.price || 0,
+          instructor_name: course.instructor_name || "Sin instructor",
+          thumbnail_url: course.thumbnail_url || "",
+          duration_hours: course.duration_hours || 0,
+          difficulty_level: course.difficulty_level || "principiante",
+          archived: course.archived || false,
+          created_at: course.created_at,
+          status: course.status || "published",
+          lessons: lessons || [],
           tags: courseTags?.map((relation) => relation.tags).filter(Boolean) || [],
           students: studentsCount || 0,
           revenue,
-          lessonsCount: course.lessons?.length || 0,
+          lessonsCount: lessons?.length || 0,
         }
+
+        console.log(
+          `Processed course ${course.title}: ${processedCourse.lessonsCount} lessons, ${processedCourse.students} students`,
+        )
+        return processedCourse
       }),
     )
+
+    console.log(`Returning ${processedCourses.length} processed courses`)
 
     return NextResponse.json({
       success: true,
@@ -96,26 +116,30 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    console.log("=== POST /api/admin/courses ===")
     const body = await req.json()
+    console.log("Request body:", body)
+
     const { title, description, price, instructor, thumbnail_url, duration_hours, difficulty_level, tags } = body
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
     // Create the course
-    const { data: course, error: courseError } = await supabase
-      .from("courses")
-      .insert({
-        title,
-        description,
-        price: Number.parseFloat(price),
-        instructor_name: instructor,
-        thumbnail_url,
-        duration_hours: duration_hours ? Number.parseInt(duration_hours) : null,
-        difficulty_level: difficulty_level || "principiante",
-        status: "published",
-      })
-      .select()
-      .single()
+    const courseData = {
+      title: title || "Nuevo Curso",
+      description: description || "",
+      price: price ? Number.parseFloat(price) : 0,
+      instructor_name: instructor || "Sin instructor",
+      thumbnail_url: thumbnail_url || "",
+      duration_hours: duration_hours ? Number.parseInt(duration_hours) : null,
+      difficulty_level: difficulty_level || "principiante",
+      status: "published",
+      archived: false,
+    }
+
+    console.log("Creating course with data:", courseData)
+
+    const { data: course, error: courseError } = await supabase.from("courses").insert(courseData).select().single()
 
     if (courseError) {
       console.error("Error creating course:", courseError)
@@ -125,8 +149,11 @@ export async function POST(req: NextRequest) {
       })
     }
 
+    console.log("Course created successfully:", course)
+
     // Add tags if provided
-    if (tags && tags.length > 0) {
+    if (tags && Array.isArray(tags) && tags.length > 0) {
+      console.log("Adding tags:", tags)
       const tagRelations = tags.map((tagId: string) => ({
         course_id: course.id,
         tag_id: tagId,
@@ -137,6 +164,8 @@ export async function POST(req: NextRequest) {
       if (tagsError) {
         console.error("Error adding course tags:", tagsError)
         // Don't fail the entire operation, just log the error
+      } else {
+        console.log("Tags added successfully")
       }
     }
 
