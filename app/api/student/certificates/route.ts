@@ -1,16 +1,13 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
-import { getUserSessionFromCookie } from "@/lib/server-utils"
+import { getServerSupabaseClient, getUserSessionFromCookie, logStudentAccess } from "@/lib/server-utils"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 export async function GET(req: NextRequest) {
   try {
-    console.log("=== GET STUDENT CERTIFICATES ===")
-    console.log("Timestamp:", new Date().toISOString())
+    console.log("=== GET STUDENT CERTIFICATES REQUEST ===")
 
-    // Get user session from cookie
     const cookieHeader = req.headers.get("cookie")
     const userSession = getUserSessionFromCookie(cookieHeader)
 
@@ -26,77 +23,68 @@ export async function GET(req: NextRequest) {
       )
     }
 
-    console.log("✅ Valid session found for user:", userSession.email)
+    const supabase = getServerSupabaseClient()
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
-
-    // Get completed courses (certificates)
-    console.log("=== FETCHING CERTIFICATES ===")
-    const { data: certificates, error: certificatesError } = await supabase
+    // Get certificates for completed courses
+    const { data: certificates, error } = await supabase
       .from("enrollments")
       .select(`
         id,
-        enrolled_at,
-        completed_at,
-        course:courses (
+        completion_date,
+        courses (
           id,
           title,
-          instructor,
-          thumbnail_url
+          instructor_name
         )
       `)
-      .eq("user_id", userSession.id)
-      .eq("completed", true)
-      .not("completed_at", "is", null)
-      .order("completed_at", { ascending: false })
+      .eq("student_id", userSession.id)
+      .eq("status", "completed")
+      .not("completion_date", "is", null)
+      .order("completion_date", { ascending: false })
 
-    console.log("Certificates query result:")
-    console.log("- Success:", !certificatesError)
-    console.log("- Error:", certificatesError)
-    console.log("- Certificates count:", certificates?.length || 0)
-
-    if (certificatesError) {
-      console.error("❌ CERTIFICATES ERROR:", certificatesError)
+    if (error) {
+      console.error("❌ Error fetching certificates:", error)
+      await logStudentAccess(userSession.id, userSession.email, "GET_CERTIFICATES", false, "FETCH_ERROR", error.message)
       return NextResponse.json(
         {
           success: false,
-          message: "Error obteniendo certificados",
-          error: "FETCH_CERTIFICATES_ERROR",
-          certificates: [],
+          message: "Error al obtener certificados",
+          error: "FETCH_ERROR",
         },
         { status: 500 },
       )
     }
 
     // Format certificates data
-    const formattedCertificates = (certificates || []).map((cert) => ({
+    const formattedCertificates = (certificates || []).map((cert: any) => ({
       id: cert.id,
-      course_id: cert.course?.id,
-      course_title: cert.course?.title || "Curso sin título",
-      instructor: cert.course?.instructor || "Instructor no disponible",
-      thumbnail_url: cert.course?.thumbnail_url,
-      enrolled_at: cert.enrolled_at,
-      completed_at: cert.completed_at,
+      course_title: cert.courses?.title || "Curso sin título",
+      instructor_name: cert.courses?.instructor_name || "Instructor desconocido",
+      completion_date: cert.completion_date,
+      certificate_url: null, // TODO: Generate certificate URL when implemented
     }))
 
-    console.log("✅ CERTIFICATES FETCHED SUCCESSFULLY")
-    console.log("Formatted certificates:", formattedCertificates.length)
+    console.log(`✅ Found ${formattedCertificates.length} certificates for user:`, userSession.email)
+    await logStudentAccess(
+      userSession.id,
+      userSession.email,
+      "GET_CERTIFICATES",
+      true,
+      null,
+      `Found ${formattedCertificates.length} certificates`,
+    )
 
     return NextResponse.json({
       success: true,
       certificates: formattedCertificates,
     })
   } catch (error) {
-    console.error("=== GET CERTIFICATES ERROR ===")
-    console.error("Error details:", error)
-    console.error("Error stack:", error instanceof Error ? error.stack : "No stack trace")
-
+    console.error("❌ Get certificates error:", error)
     return NextResponse.json(
       {
         success: false,
         message: "Error interno del servidor",
         error: "INTERNAL_SERVER_ERROR",
-        certificates: [],
       },
       { status: 500 },
     )

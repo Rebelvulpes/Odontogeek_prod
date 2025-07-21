@@ -1,187 +1,179 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
+import { getServerSupabaseClient, getUserSessionFromCookie, logStudentAccess } from "@/lib/server-utils"
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
-
-export async function PUT(req: NextRequest) {
+export async function GET(req: NextRequest) {
   try {
-    console.log("=== UPDATE STUDENT PROFILE ===")
-    console.log("Timestamp:", new Date().toISOString())
+    console.log("=== GET STUDENT PROFILE REQUEST ===")
 
-    // Get user session
-    const sessionCookie = req.cookies.get("user-session")
-    if (!sessionCookie) {
-      console.log("❌ NO SESSION COOKIE")
+    const cookieHeader = req.headers.get("cookie")
+    const userSession = getUserSessionFromCookie(cookieHeader)
+
+    if (!userSession) {
+      console.log("❌ No valid session found")
       return NextResponse.json(
         {
           success: false,
-          message: "No hay sesión activa",
-          error: "NO_SESSION",
-        },
-        { status: 401 },
-      )
-    }
-
-    let userSession
-    try {
-      userSession = JSON.parse(sessionCookie.value)
-      console.log("Session user ID:", userSession.id)
-      console.log("Session role:", userSession.role)
-    } catch (parseError) {
-      console.error("❌ SESSION PARSE ERROR:", parseError)
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Sesión inválida",
+          message: "Sesión no válida",
           error: "INVALID_SESSION",
         },
         { status: 401 },
       )
     }
 
-    // Get update data
+    const supabase = getServerSupabaseClient()
+
+    const { data: profile, error } = await supabase
+      .from("users")
+      .select("id, email, first_name, last_name, avatar_url, bio, role, created_at")
+      .eq("id", userSession.id)
+      .single()
+
+    if (error || !profile) {
+      console.error("❌ Error fetching profile:", error)
+      await logStudentAccess(
+        userSession.id,
+        userSession.email,
+        "GET_PROFILE",
+        false,
+        "PROFILE_NOT_FOUND",
+        error?.message || "Profile not found",
+      )
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Perfil no encontrado",
+          error: "PROFILE_NOT_FOUND",
+        },
+        { status: 404 },
+      )
+    }
+
+    console.log("✅ Profile fetched successfully for user:", profile.email)
+    await logStudentAccess(userSession.id, userSession.email, "GET_PROFILE", true, null, "Profile fetched successfully")
+
+    return NextResponse.json({
+      success: true,
+      profile,
+    })
+  } catch (error) {
+    console.error("❌ Get profile error:", error)
+    return NextResponse.json(
+      {
+        success: false,
+        message: "Error interno del servidor",
+        error: "INTERNAL_SERVER_ERROR",
+      },
+      { status: 500 },
+    )
+  }
+}
+
+export async function PUT(req: NextRequest) {
+  try {
+    console.log("=== UPDATE STUDENT PROFILE REQUEST ===")
+
+    const cookieHeader = req.headers.get("cookie")
+    const userSession = getUserSessionFromCookie(cookieHeader)
+
+    if (!userSession) {
+      console.log("❌ No valid session found")
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Sesión no válida",
+          error: "INVALID_SESSION",
+        },
+        { status: 401 },
+      )
+    }
+
     const { first_name, last_name, email, bio } = await req.json()
 
-    console.log("=== UPDATE DATA ===")
-    console.log("First name:", first_name)
-    console.log("Last name:", last_name)
-    console.log("Email:", email)
-    console.log("Bio provided:", !!bio)
-
-    // Validation
     if (!first_name || !last_name || !email) {
-      console.log("❌ VALIDATION FAILED: Missing required fields")
       return NextResponse.json(
         {
           success: false,
           message: "Nombre, apellido y email son requeridos",
-          error: "MISSING_REQUIRED_FIELDS",
+          error: "MISSING_FIELDS",
         },
         { status: 400 },
       )
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(email)) {
-      console.log("❌ VALIDATION FAILED: Invalid email format")
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Formato de email inválido",
-          error: "INVALID_EMAIL_FORMAT",
-        },
-        { status: 400 },
-      )
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    const supabase = getServerSupabaseClient()
 
     // Check if email is already taken by another user
-    if (email.toLowerCase().trim() !== userSession.email.toLowerCase().trim()) {
-      console.log("=== CHECKING EMAIL AVAILABILITY ===")
-      const { data: existingUser, error: checkError } = await supabase
+    if (email !== userSession.email) {
+      const { data: existingUser } = await supabase
         .from("users")
         .select("id")
-        .eq("email", email.toLowerCase().trim())
+        .eq("email", email)
         .neq("id", userSession.id)
         .single()
 
       if (existingUser) {
-        console.log("❌ EMAIL ALREADY TAKEN")
         return NextResponse.json(
           {
             success: false,
             message: "Este email ya está en uso",
-            error: "EMAIL_ALREADY_TAKEN",
+            error: "EMAIL_TAKEN",
           },
-          { status: 409 },
+          { status: 400 },
         )
       }
     }
 
-    // Update user
-    console.log("=== UPDATING USER ===")
-    const updateData = {
-      first_name: first_name.trim(),
-      last_name: last_name.trim(),
-      email: email.toLowerCase().trim(),
-      bio: bio ? bio.trim() : null,
-      updated_at: new Date().toISOString(),
-    }
-
-    const { data: updatedUser, error: updateError } = await supabase
+    // Update profile
+    const { data: updatedProfile, error: updateError } = await supabase
       .from("users")
-      .update(updateData)
+      .update({
+        first_name: first_name.trim(),
+        last_name: last_name.trim(),
+        email: email.trim().toLowerCase(),
+        bio: bio?.trim() || null,
+        updated_at: new Date().toISOString(),
+      })
       .eq("id", userSession.id)
-      .select()
+      .select("id, email, first_name, last_name, avatar_url, bio, role")
       .single()
 
-    console.log("Update result:")
-    console.log("- Success:", !updateError)
-    console.log("- Error:", updateError)
-    console.log("- Updated user:", !!updatedUser)
-
     if (updateError) {
-      console.error("❌ UPDATE ERROR:", updateError)
+      console.error("❌ Error updating profile:", updateError)
+      await logStudentAccess(
+        userSession.id,
+        userSession.email,
+        "UPDATE_PROFILE",
+        false,
+        "UPDATE_FAILED",
+        updateError.message,
+      )
       return NextResponse.json(
         {
           success: false,
-          message: `Error actualizando perfil: ${updateError.message}`,
+          message: "Error al actualizar el perfil",
           error: "UPDATE_FAILED",
         },
         { status: 500 },
       )
     }
 
-    if (!updatedUser) {
-      console.log("❌ NO USER RETURNED AFTER UPDATE")
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Error actualizando perfil",
-          error: "NO_USER_RETURNED",
-        },
-        { status: 500 },
-      )
-    }
+    console.log("✅ Profile updated successfully for user:", updatedProfile.email)
+    await logStudentAccess(
+      userSession.id,
+      updatedProfile.email,
+      "UPDATE_PROFILE",
+      true,
+      null,
+      "Profile updated successfully",
+    )
 
-    console.log("✅ PROFILE UPDATED SUCCESSFULLY")
-    console.log("Updated user:", updatedUser.email)
-
-    // Update session cookie with new data
-    const newUserSession = {
-      id: updatedUser.id,
-      email: updatedUser.email,
-      first_name: updatedUser.first_name,
-      last_name: updatedUser.last_name,
-      role: updatedUser.role,
-      avatar_url: updatedUser.avatar_url,
-      bio: updatedUser.bio,
-      created_at: updatedUser.created_at,
-    }
-
-    const response = NextResponse.json({
+    return NextResponse.json({
       success: true,
-      message: "Perfil actualizado exitosamente",
-      user: newUserSession,
+      message: "Perfil actualizado correctamente",
+      profile: updatedProfile,
     })
-
-    // Update session cookie
-    response.cookies.set("user-session", JSON.stringify(newUserSession), {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60, // 7 days
-      path: "/",
-    })
-
-    return response
   } catch (error) {
-    console.error("=== UPDATE PROFILE ERROR ===")
-    console.error("Error details:", error)
-    console.error("Error stack:", error instanceof Error ? error.stack : "No stack trace")
-
+    console.error("❌ Update profile error:", error)
     return NextResponse.json(
       {
         success: false,

@@ -1,4 +1,4 @@
--- Add bio column to users table
+-- Add bio column to users table if it doesn't exist
 DO $$ 
 BEGIN
     -- Check if bio column exists
@@ -11,9 +11,9 @@ BEGIN
         -- Add bio column
         ALTER TABLE users ADD COLUMN bio TEXT;
         
-        RAISE NOTICE '✅ Bio column added to users table';
+        RAISE NOTICE 'Bio column added to users table successfully';
     ELSE
-        RAISE NOTICE '⚠️ Bio column already exists in users table';
+        RAISE NOTICE 'Bio column already exists in users table';
     END IF;
 END $$;
 

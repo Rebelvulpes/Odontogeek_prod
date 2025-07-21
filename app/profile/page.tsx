@@ -1,29 +1,44 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect } from "react"
-import { Navigation } from "@/components/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Separator } from "@/components/ui/separator"
-import { Lock, Camera, Award, BookOpen, Download, Edit, Save, X, CheckCircle, Clock, Trophy } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Navigation } from "@/components/navigation"
+import {
+  User,
+  Lock,
+  BookOpen,
+  Award,
+  Camera,
+  Save,
+  Eye,
+  EyeOff,
+  Download,
+  Calendar,
+  GraduationCap,
+  TrendingUp,
+  CheckCircle,
+} from "lucide-react"
 
 interface UserProfile {
   id: string
   email: string
   first_name: string
   last_name: string
-  role: string
   avatar_url?: string
   bio?: string
-  created_at: string
+  role: string
 }
 
 interface Course {
@@ -31,20 +46,19 @@ interface Course {
   title: string
   description: string
   thumbnail_url: string
-  progress: number
-  enrolled_at: string
-  completed_at?: string
-  status: string
-  enrollment_id: string
+  instructor_name: string
+  progress_percentage: number
+  enrollment_date: string
+  completion_date?: string
+  status: "in_progress" | "completed"
 }
 
 interface Certificate {
   id: string
-  course_id: string
   course_title: string
-  instructor: string
-  thumbnail_url?: string
-  completed_at: string
+  instructor_name: string
+  completion_date: string
+  certificate_url?: string
 }
 
 export default function ProfilePage() {
@@ -52,7 +66,7 @@ export default function ProfilePage() {
   const [courses, setCourses] = useState<Course[]>([])
   const [certificates, setCertificates] = useState<Certificate[]>([])
   const [loading, setLoading] = useState(true)
-  const [updating, setUpdating] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
 
   // Form states
@@ -64,72 +78,89 @@ export default function ProfilePage() {
   })
 
   const [passwordForm, setPasswordForm] = useState({
-    currentPassword: "",
-    newPassword: "",
-    confirmPassword: "",
+    current_password: "",
+    new_password: "",
+    confirm_password: "",
   })
 
-  const [editingProfile, setEditingProfile] = useState(false)
-  const [changingPassword, setChangingPassword] = useState(false)
+  const [showPasswords, setShowPasswords] = useState({
+    current: false,
+    new: false,
+    confirm: false,
+  })
 
+  // Load user data
   useEffect(() => {
     loadUserData()
+    loadUserCourses()
+    loadUserCertificates()
   }, [])
 
   const loadUserData = async () => {
     try {
-      setLoading(true)
-
-      // Load user profile
-      const userResponse = await fetch("/api/auth/me", {
+      const response = await fetch("/api/auth/me", {
         credentials: "include",
       })
 
-      if (userResponse.ok) {
-        const userData = await userResponse.json()
-        setUser(userData.user)
-        setProfileForm({
-          first_name: userData.user.first_name || "",
-          last_name: userData.user.last_name || "",
-          email: userData.user.email || "",
-          bio: userData.user.bio || "",
-        })
-
-        // Load courses if user is a student
-        if (userData.user.role === "student") {
-          const coursesResponse = await fetch("/api/student/courses", {
-            credentials: "include",
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success && data.user) {
+          setUser(data.user)
+          setProfileForm({
+            first_name: data.user.first_name || "",
+            last_name: data.user.last_name || "",
+            email: data.user.email || "",
+            bio: data.user.bio || "",
           })
-
-          if (coursesResponse.ok) {
-            const coursesData = await coursesResponse.json()
-            setCourses(coursesData.courses || [])
-          }
-
-          // Load certificates
-          const certificatesResponse = await fetch("/api/student/certificates", {
-            credentials: "include",
-          })
-
-          if (certificatesResponse.ok) {
-            const certificatesData = await certificatesResponse.json()
-            setCertificates(certificatesData.certificates || [])
-          }
         }
       }
     } catch (error) {
       console.error("Error loading user data:", error)
-      setMessage({ type: "error", text: "Error cargando datos del perfil" })
     } finally {
       setLoading(false)
     }
   }
 
-  const updateProfile = async () => {
+  const loadUserCourses = async () => {
     try {
-      setUpdating(true)
-      setMessage(null)
+      const response = await fetch("/api/student/courses", {
+        credentials: "include",
+      })
 
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success && data.courses) {
+          setCourses(data.courses)
+        }
+      }
+    } catch (error) {
+      console.error("Error loading courses:", error)
+    }
+  }
+
+  const loadUserCertificates = async () => {
+    try {
+      const response = await fetch("/api/student/certificates", {
+        credentials: "include",
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success && data.certificates) {
+          setCertificates(data.certificates)
+        }
+      }
+    } catch (error) {
+      console.error("Error loading certificates:", error)
+    }
+  }
+
+  const handleProfileUpdate = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSaving(true)
+    setMessage(null)
+
+    try {
       const response = await fetch("/api/student/profile", {
         method: "PUT",
         headers: {
@@ -142,35 +173,35 @@ export default function ProfilePage() {
       const data = await response.json()
 
       if (data.success) {
-        setUser(data.user)
-        setEditingProfile(false)
-        setMessage({ type: "success", text: "Perfil actualizado exitosamente" })
+        setUser((prev) => (prev ? { ...prev, ...profileForm } : null))
+        setMessage({ type: "success", text: "Perfil actualizado correctamente" })
       } else {
-        setMessage({ type: "error", text: data.message || "Error actualizando perfil" })
+        setMessage({ type: "error", text: data.message || "Error al actualizar perfil" })
       }
     } catch (error) {
-      console.error("Error updating profile:", error)
-      setMessage({ type: "error", text: "Error actualizando perfil" })
+      setMessage({ type: "error", text: "Error interno del servidor" })
     } finally {
-      setUpdating(false)
+      setSaving(false)
     }
   }
 
-  const changePassword = async () => {
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (passwordForm.new_password !== passwordForm.confirm_password) {
+      setMessage({ type: "error", text: "Las contraseñas no coinciden" })
+      return
+    }
+
+    if (passwordForm.new_password.length < 6) {
+      setMessage({ type: "error", text: "La nueva contraseña debe tener al menos 6 caracteres" })
+      return
+    }
+
+    setSaving(true)
+    setMessage(null)
+
     try {
-      if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-        setMessage({ type: "error", text: "Las contraseñas no coinciden" })
-        return
-      }
-
-      if (passwordForm.newPassword.length < 6) {
-        setMessage({ type: "error", text: "La nueva contraseña debe tener al menos 6 caracteres" })
-        return
-      }
-
-      setUpdating(true)
-      setMessage(null)
-
       const response = await fetch("/api/auth/change-password", {
         method: "POST",
         headers: {
@@ -178,25 +209,23 @@ export default function ProfilePage() {
         },
         credentials: "include",
         body: JSON.stringify({
-          currentPassword: passwordForm.currentPassword,
-          newPassword: passwordForm.newPassword,
+          current_password: passwordForm.current_password,
+          new_password: passwordForm.new_password,
         }),
       })
 
       const data = await response.json()
 
       if (data.success) {
-        setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" })
-        setChangingPassword(false)
-        setMessage({ type: "success", text: "Contraseña actualizada exitosamente" })
+        setPasswordForm({ current_password: "", new_password: "", confirm_password: "" })
+        setMessage({ type: "success", text: "Contraseña cambiada correctamente" })
       } else {
-        setMessage({ type: "error", text: data.message || "Error cambiando contraseña" })
+        setMessage({ type: "error", text: data.message || "Error al cambiar contraseña" })
       }
     } catch (error) {
-      console.error("Error changing password:", error)
-      setMessage({ type: "error", text: "Error cambiando contraseña" })
+      setMessage({ type: "error", text: "Error interno del servidor" })
     } finally {
-      setUpdating(false)
+      setSaving(false)
     }
   }
 
@@ -204,9 +233,11 @@ export default function ProfilePage() {
     if (!user) return "U"
     const firstName = user.first_name || ""
     const lastName = user.last_name || ""
+
     if (firstName && lastName) {
       return `${firstName[0]}${lastName[0]}`.toUpperCase()
     }
+    if (firstName) return firstName.substring(0, 2).toUpperCase()
     return user.email.substring(0, 2).toUpperCase()
   }
 
@@ -219,14 +250,14 @@ export default function ProfilePage() {
     return user.email.split("@")[0]
   }
 
-  const getCompletedCoursesCount = () => {
-    return courses.filter((course) => course.completed_at).length
-  }
+  const getStats = () => {
+    const totalCourses = courses.length
+    const completedCourses = courses.filter((c) => c.status === "completed").length
+    const averageProgress =
+      totalCourses > 0 ? Math.round(courses.reduce((sum, c) => sum + c.progress_percentage, 0) / totalCourses) : 0
+    const totalCertificates = certificates.length
 
-  const getAverageProgress = () => {
-    if (courses.length === 0) return 0
-    const totalProgress = courses.reduce((sum, course) => sum + course.progress, 0)
-    return Math.round(totalProgress / courses.length)
+    return { totalCourses, completedCourses, averageProgress, totalCertificates }
   }
 
   if (loading) {
@@ -234,8 +265,11 @@ export default function ProfilePage() {
       <div className="min-h-screen bg-gray-50">
         <Navigation user={user} />
         <div className="container mx-auto px-4 py-8">
-          <div className="flex items-center justify-center h-64">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <div className="flex items-center justify-center py-20">
+            <div className="text-center">
+              <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
+              <p className="text-gray-600">Cargando perfil...</p>
+            </div>
           </div>
         </div>
       </div>
@@ -247,15 +281,19 @@ export default function ProfilePage() {
       <div className="min-h-screen bg-gray-50">
         <Navigation user={null} />
         <div className="container mx-auto px-4 py-8">
-          <Alert>
-            <AlertDescription>
-              No se pudo cargar la información del perfil. Por favor, inicia sesión nuevamente.
-            </AlertDescription>
-          </Alert>
+          <div className="text-center py-20">
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">Acceso Denegado</h1>
+            <p className="text-gray-600 mb-8">Debes iniciar sesión para ver tu perfil.</p>
+            <Button asChild>
+              <a href="/auth/login">Iniciar Sesión</a>
+            </Button>
+          </div>
         </div>
       </div>
     )
   }
+
+  const stats = getStats()
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -264,332 +302,381 @@ export default function ProfilePage() {
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Mi Perfil</h1>
-          <p className="text-gray-600">Gestiona tu información personal y configuración de cuenta</p>
+          <div className="flex items-center space-x-4 mb-6">
+            <Avatar className="h-20 w-20">
+              <AvatarImage src={user.avatar_url || "/placeholder.svg"} alt={getUserDisplayName()} />
+              <AvatarFallback className="text-xl">{getUserInitials()}</AvatarFallback>
+            </Avatar>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">{getUserDisplayName()}</h1>
+              <p className="text-gray-600">{user.email}</p>
+              <Badge variant={user.role === "admin" ? "default" : "secondary"} className="mt-2">
+                {user.role === "admin" ? "Administrador" : "Estudiante"}
+              </Badge>
+            </div>
+          </div>
+
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-2">
+                  <BookOpen className="h-8 w-8 text-blue-600" />
+                  <div>
+                    <p className="text-2xl font-bold">{stats.totalCourses}</p>
+                    <p className="text-sm text-gray-600">Cursos Inscritos</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-2">
+                  <CheckCircle className="h-8 w-8 text-green-600" />
+                  <div>
+                    <p className="text-2xl font-bold">{stats.completedCourses}</p>
+                    <p className="text-sm text-gray-600">Completados</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-2">
+                  <TrendingUp className="h-8 w-8 text-orange-600" />
+                  <div>
+                    <p className="text-2xl font-bold">{stats.averageProgress}%</p>
+                    <p className="text-sm text-gray-600">Progreso Promedio</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-2">
+                  <Award className="h-8 w-8 text-yellow-600" />
+                  <div>
+                    <p className="text-2xl font-bold">{stats.totalCertificates}</p>
+                    <p className="text-sm text-gray-600">Certificados</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
         {/* Message Alert */}
         {message && (
           <Alert
-            className={`mb-6 ${message.type === "success" ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"}`}
+            className={`mb-6 ${message.type === "error" ? "border-red-200 bg-red-50" : "border-green-200 bg-green-50"}`}
           >
-            <AlertDescription className={message.type === "success" ? "text-green-800" : "text-red-800"}>
+            <AlertDescription className={message.type === "error" ? "text-red-800" : "text-green-800"}>
               {message.text}
             </AlertDescription>
           </Alert>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Profile Summary Card */}
-          <div className="lg:col-span-1">
+        {/* Tabs */}
+        <Tabs defaultValue="profile" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="profile" className="flex items-center space-x-2">
+              <User className="h-4 w-4" />
+              <span>Perfil</span>
+            </TabsTrigger>
+            <TabsTrigger value="security" className="flex items-center space-x-2">
+              <Lock className="h-4 w-4" />
+              <span>Seguridad</span>
+            </TabsTrigger>
+            <TabsTrigger value="courses" className="flex items-center space-x-2">
+              <BookOpen className="h-4 w-4" />
+              <span>Cursos</span>
+            </TabsTrigger>
+            <TabsTrigger value="certificates" className="flex items-center space-x-2">
+              <Award className="h-4 w-4" />
+              <span>Certificados</span>
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Profile Tab */}
+          <TabsContent value="profile">
             <Card>
-              <CardHeader className="text-center">
-                <div className="relative mx-auto mb-4">
-                  <Avatar className="h-24 w-24 mx-auto">
-                    <AvatarImage src={user.avatar_url || "/placeholder.svg"} alt={getUserDisplayName()} />
-                    <AvatarFallback className="text-xl">{getUserInitials()}</AvatarFallback>
-                  </Avatar>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="absolute -bottom-2 -right-2 h-8 w-8 rounded-full p-0 bg-transparent"
-                  >
-                    <Camera className="h-4 w-4" />
-                  </Button>
-                </div>
-                <CardTitle className="text-xl">{getUserDisplayName()}</CardTitle>
-                <CardDescription>{user.email}</CardDescription>
-                <Badge variant="secondary" className="mt-2">
-                  {user.role === "admin" ? "Administrador" : "Estudiante"}
-                </Badge>
+              <CardHeader>
+                <CardTitle>Información Personal</CardTitle>
+                <CardDescription>Actualiza tu información personal y biografía</CardDescription>
               </CardHeader>
+              <CardContent>
+                <form onSubmit={handleProfileUpdate} className="space-y-6">
+                  {/* Avatar Section */}
+                  <div className="flex items-center space-x-4">
+                    <Avatar className="h-24 w-24">
+                      <AvatarImage src={user.avatar_url || "/placeholder.svg"} alt={getUserDisplayName()} />
+                      <AvatarFallback className="text-xl">{getUserInitials()}</AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <Button type="button" variant="outline" className="flex items-center space-x-2 bg-transparent">
+                        <Camera className="h-4 w-4" />
+                        <span>Cambiar Foto</span>
+                      </Button>
+                      <p className="text-sm text-gray-500 mt-2">JPG, PNG o GIF. Máximo 2MB.</p>
+                    </div>
+                  </div>
 
-              {user.role === "student" && (
-                <CardContent className="space-y-4">
                   <Separator />
-                  <div className="grid grid-cols-2 gap-4 text-center">
-                    <div>
-                      <div className="text-2xl font-bold text-blue-600">{courses.length}</div>
-                      <div className="text-sm text-gray-600">Cursos Inscritos</div>
-                    </div>
-                    <div>
-                      <div className="text-2xl font-bold text-green-600">{getCompletedCoursesCount()}</div>
-                      <div className="text-sm text-gray-600">Completados</div>
-                    </div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-purple-600">{getAverageProgress()}%</div>
-                    <div className="text-sm text-gray-600">Progreso Promedio</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-orange-600">{certificates.length}</div>
-                    <div className="text-sm text-gray-600">Certificados</div>
-                  </div>
-                </CardContent>
-              )}
-            </Card>
-          </div>
 
-          {/* Main Content */}
-          <div className="lg:col-span-2">
-            <Tabs defaultValue="profile" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="profile">Perfil</TabsTrigger>
-                <TabsTrigger value="security">Seguridad</TabsTrigger>
-                {user.role === "student" && <TabsTrigger value="courses">Cursos</TabsTrigger>}
-                {user.role === "student" && <TabsTrigger value="certificates">Certificados</TabsTrigger>}
-              </TabsList>
-
-              {/* Profile Tab */}
-              <TabsContent value="profile">
-                <Card>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle>Información Personal</CardTitle>
-                        <CardDescription>Actualiza tu información personal y biografía</CardDescription>
-                      </div>
-                      <Button variant="outline" size="sm" onClick={() => setEditingProfile(!editingProfile)}>
-                        {editingProfile ? <X className="h-4 w-4" /> : <Edit className="h-4 w-4" />}
-                        {editingProfile ? "Cancelar" : "Editar"}
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="first_name">Nombre</Label>
-                        <Input
-                          id="first_name"
-                          value={profileForm.first_name}
-                          onChange={(e) => setProfileForm((prev) => ({ ...prev, first_name: e.target.value }))}
-                          disabled={!editingProfile}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="last_name">Apellido</Label>
-                        <Input
-                          id="last_name"
-                          value={profileForm.last_name}
-                          onChange={(e) => setProfileForm((prev) => ({ ...prev, last_name: e.target.value }))}
-                          disabled={!editingProfile}
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label htmlFor="email">Email</Label>
+                  {/* Form Fields */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="first_name">Nombre</Label>
                       <Input
-                        id="email"
-                        type="email"
-                        value={profileForm.email}
-                        onChange={(e) => setProfileForm((prev) => ({ ...prev, email: e.target.value }))}
-                        disabled={!editingProfile}
+                        id="first_name"
+                        value={profileForm.first_name}
+                        onChange={(e) => setProfileForm((prev) => ({ ...prev, first_name: e.target.value }))}
+                        placeholder="Tu nombre"
                       />
                     </div>
 
-                    <div>
-                      <Label htmlFor="bio">Biografía</Label>
-                      <Textarea
-                        id="bio"
-                        placeholder="Cuéntanos un poco sobre ti..."
-                        value={profileForm.bio}
-                        onChange={(e) => setProfileForm((prev) => ({ ...prev, bio: e.target.value }))}
-                        disabled={!editingProfile}
-                        rows={4}
+                    <div className="space-y-2">
+                      <Label htmlFor="last_name">Apellido</Label>
+                      <Input
+                        id="last_name"
+                        value={profileForm.last_name}
+                        onChange={(e) => setProfileForm((prev) => ({ ...prev, last_name: e.target.value }))}
+                        placeholder="Tu apellido"
                       />
                     </div>
+                  </div>
 
-                    {editingProfile && (
-                      <div className="flex gap-2">
-                        <Button onClick={updateProfile} disabled={updating}>
-                          <Save className="h-4 w-4 mr-2" />
-                          {updating ? "Guardando..." : "Guardar Cambios"}
-                        </Button>
-                        <Button variant="outline" onClick={() => setEditingProfile(false)}>
-                          Cancelar
-                        </Button>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={profileForm.email}
+                      onChange={(e) => setProfileForm((prev) => ({ ...prev, email: e.target.value }))}
+                      placeholder="tu@email.com"
+                    />
+                  </div>
 
-              {/* Security Tab */}
-              <TabsContent value="security">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Seguridad de la Cuenta</CardTitle>
-                    <CardDescription>Cambia tu contraseña y gestiona la seguridad de tu cuenta</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {!changingPassword ? (
-                      <Button onClick={() => setChangingPassword(true)}>
-                        <Lock className="h-4 w-4 mr-2" />
-                        Cambiar Contraseña
+                  <div className="space-y-2">
+                    <Label htmlFor="bio">Biografía</Label>
+                    <Textarea
+                      id="bio"
+                      value={profileForm.bio}
+                      onChange={(e) => setProfileForm((prev) => ({ ...prev, bio: e.target.value }))}
+                      placeholder="Cuéntanos sobre ti..."
+                      rows={4}
+                    />
+                  </div>
+
+                  <Button type="submit" disabled={saving} className="flex items-center space-x-2">
+                    <Save className="h-4 w-4" />
+                    <span>{saving ? "Guardando..." : "Guardar Cambios"}</span>
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Security Tab */}
+          <TabsContent value="security">
+            <Card>
+              <CardHeader>
+                <CardTitle>Cambiar Contraseña</CardTitle>
+                <CardDescription>Actualiza tu contraseña para mantener tu cuenta segura</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handlePasswordChange} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="current_password">Contraseña Actual</Label>
+                    <div className="relative">
+                      <Input
+                        id="current_password"
+                        type={showPasswords.current ? "text" : "password"}
+                        value={passwordForm.current_password}
+                        onChange={(e) => setPasswordForm((prev) => ({ ...prev, current_password: e.target.value }))}
+                        placeholder="Tu contraseña actual"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-0 top-0 h-full px-3"
+                        onClick={() => setShowPasswords((prev) => ({ ...prev, current: !prev.current }))}
+                      >
+                        {showPasswords.current ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </Button>
-                    ) : (
-                      <div className="space-y-4">
-                        <div>
-                          <Label htmlFor="currentPassword">Contraseña Actual</Label>
-                          <Input
-                            id="currentPassword"
-                            type="password"
-                            value={passwordForm.currentPassword}
-                            onChange={(e) => setPasswordForm((prev) => ({ ...prev, currentPassword: e.target.value }))}
-                          />
-                        </div>
+                    </div>
+                  </div>
 
-                        <div>
-                          <Label htmlFor="newPassword">Nueva Contraseña</Label>
-                          <Input
-                            id="newPassword"
-                            type="password"
-                            value={passwordForm.newPassword}
-                            onChange={(e) => setPasswordForm((prev) => ({ ...prev, newPassword: e.target.value }))}
-                          />
-                        </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="new_password">Nueva Contraseña</Label>
+                    <div className="relative">
+                      <Input
+                        id="new_password"
+                        type={showPasswords.new ? "text" : "password"}
+                        value={passwordForm.new_password}
+                        onChange={(e) => setPasswordForm((prev) => ({ ...prev, new_password: e.target.value }))}
+                        placeholder="Tu nueva contraseña"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-0 top-0 h-full px-3"
+                        onClick={() => setShowPasswords((prev) => ({ ...prev, new: !prev.new }))}
+                      >
+                        {showPasswords.new ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                  </div>
 
-                        <div>
-                          <Label htmlFor="confirmPassword">Confirmar Nueva Contraseña</Label>
-                          <Input
-                            id="confirmPassword"
-                            type="password"
-                            value={passwordForm.confirmPassword}
-                            onChange={(e) => setPasswordForm((prev) => ({ ...prev, confirmPassword: e.target.value }))}
-                          />
-                        </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="confirm_password">Confirmar Nueva Contraseña</Label>
+                    <div className="relative">
+                      <Input
+                        id="confirm_password"
+                        type={showPasswords.confirm ? "text" : "password"}
+                        value={passwordForm.confirm_password}
+                        onChange={(e) => setPasswordForm((prev) => ({ ...prev, confirm_password: e.target.value }))}
+                        placeholder="Confirma tu nueva contraseña"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-0 top-0 h-full px-3"
+                        onClick={() => setShowPasswords((prev) => ({ ...prev, confirm: !prev.confirm }))}
+                      >
+                        {showPasswords.confirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                  </div>
 
-                        <div className="flex gap-2">
-                          <Button onClick={changePassword} disabled={updating}>
-                            {updating ? "Cambiando..." : "Cambiar Contraseña"}
-                          </Button>
-                          <Button variant="outline" onClick={() => setChangingPassword(false)}>
-                            Cancelar
+                  <Button type="submit" disabled={saving} className="flex items-center space-x-2">
+                    <Lock className="h-4 w-4" />
+                    <span>{saving ? "Cambiando..." : "Cambiar Contraseña"}</span>
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Courses Tab */}
+          <TabsContent value="courses">
+            <Card>
+              <CardHeader>
+                <CardTitle>Mis Cursos</CardTitle>
+                <CardDescription>Revisa tu progreso en los cursos inscritos</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {courses.length > 0 ? (
+                  <div className="space-y-4">
+                    {courses.map((course) => (
+                      <div key={course.id} className="border rounded-lg p-4">
+                        <div className="flex items-start space-x-4">
+                          <img
+                            src={course.thumbnail_url || "/placeholder.svg?height=80&width=80"}
+                            alt={course.title}
+                            className="w-20 h-20 rounded-lg object-cover"
+                          />
+                          <div className="flex-1">
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <h3 className="font-semibold text-lg">{course.title}</h3>
+                                <p className="text-gray-600 text-sm mb-2">{course.instructor_name}</p>
+                                <Badge variant={course.status === "completed" ? "default" : "secondary"}>
+                                  {course.status === "completed" ? "Completado" : "En Progreso"}
+                                </Badge>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-2xl font-bold text-blue-600">{course.progress_percentage}%</p>
+                                <p className="text-sm text-gray-500">Progreso</p>
+                              </div>
+                            </div>
+
+                            <div className="mt-4">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-sm text-gray-600">Progreso del curso</span>
+                                <span className="text-sm font-medium">{course.progress_percentage}%</span>
+                              </div>
+                              <Progress value={course.progress_percentage} className="h-2" />
+                            </div>
+
+                            <div className="flex items-center justify-between mt-4 text-sm text-gray-500">
+                              <div className="flex items-center space-x-1">
+                                <Calendar className="h-4 w-4" />
+                                <span>Inscrito: {new Date(course.enrollment_date).toLocaleDateString()}</span>
+                              </div>
+                              {course.completion_date && (
+                                <div className="flex items-center space-x-1">
+                                  <GraduationCap className="h-4 w-4" />
+                                  <span>Completado: {new Date(course.completion_date).toLocaleDateString()}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <BookOpen className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">No tienes cursos inscritos</h3>
+                    <p className="text-gray-600 mb-4">Explora nuestro catálogo y comienza tu aprendizaje</p>
+                    <Button asChild>
+                      <a href="/courses">Explorar Cursos</a>
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Certificates Tab */}
+          <TabsContent value="certificates">
+            <Card>
+              <CardHeader>
+                <CardTitle>Mis Certificados</CardTitle>
+                <CardDescription>Descarga y comparte tus certificados de finalización</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {certificates.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {certificates.map((certificate) => (
+                      <div key={certificate.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                        <div className="text-center">
+                          <Award className="h-12 w-12 text-yellow-600 mx-auto mb-4" />
+                          <h3 className="font-semibold text-lg mb-2">{certificate.course_title}</h3>
+                          <p className="text-gray-600 text-sm mb-2">Instructor: {certificate.instructor_name}</p>
+                          <p className="text-gray-500 text-sm mb-4">
+                            Completado: {new Date(certificate.completion_date).toLocaleDateString()}
+                          </p>
+                          <Button size="sm" className="flex items-center space-x-2 mx-auto">
+                            <Download className="h-4 w-4" />
+                            <span>Descargar PDF</span>
                           </Button>
                         </div>
                       </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              {/* Courses Tab */}
-              {user.role === "student" && (
-                <TabsContent value="courses">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Mis Cursos</CardTitle>
-                      <CardDescription>Progreso y estado de tus cursos inscritos</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {courses.length === 0 ? (
-                        <div className="text-center py-8">
-                          <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                          <p className="text-gray-600">No tienes cursos inscritos aún</p>
-                        </div>
-                      ) : (
-                        <div className="space-y-4">
-                          {courses.map((course) => (
-                            <div key={course.id} className="border rounded-lg p-4">
-                              <div className="flex items-start gap-4">
-                                <img
-                                  src={course.thumbnail_url || "/placeholder.svg"}
-                                  alt={course.title}
-                                  className="w-16 h-16 rounded-lg object-cover"
-                                />
-                                <div className="flex-1">
-                                  <h3 className="font-semibold text-lg">{course.title}</h3>
-                                  <p className="text-gray-600 text-sm mb-2">{course.description}</p>
-
-                                  <div className="flex items-center gap-4 mb-2">
-                                    <Badge variant={course.completed_at ? "default" : "secondary"}>
-                                      {course.completed_at ? (
-                                        <>
-                                          <CheckCircle className="h-3 w-3 mr-1" />
-                                          Completado
-                                        </>
-                                      ) : (
-                                        <>
-                                          <Clock className="h-3 w-3 mr-1" />
-                                          En Progreso
-                                        </>
-                                      )}
-                                    </Badge>
-                                    <span className="text-sm text-gray-600">
-                                      Inscrito: {new Date(course.enrolled_at).toLocaleDateString()}
-                                    </span>
-                                  </div>
-
-                                  <div className="space-y-1">
-                                    <div className="flex justify-between text-sm">
-                                      <span>Progreso</span>
-                                      <span>{course.progress}%</span>
-                                    </div>
-                                    <Progress value={course.progress} className="h-2" />
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-              )}
-
-              {/* Certificates Tab */}
-              {user.role === "student" && (
-                <TabsContent value="certificates">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Mis Certificados</CardTitle>
-                      <CardDescription>Certificados obtenidos por completar cursos</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {certificates.length === 0 ? (
-                        <div className="text-center py-8">
-                          <Trophy className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                          <p className="text-gray-600">No tienes certificados aún</p>
-                          <p className="text-sm text-gray-500 mt-2">
-                            Completa un curso para obtener tu primer certificado
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {certificates.map((certificate) => (
-                            <div
-                              key={certificate.id}
-                              className="border rounded-lg p-4 hover:shadow-md transition-shadow"
-                            >
-                              <div className="flex items-start gap-3">
-                                <div className="bg-yellow-100 p-2 rounded-lg">
-                                  <Award className="h-6 w-6 text-yellow-600" />
-                                </div>
-                                <div className="flex-1">
-                                  <h3 className="font-semibold">{certificate.course_title}</h3>
-                                  <p className="text-sm text-gray-600 mb-2">Instructor: {certificate.instructor}</p>
-                                  <p className="text-sm text-gray-500 mb-3">
-                                    Completado: {new Date(certificate.completed_at).toLocaleDateString()}
-                                  </p>
-                                  <Button size="sm" variant="outline">
-                                    <Download className="h-4 w-4 mr-2" />
-                                    Descargar PDF
-                                  </Button>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-              )}
-            </Tabs>
-          </div>
-        </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <Award className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">No tienes certificados aún</h3>
+                    <p className="text-gray-600 mb-4">Completa tus cursos para obtener certificados</p>
+                    <Button asChild>
+                      <a href="/courses">Ver Mis Cursos</a>
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   )

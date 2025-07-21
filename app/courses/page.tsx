@@ -46,6 +46,10 @@ interface Tag {
 }
 
 export default function CoursesPage() {
+  // Hook para verificar autenticación
+  const [user, setUser] = useState<any>(null)
+  const [authLoading, setAuthLoading] = useState(true)
+
   const [courses, setCourses] = useState<Course[]>([])
   const [tags, setTags] = useState<Tag[]>([])
   const [loading, setLoading] = useState(true)
@@ -55,6 +59,37 @@ export default function CoursesPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [showFilters, setShowFilters] = useState(false)
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const response = await fetch("/api/auth/me", {
+          credentials: "include",
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success && data.user) {
+            setUser(data.user)
+          }
+        }
+      } catch (error) {
+        console.error("Error checking auth:", error)
+      } finally {
+        setAuthLoading(false)
+      }
+    }
+
+    checkAuth()
+  }, [])
+
+  useEffect(() => {
+    loadTags()
+  }, [])
+
+  useEffect(() => {
+    loadCourses()
+  }, [currentPage, searchTerm, selectedTags, sortBy])
 
   const loadCourses = async () => {
     try {
@@ -107,14 +142,6 @@ export default function CoursesPage() {
     }
   }
 
-  useEffect(() => {
-    loadTags()
-  }, [])
-
-  useEffect(() => {
-    loadCourses()
-  }, [currentPage, searchTerm, selectedTags, sortBy])
-
   const handleTagToggle = (tagSlug: string) => {
     setSelectedTags((prev) => (prev.includes(tagSlug) ? prev.filter((t) => t !== tagSlug) : [...prev, tagSlug]))
     setCurrentPage(1)
@@ -165,7 +192,7 @@ export default function CoursesPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <Navigation user={null} />
+        <Navigation user={user} />
         <div className="container mx-auto px-4 py-8">
           <div className="flex items-center justify-center py-20">
             <div className="text-center">
@@ -180,7 +207,7 @@ export default function CoursesPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navigation user={null} />
+      <Navigation user={user} />
 
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
