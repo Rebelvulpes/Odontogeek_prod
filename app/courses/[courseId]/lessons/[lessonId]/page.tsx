@@ -274,13 +274,18 @@ export default function LessonPage() {
             {hasAccess && lesson.video_url ? (
               <Card className="mb-6">
                 <CardContent className="p-0">
-                  <div className="aspect-video bg-black rounded-t-lg overflow-hidden">
+                  <div className="relative w-full" style={{ paddingBottom: "56.25%" /* 16:9 aspect ratio */ }}>
                     <iframe
                       src={lesson.video_url}
                       title={lesson.title}
-                      className="w-full h-full"
+                      className="absolute top-0 left-0 w-full h-full rounded-t-lg"
                       allowFullScreen
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                      style={{
+                        border: "none",
+                        width: "100%",
+                        height: "100%",
+                      }}
                     />
                   </div>
                 </CardContent>
