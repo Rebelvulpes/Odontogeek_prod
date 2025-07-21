@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, Play, Clock, BookOpen, Lock } from "lucide-react"
-import { Navigation } from "@/components/navigation"
+import { ClientNavigation } from "@/components/client-navigation"
+import { getUserSessionFromCookie } from "@/lib/server-utils"
+import { cookies } from "next/headers"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -66,9 +68,15 @@ async function getCourseLessons(courseId: string) {
 }
 
 async function getCurrentUser() {
-  // This would normally get the user from session/cookies
-  // For now, return null to show logged-out state
-  return null
+  try {
+    const cookieStore = await cookies()
+    const cookieHeader = cookieStore.toString()
+    const userSession = getUserSessionFromCookie(cookieHeader)
+    return userSession
+  } catch (error) {
+    console.error("Error getting current user:", error)
+    return null
+  }
 }
 
 export default async function LessonPage({
@@ -77,7 +85,7 @@ export default async function LessonPage({
   params: { courseId: string; lessonId: string }
 }) {
   const lesson = await getLessonData(params.lessonId)
-  const user = await getCurrentUser()
+  // const user = await getCurrentUser() // REMOVED
 
   if (!lesson) {
     notFound()
@@ -91,7 +99,7 @@ export default async function LessonPage({
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Navigation with user state */}
-      <Navigation user={user} />
+      <ClientNavigation />
 
       <div className="container mx-auto px-4 py-8">
         <div className="grid lg:grid-cols-4 gap-8">

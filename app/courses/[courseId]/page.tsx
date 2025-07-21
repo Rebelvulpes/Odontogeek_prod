@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Play, Clock, Award, CheckCircle, Lock } from "lucide-react"
-import { Navigation } from "@/components/navigation"
+import { ClientNavigation } from "@/components/client-navigation"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -34,15 +34,8 @@ async function getCourse(courseId: string) {
   return course
 }
 
-async function getCurrentUser() {
-  // This would normally get the user from session/cookies
-  // For now, return null to show logged-out state
-  return null
-}
-
 export default async function CoursePage({ params }: { params: { courseId: string } }) {
   const course = await getCourse(params.courseId)
-  const user = await getCurrentUser()
 
   if (!course) {
     notFound()
@@ -55,7 +48,7 @@ export default async function CoursePage({ params }: { params: { courseId: strin
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Navigation with user state */}
-      <Navigation user={user} />
+      <ClientNavigation />
 
       <div className="container mx-auto px-4 py-8">
         <div className="grid lg:grid-cols-3 gap-8">
