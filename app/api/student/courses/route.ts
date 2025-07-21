@@ -2,16 +2,30 @@ import { type NextRequest, NextResponse } from "next/server"
 import { getUserSessionFromCookie, getServerSupabaseClient, logStudentAccess } from "@/lib/server-utils"
 
 export async function GET(request: NextRequest) {
+  const startTime = Date.now()
+  const debugInfo: any = {
+    timestamp: new Date().toISOString(),
+    step: "initialization",
+    success: false,
+  }
+
   try {
     // Get request info for logging
     const ipAddress = request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || "unknown"
     const userAgent = request.headers.get("user-agent") || "unknown"
 
+    debugInfo.step = "authentication"
+
     // Get user session
     const cookieHeader = request.headers.get("cookie")
     const userSession = getUserSessionFromCookie(cookieHeader)
 
+    debugInfo.hasSession = !!userSession
+    debugInfo.userEmail = userSession?.email || "none"
+    debugInfo.userRole = userSession?.role || "none"
+
     if (!userSession) {
+      debugInfo.error = "No valid session found"
       await logStudentAccess(
         null,
         "unknown",
@@ -22,13 +36,24 @@ export async function GET(request: NextRequest) {
         ipAddress,
         userAgent,
       )
-      return NextResponse.json({ error: "Authentication required" }, { status: 401 })
+
+      return NextResponse.json(
+        {
+          error: "Authentication required",
+          debug: debugInfo,
+        },
+        { status: 401 },
+      )
     }
+
+    debugInfo.step = "database_connection"
 
     // Connect to database
     const supabase = getServerSupabaseClient()
 
-    // Get courses with lessons and enrollment status
+    debugInfo.step = "courses_lookup"
+
+    // Get all courses with their lessons
     const { data: courses, error: coursesError } = await supabase
       .from("courses")
       .select(`
@@ -36,9 +61,9 @@ export async function GET(request: NextRequest) {
         title,
         description,
         price,
-        instructor,
         thumbnail_url,
         difficulty_level,
+        status,
         created_at,
         lessons (
           id,
@@ -46,92 +71,100 @@ export async function GET(request: NextRequest) {
           description,
           duration_minutes,
           order_index,
-          is_free
+          is_free,
+          created_at
         )
       `)
+      .eq("status", "published")
       .order("created_at", { ascending: false })
 
+    debugInfo.coursesQuery = {
+      error: coursesError?.message || null,
+      found: !!courses,
+      count: courses?.length || 0,
+    }
+
     if (coursesError) {
-      console.error("Error fetching courses:", coursesError)
+      debugInfo.error = `Error fetching courses: ${coursesError.message}`
       await logStudentAccess(
         userSession.id,
         userSession.email,
         "courses_access",
         false,
         "DATABASE_ERROR",
-        coursesError.message,
+        `Error fetching courses: ${coursesError.message}`,
         ipAddress,
         userAgent,
       )
-      return NextResponse.json({ error: "Failed to fetch courses" }, { status: 500 })
+
+      return NextResponse.json(
+        {
+          error: "Error fetching courses",
+          debug: debugInfo,
+        },
+        { status: 500 },
+      )
     }
+
+    debugInfo.step = "enrollment_check"
 
     // Get user's enrollments
     const { data: enrollments, error: enrollmentsError } = await supabase
       .from("enrollments")
       .select("course_id, status, created_at")
       .eq("user_id", userSession.id)
+      .eq("status", "active")
 
-    if (enrollmentsError) {
-      console.error("Error fetching enrollments:", enrollmentsError)
+    debugInfo.enrollmentsQuery = {
+      error: enrollmentsError?.message || null,
+      found: !!enrollments,
+      count: enrollments?.length || 0,
     }
 
-    // Create enrollment map for quick lookup
-    const enrollmentMap = new Map()
-    if (enrollments) {
-      enrollments.forEach((enrollment) => {
-        enrollmentMap.set(enrollment.course_id, enrollment)
-      })
-    }
+    const enrolledCourseIds = new Set(enrollments?.map((e) => e.course_id) || [])
 
-    // Enhance courses with enrollment status and access info
-    const enhancedCourses =
-      courses?.map((course) => {
-        const enrollment = enrollmentMap.get(course.id)
-        const isEnrolled = !!enrollment && enrollment.status === "active"
-        const isAdmin = userSession.role === "admin"
+    debugInfo.step = "data_processing"
 
-        // Sort lessons by order_index
-        const sortedLessons = course.lessons?.sort((a, b) => (a.order_index || 0) - (b.order_index || 0)) || []
+    // Process courses data
+    const processedCourses = courses?.map((course) => {
+      const isEnrolled = enrolledCourseIds.has(course.id)
+      const sortedLessons = course.lessons?.sort((a, b) => (a.order_index || 0) - (b.order_index || 0)) || []
+      const freeLessons = sortedLessons.filter((lesson) => lesson.is_free)
+      const premiumLessons = sortedLessons.filter((lesson) => !lesson.is_free)
 
-        // Calculate accessible lessons
-        const accessibleLessons = sortedLessons.filter((lesson) => lesson.is_free || isEnrolled || isAdmin)
+      return {
+        id: course.id,
+        title: course.title,
+        description: course.description,
+        price: course.price,
+        thumbnail_url: course.thumbnail_url,
+        difficulty_level: course.difficulty_level,
+        created_at: course.created_at,
+        lessons: {
+          total: sortedLessons.length,
+          free: freeLessons.length,
+          premium: premiumLessons.length,
+          list: sortedLessons.map((lesson) => ({
+            id: lesson.id,
+            title: lesson.title,
+            description: lesson.description,
+            duration_minutes: lesson.duration_minutes,
+            order_index: lesson.order_index,
+            is_free: lesson.is_free,
+            has_access: userSession.role === "admin" || lesson.is_free || isEnrolled,
+          })),
+        },
+        enrollment: {
+          is_enrolled: isEnrolled,
+          can_access_premium: userSession.role === "admin" || isEnrolled,
+        },
+      }
+    })
 
-        return {
-          id: course.id,
-          title: course.title,
-          description: course.description,
-          price: course.price,
-          instructor: course.instructor,
-          thumbnail_url: course.thumbnail_url,
-          difficulty_level: course.difficulty_level,
-          created_at: course.created_at,
-          enrollment: {
-            isEnrolled,
-            status: enrollment?.status || null,
-            enrolledAt: enrollment?.created_at || null,
-          },
-          lessons: {
-            total: sortedLessons.length,
-            accessible: accessibleLessons.length,
-            free: sortedLessons.filter((l) => l.is_free).length,
-            premium: sortedLessons.filter((l) => !l.is_free).length,
-            list: sortedLessons.map((lesson) => ({
-              id: lesson.id,
-              title: lesson.title,
-              description: lesson.description,
-              duration_minutes: lesson.duration_minutes,
-              order_index: lesson.order_index,
-              is_free: lesson.is_free,
-              hasAccess: lesson.is_free || isEnrolled || isAdmin,
-            })),
-          },
-          access: {
-            canAccess: isAdmin || isEnrolled || sortedLessons.some((l) => l.is_free),
-            reason: isAdmin ? "admin" : isEnrolled ? "enrolled" : "free_content",
-          },
-        }
-      }) || []
+    debugInfo.step = "success"
+    debugInfo.success = true
+    debugInfo.processingTime = Date.now() - startTime
+    debugInfo.coursesProcessed = processedCourses?.length || 0
 
     // Log successful access
     await logStudentAccess(
@@ -140,28 +173,28 @@ export async function GET(request: NextRequest) {
       "courses_access",
       true,
       null,
-      `Successfully fetched ${enhancedCourses.length} courses`,
+      `Successfully fetched ${processedCourses?.length || 0} courses`,
       ipAddress,
       userAgent,
     )
 
+    // Return courses data
     return NextResponse.json({
       success: true,
-      courses: enhancedCourses,
+      courses: processedCourses || [],
       user: {
         id: userSession.id,
         email: userSession.email,
         role: userSession.role,
-        name: `${userSession.first_name || ""} ${userSession.last_name || ""}`.trim(),
       },
-      stats: {
-        totalCourses: enhancedCourses.length,
-        enrolledCourses: enhancedCourses.filter((c) => c.enrollment.isEnrolled).length,
-        freeCourses: enhancedCourses.filter((c) => c.lessons.free > 0).length,
-      },
+      debug: debugInfo,
     })
   } catch (error) {
-    console.error("❌ Error in courses API:", error)
+    debugInfo.step = "error_handling"
+    debugInfo.error = error instanceof Error ? error.message : "Unknown error"
+    debugInfo.processingTime = Date.now() - startTime
+
+    console.error("❌ Error in courses access API:", error)
 
     // Log the error
     try {
@@ -173,7 +206,7 @@ export async function GET(request: NextRequest) {
         "courses_access",
         false,
         "SERVER_ERROR",
-        error instanceof Error ? error.message : "Unknown error",
+        debugInfo.error,
         ipAddress,
         userAgent,
       )
@@ -181,6 +214,12 @@ export async function GET(request: NextRequest) {
       console.error("Failed to log error:", logError)
     }
 
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    return NextResponse.json(
+      {
+        error: "Internal server error",
+        debug: debugInfo,
+      },
+      { status: 500 },
+    )
   }
 }

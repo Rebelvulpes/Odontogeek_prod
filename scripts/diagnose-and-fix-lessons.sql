@@ -144,6 +144,19 @@ BEGIN
         RAISE NOTICE '✅ Columna updated_at ya existe';
     END IF;
     
+    -- Verificar estructura de tabla courses y agregar instructor si no existe
+    SELECT EXISTS (
+        SELECT FROM information_schema.columns 
+        WHERE table_name = 'courses' AND column_name = 'instructor'
+    ) INTO column_exists;
+    
+    IF NOT column_exists THEN
+        ALTER TABLE courses ADD COLUMN instructor TEXT DEFAULT 'Dr. Instructor';
+        RAISE NOTICE '✅ Columna instructor agregada a courses';
+    ELSE
+        RAISE NOTICE '✅ Columna instructor ya existe en courses';
+    END IF;
+    
     -- Mostrar estructura final
     RAISE NOTICE '📋 Estructura final de tabla lessons:';
     FOR column_exists IN 

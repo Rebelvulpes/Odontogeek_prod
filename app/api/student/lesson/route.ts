@@ -108,7 +108,7 @@ export async function GET(request: NextRequest) {
 
     debugInfo.step = "lesson_lookup"
 
-    // Get lesson with course information
+    // Get lesson with course information - Fixed query without instructor column
     const { data: lesson, error: lessonError } = await supabase
       .from("lessons")
       .select(`
@@ -127,7 +127,6 @@ export async function GET(request: NextRequest) {
           title,
           description,
           price,
-          instructor,
           created_at
         )
       `)
@@ -269,7 +268,7 @@ export async function GET(request: NextRequest) {
           id: lesson.courses?.id,
           title: lesson.courses?.title,
           description: lesson.courses?.description,
-          instructor: lesson.courses?.instructor,
+          price: lesson.courses?.price,
         },
       },
       access: {
