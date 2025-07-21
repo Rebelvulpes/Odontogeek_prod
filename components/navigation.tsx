@@ -23,7 +23,7 @@ export function Navigation({ user: initialUser }: NavigationProps) {
 
   const navigationItems = [
     { name: "Cursos", href: "/courses", icon: BookOpen },
-    { name: "Nosotros", href: "/about", icon: Users },
+    { name: "Nosotros", href: "/nosotros", icon: Users },
     { name: "Certificaciones", href: "/certifications", icon: Award },
     { name: "Contacto", href: "/contact", icon: Phone },
   ]
