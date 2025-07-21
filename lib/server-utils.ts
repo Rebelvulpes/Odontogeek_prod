@@ -123,6 +123,9 @@ export const getUserSessionFromCookie = (cookieHeader: string | null): UserSessi
   }
 }
 
+// Export getUserFromSession as named export (alias for getUserSessionFromCookie)
+export const getUserFromSession = getUserSessionFromCookie
+
 // Log student access for monitoring and security
 export const logStudentAccess = async (
   userId: string | null,

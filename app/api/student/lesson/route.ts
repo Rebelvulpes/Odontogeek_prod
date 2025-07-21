@@ -1,48 +1,35 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase"
-import { getUserFromSession } from "@/lib/server-utils"
+import { getServerSupabaseClient, getUserSessionFromCookie, logStudentAccess } from "@/lib/server-utils"
 
 export async function GET(request: NextRequest) {
   const startTime = Date.now()
-  const timestamp = new Date().toISOString()
+  const requestUrl = request.url
+  const userAgent = request.headers.get("user-agent") || "unknown"
+  const ipAddress = request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || "unknown"
+
+  console.log(`🔍 [LESSON ACCESS] Starting lesson access request`)
+  console.log(`📍 Request URL: ${requestUrl}`)
 
   try {
+    // 1. Extract lesson ID from URL
     const { searchParams } = new URL(request.url)
     const lessonId = searchParams.get("lessonId")
 
-    // Debug info object
     const debugInfo = {
-      timestamp,
-      step: "initialization",
+      timestamp: new Date().toISOString(),
+      step: "initial_validation",
       lessonId,
-      requestUrl: request.url,
-      hasSession: false,
-      userEmail: null,
-      userRole: null,
-      lessonQuery: {
-        error: null,
-        found: false,
-        lessonTitle: null,
-        courseTitle: null,
-        isFree: false,
-      },
-      enrollmentCheck: {
-        isEnrolled: false,
-        error: null,
-      },
-      accessDecision: {
-        hasAccess: false,
-        reason: null,
-      },
+      requestUrl,
     }
 
-    // Validate lesson ID
     if (!lessonId) {
+      console.log("❌ No lesson ID provided")
       return NextResponse.json(
         {
+          ...debugInfo,
+          step: "validation_failed",
           success: false,
           error: "Lesson ID is required",
-          debug: { ...debugInfo, step: "validation_failed" },
         },
         { status: 400 },
       )
@@ -51,30 +38,64 @@ export async function GET(request: NextRequest) {
     // Validate UUID format
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
     if (!uuidRegex.test(lessonId)) {
+      console.log(`❌ Invalid UUID format: ${lessonId}`)
       return NextResponse.json(
         {
+          ...debugInfo,
+          step: "uuid_validation_failed",
           success: false,
           error: "Invalid lesson ID format",
-          debug: { ...debugInfo, step: "uuid_validation_failed" },
         },
         { status: 400 },
       )
     }
 
-    debugInfo.step = "session_check"
+    console.log(`✅ Valid lesson ID: ${lessonId}`)
 
-    // Get user session
-    const supabase = createClient()
-    const user = await getUserFromSession()
+    // 2. Get user session
+    const cookieHeader = request.headers.get("cookie")
+    const userSession = getUserSessionFromCookie(cookieHeader)
 
-    debugInfo.hasSession = !!user
-    debugInfo.userEmail = user?.email || null
-    debugInfo.userRole = user?.role || null
+    const sessionDebug = {
+      ...debugInfo,
+      step: "session_validation",
+      hasSession: !!userSession,
+      userEmail: userSession?.email || null,
+      userRole: userSession?.role || null,
+    }
 
-    debugInfo.step = "lesson_lookup"
+    if (!userSession) {
+      console.log("❌ No valid user session found")
+      await logStudentAccess(
+        null,
+        "anonymous",
+        "lesson_access_denied",
+        false,
+        "NO_SESSION",
+        "No valid session",
+        ipAddress,
+        userAgent,
+      )
 
-    // Get lesson with course information
-    const { data: lesson, error: lessonError } = await supabase
+      return NextResponse.json(
+        {
+          ...sessionDebug,
+          success: false,
+          error: "Authentication required",
+        },
+        { status: 401 },
+      )
+    }
+
+    console.log(`✅ User session found: ${userSession.email} (${userSession.role})`)
+
+    // 3. Get Supabase client
+    const supabase = getServerSupabaseClient()
+
+    // 4. Look up lesson with detailed error handling
+    console.log(`🔍 Looking up lesson: ${lessonId}`)
+
+    const lessonQuery = await supabase
       .from("lessons")
       .select(`
         id,
@@ -85,134 +106,215 @@ export async function GET(request: NextRequest) {
         duration_minutes,
         order_index,
         is_free,
-        created_at,
-        course:courses (
+        status,
+        course_id,
+        courses!inner (
           id,
           title,
-          description,
-          price,
-          instructor
+          status,
+          is_free
         )
       `)
       .eq("id", lessonId)
+      .eq("status", "published")
       .single()
 
-    debugInfo.lessonQuery = {
-      error: lessonError?.message || null,
-      found: !!lesson,
-      lessonTitle: lesson?.title || null,
-      courseTitle: lesson?.course?.title || null,
-      isFree: lesson?.is_free || false,
+    const lessonDebug = {
+      ...sessionDebug,
+      step: "lesson_lookup",
+      lessonQuery: {
+        error: lessonQuery.error?.message || null,
+        found: !!lessonQuery.data,
+        lessonTitle: lessonQuery.data?.title || null,
+        courseTitle: lessonQuery.data?.courses?.title || null,
+        isFree: lessonQuery.data?.is_free || false,
+      },
     }
 
-    if (lessonError || !lesson) {
+    if (lessonQuery.error) {
+      console.log(`❌ Database error looking up lesson:`, lessonQuery.error)
+      await logStudentAccess(
+        userSession.id,
+        userSession.email,
+        "lesson_access_error",
+        false,
+        "DB_ERROR",
+        lessonQuery.error.message,
+        ipAddress,
+        userAgent,
+      )
+
       return NextResponse.json(
         {
+          ...lessonDebug,
           success: false,
-          error: `Lesson not found: ${lessonError?.message || "Unknown error"}`,
-          debug: debugInfo,
+          error: `Lesson not found: ${lessonQuery.error.message}`,
         },
         { status: 404 },
       )
     }
 
-    debugInfo.step = "access_check"
+    if (!lessonQuery.data) {
+      console.log(`❌ Lesson not found: ${lessonId}`)
+      await logStudentAccess(
+        userSession.id,
+        userSession.email,
+        "lesson_not_found",
+        false,
+        "NOT_FOUND",
+        `Lesson ${lessonId} not found`,
+        ipAddress,
+        userAgent,
+      )
 
-    // Determine access
+      return NextResponse.json(
+        {
+          ...lessonDebug,
+          success: false,
+          error: "Lesson not found",
+        },
+        { status: 404 },
+      )
+    }
+
+    const lesson = lessonQuery.data
+    console.log(`✅ Lesson found: "${lesson.title}" in course "${lesson.courses.title}"`)
+
+    // 5. Check access permissions
     let hasAccess = false
-    let accessReason = "no_access"
+    let accessReason = ""
 
     // Admin always has access
-    if (user?.role === "admin") {
+    if (userSession.role === "admin") {
       hasAccess = true
       accessReason = "admin_access"
+      console.log(`✅ Admin access granted`)
     }
     // Free lessons are accessible to everyone
     else if (lesson.is_free) {
       hasAccess = true
       accessReason = "free_lesson"
+      console.log(`✅ Free lesson access granted`)
     }
-    // Check enrollment for premium lessons
-    else if (user) {
-      debugInfo.step = "enrollment_check"
-
-      const { data: enrollment, error: enrollmentError } = await supabase
+    // Check enrollment for paid lessons
+    else {
+      console.log(`🔍 Checking enrollment for paid lesson`)
+      const enrollmentQuery = await supabase
         .from("enrollments")
-        .select("id, user_id, course_id")
-        .eq("user_id", user.id)
-        .eq("course_id", lesson.course.id)
+        .select("id, status")
+        .eq("user_id", userSession.id)
+        .eq("course_id", lesson.course_id)
+        .eq("status", "active")
         .single()
 
-      debugInfo.enrollmentCheck = {
-        isEnrolled: !!enrollment,
-        error: enrollmentError?.message || null,
-      }
-
-      if (enrollment) {
+      if (enrollmentQuery.data) {
         hasAccess = true
-        accessReason = "enrolled_user"
+        accessReason = "enrolled"
+        console.log(`✅ Enrollment found - access granted`)
       } else {
         hasAccess = false
         accessReason = "not_enrolled"
+        console.log(`❌ No active enrollment found`)
       }
-    } else {
-      hasAccess = false
-      accessReason = "not_authenticated"
     }
 
-    debugInfo.accessDecision = {
+    const accessDebug = {
+      ...lessonDebug,
+      step: "access_check",
       hasAccess,
-      reason: accessReason,
+      accessReason,
+      isAdmin: userSession.role === "admin",
+      isFreeLesson: lesson.is_free,
     }
 
-    debugInfo.step = "response_preparation"
+    if (!hasAccess) {
+      console.log(`❌ Access denied for lesson: ${lessonId}`)
+      await logStudentAccess(
+        userSession.id,
+        userSession.email,
+        "lesson_access_denied",
+        false,
+        "NO_ACCESS",
+        `Access denied to lesson ${lessonId} - ${accessReason}`,
+        ipAddress,
+        userAgent,
+      )
 
-    const response = {
+      return NextResponse.json(
+        {
+          ...accessDebug,
+          success: false,
+          error: "Access denied - enrollment required",
+        },
+        { status: 403 },
+      )
+    }
+
+    // 6. Log successful access
+    await logStudentAccess(
+      userSession.id,
+      userSession.email,
+      "lesson_access_granted",
+      true,
+      null,
+      `Access granted to lesson ${lessonId} - ${accessReason}`,
+      ipAddress,
+      userAgent,
+    )
+
+    // 7. Return lesson data
+    const responseTime = Date.now() - startTime
+    console.log(`✅ Lesson access granted in ${responseTime}ms`)
+
+    const successResponse = {
+      ...accessDebug,
+      step: "success",
       success: true,
+      responseTime: `${responseTime}ms`,
       lesson: {
         id: lesson.id,
         title: lesson.title,
-        description: lesson.description || "",
-        content: lesson.content || "",
-        video_url: lesson.video_url || "",
-        duration_minutes: lesson.duration_minutes || 0,
-        order_index: lesson.order_index || 1,
-        is_free: lesson.is_free || false,
-        created_at: lesson.created_at,
+        description: lesson.description,
+        content: lesson.content,
+        video_url: lesson.video_url,
+        duration_minutes: lesson.duration_minutes,
+        order_index: lesson.order_index,
+        is_free: lesson.is_free,
         course: {
-          id: lesson.course.id,
-          title: lesson.course.title,
-          description: lesson.course.description || "",
-          price: lesson.course.price || 0,
-          instructor: lesson.course.instructor || "Instructor",
+          id: lesson.courses.id,
+          title: lesson.courses.title,
         },
-      },
-      access: {
-        hasAccess,
-        reason: accessReason,
-        userRole: user?.role || "guest",
-      },
-      debug: {
-        ...debugInfo,
-        processingTime: `${Date.now() - startTime}ms`,
-        step: "completed",
       },
     }
 
-    return NextResponse.json(response)
+    return NextResponse.json(successResponse)
   } catch (error) {
-    console.error("Lesson API Error:", error)
+    const responseTime = Date.now() - startTime
+    console.error(`❌ Unexpected error in lesson access:`, error)
+
+    // Try to get user info for logging
+    const cookieHeader = request.headers.get("cookie")
+    const userSession = getUserSessionFromCookie(cookieHeader)
+
+    await logStudentAccess(
+      userSession?.id || null,
+      userSession?.email || "unknown",
+      "lesson_access_error",
+      false,
+      "UNEXPECTED_ERROR",
+      error instanceof Error ? error.message : "Unknown error",
+      ipAddress,
+      userAgent,
+    )
 
     return NextResponse.json(
       {
+        timestamp: new Date().toISOString(),
+        step: "unexpected_error",
         success: false,
         error: "Internal server error",
-        debug: {
-          timestamp,
-          step: "error_handler",
-          error: error instanceof Error ? error.message : "Unknown error",
-          processingTime: `${Date.now() - startTime}ms`,
-        },
+        responseTime: `${responseTime}ms`,
+        requestUrl,
       },
       { status: 500 },
     )
