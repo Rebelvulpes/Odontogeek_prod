@@ -31,7 +31,12 @@ export async function GET(request: NextRequest) {
           success: false,
           error: "Lesson ID is required",
         },
-        { status: 400 },
+        {
+          status: 400,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
       )
     }
 
@@ -46,7 +51,12 @@ export async function GET(request: NextRequest) {
           success: false,
           error: "Invalid lesson ID format",
         },
-        { status: 400 },
+        {
+          status: 400,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
       )
     }
 
@@ -66,16 +76,20 @@ export async function GET(request: NextRequest) {
 
     if (!userSession) {
       console.log("❌ No valid user session found")
-      await logStudentAccess(
-        null,
-        "anonymous",
-        "lesson_access_denied",
-        false,
-        "NO_SESSION",
-        "No valid session",
-        ipAddress,
-        userAgent,
-      )
+      try {
+        await logStudentAccess(
+          null,
+          "anonymous",
+          "lesson_access_denied",
+          false,
+          "NO_SESSION",
+          "No valid session",
+          ipAddress,
+          userAgent,
+        )
+      } catch (logError) {
+        console.error("❌ Error logging access:", logError)
+      }
 
       return NextResponse.json(
         {
@@ -83,41 +97,84 @@ export async function GET(request: NextRequest) {
           success: false,
           error: "Authentication required",
         },
-        { status: 401 },
+        {
+          status: 401,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
       )
     }
 
     console.log(`✅ User session found: ${userSession.email} (${userSession.role})`)
 
-    // 3. Get Supabase client
-    const supabase = getServerSupabaseClient()
+    // 3. Get Supabase client with error handling
+    let supabase
+    try {
+      supabase = getServerSupabaseClient()
+    } catch (supabaseError) {
+      console.error("❌ Error creating Supabase client:", supabaseError)
+      return NextResponse.json(
+        {
+          ...sessionDebug,
+          step: "supabase_client_error",
+          success: false,
+          error: "Database connection error",
+        },
+        {
+          status: 500,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      )
+    }
 
     // 4. Look up lesson with detailed error handling
     console.log(`🔍 Looking up lesson: ${lessonId}`)
 
-    const lessonQuery = await supabase
-      .from("lessons")
-      .select(`
-        id,
-        title,
-        description,
-        content,
-        video_url,
-        duration_minutes,
-        order_index,
-        is_free,
-        status,
-        course_id,
-        courses!inner (
+    let lessonQuery
+    try {
+      lessonQuery = await supabase
+        .from("lessons")
+        .select(`
           id,
           title,
+          description,
+          content,
+          video_url,
+          duration_minutes,
+          order_index,
+          is_free,
           status,
-          is_free
-        )
-      `)
-      .eq("id", lessonId)
-      .eq("status", "published")
-      .single()
+          course_id,
+          courses!inner (
+            id,
+            title,
+            status,
+            is_free
+          )
+        `)
+        .eq("id", lessonId)
+        .eq("status", "published")
+        .single()
+    } catch (queryError) {
+      console.error("❌ Database query error:", queryError)
+      return NextResponse.json(
+        {
+          ...sessionDebug,
+          step: "database_query_error",
+          success: false,
+          error: "Database query failed",
+        },
+        {
+          status: 500,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      )
+    }
 
     const lessonDebug = {
       ...sessionDebug,
@@ -133,16 +190,20 @@ export async function GET(request: NextRequest) {
 
     if (lessonQuery.error) {
       console.log(`❌ Database error looking up lesson:`, lessonQuery.error)
-      await logStudentAccess(
-        userSession.id,
-        userSession.email,
-        "lesson_access_error",
-        false,
-        "DB_ERROR",
-        lessonQuery.error.message,
-        ipAddress,
-        userAgent,
-      )
+      try {
+        await logStudentAccess(
+          userSession.id,
+          userSession.email,
+          "lesson_access_error",
+          false,
+          "DB_ERROR",
+          lessonQuery.error.message,
+          ipAddress,
+          userAgent,
+        )
+      } catch (logError) {
+        console.error("❌ Error logging access:", logError)
+      }
 
       return NextResponse.json(
         {
@@ -150,22 +211,31 @@ export async function GET(request: NextRequest) {
           success: false,
           error: `Lesson not found: ${lessonQuery.error.message}`,
         },
-        { status: 404 },
+        {
+          status: 404,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
       )
     }
 
     if (!lessonQuery.data) {
       console.log(`❌ Lesson not found: ${lessonId}`)
-      await logStudentAccess(
-        userSession.id,
-        userSession.email,
-        "lesson_not_found",
-        false,
-        "NOT_FOUND",
-        `Lesson ${lessonId} not found`,
-        ipAddress,
-        userAgent,
-      )
+      try {
+        await logStudentAccess(
+          userSession.id,
+          userSession.email,
+          "lesson_not_found",
+          false,
+          "NOT_FOUND",
+          `Lesson ${lessonId} not found`,
+          ipAddress,
+          userAgent,
+        )
+      } catch (logError) {
+        console.error("❌ Error logging access:", logError)
+      }
 
       return NextResponse.json(
         {
@@ -173,7 +243,12 @@ export async function GET(request: NextRequest) {
           success: false,
           error: "Lesson not found",
         },
-        { status: 404 },
+        {
+          status: 404,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
       )
     }
 
@@ -199,22 +274,28 @@ export async function GET(request: NextRequest) {
     // Check enrollment for paid lessons
     else {
       console.log(`🔍 Checking enrollment for paid lesson`)
-      const enrollmentQuery = await supabase
-        .from("enrollments")
-        .select("id, status")
-        .eq("user_id", userSession.id)
-        .eq("course_id", lesson.course_id)
-        .eq("status", "active")
-        .single()
+      try {
+        const enrollmentQuery = await supabase
+          .from("enrollments")
+          .select("id, status")
+          .eq("user_id", userSession.id)
+          .eq("course_id", lesson.course_id)
+          .eq("status", "active")
+          .single()
 
-      if (enrollmentQuery.data) {
-        hasAccess = true
-        accessReason = "enrolled"
-        console.log(`✅ Enrollment found - access granted`)
-      } else {
+        if (enrollmentQuery.data) {
+          hasAccess = true
+          accessReason = "enrolled"
+          console.log(`✅ Enrollment found - access granted`)
+        } else {
+          hasAccess = false
+          accessReason = "not_enrolled"
+          console.log(`❌ No active enrollment found`)
+        }
+      } catch (enrollmentError) {
+        console.error("❌ Error checking enrollment:", enrollmentError)
         hasAccess = false
-        accessReason = "not_enrolled"
-        console.log(`❌ No active enrollment found`)
+        accessReason = "enrollment_check_failed"
       }
     }
 
@@ -229,16 +310,20 @@ export async function GET(request: NextRequest) {
 
     if (!hasAccess) {
       console.log(`❌ Access denied for lesson: ${lessonId}`)
-      await logStudentAccess(
-        userSession.id,
-        userSession.email,
-        "lesson_access_denied",
-        false,
-        "NO_ACCESS",
-        `Access denied to lesson ${lessonId} - ${accessReason}`,
-        ipAddress,
-        userAgent,
-      )
+      try {
+        await logStudentAccess(
+          userSession.id,
+          userSession.email,
+          "lesson_access_denied",
+          false,
+          "NO_ACCESS",
+          `Access denied to lesson ${lessonId} - ${accessReason}`,
+          ipAddress,
+          userAgent,
+        )
+      } catch (logError) {
+        console.error("❌ Error logging access:", logError)
+      }
 
       return NextResponse.json(
         {
@@ -246,21 +331,30 @@ export async function GET(request: NextRequest) {
           success: false,
           error: "Access denied - enrollment required",
         },
-        { status: 403 },
+        {
+          status: 403,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
       )
     }
 
     // 6. Log successful access
-    await logStudentAccess(
-      userSession.id,
-      userSession.email,
-      "lesson_access_granted",
-      true,
-      null,
-      `Access granted to lesson ${lessonId} - ${accessReason}`,
-      ipAddress,
-      userAgent,
-    )
+    try {
+      await logStudentAccess(
+        userSession.id,
+        userSession.email,
+        "lesson_access_granted",
+        true,
+        null,
+        `Access granted to lesson ${lessonId} - ${accessReason}`,
+        ipAddress,
+        userAgent,
+      )
+    } catch (logError) {
+      console.error("❌ Error logging access:", logError)
+    }
 
     // 7. Return lesson data
     const responseTime = Date.now() - startTime
@@ -287,25 +381,38 @@ export async function GET(request: NextRequest) {
       },
     }
 
-    return NextResponse.json(successResponse)
+    return NextResponse.json(successResponse, {
+      headers: {
+        "Content-Type": "application/json",
+      },
+    })
   } catch (error) {
     const responseTime = Date.now() - startTime
     console.error(`❌ Unexpected error in lesson access:`, error)
 
     // Try to get user info for logging
-    const cookieHeader = request.headers.get("cookie")
-    const userSession = getUserSessionFromCookie(cookieHeader)
+    let userSession = null
+    try {
+      const cookieHeader = request.headers.get("cookie")
+      userSession = getUserSessionFromCookie(cookieHeader)
+    } catch (sessionError) {
+      console.error("❌ Error getting session for logging:", sessionError)
+    }
 
-    await logStudentAccess(
-      userSession?.id || null,
-      userSession?.email || "unknown",
-      "lesson_access_error",
-      false,
-      "UNEXPECTED_ERROR",
-      error instanceof Error ? error.message : "Unknown error",
-      ipAddress,
-      userAgent,
-    )
+    try {
+      await logStudentAccess(
+        userSession?.id || null,
+        userSession?.email || "unknown",
+        "lesson_access_error",
+        false,
+        "UNEXPECTED_ERROR",
+        error instanceof Error ? error.message : "Unknown error",
+        ipAddress,
+        userAgent,
+      )
+    } catch (logError) {
+      console.error("❌ Error logging access:", logError)
+    }
 
     return NextResponse.json(
       {
@@ -316,7 +423,12 @@ export async function GET(request: NextRequest) {
         responseTime: `${responseTime}ms`,
         requestUrl,
       },
-      { status: 500 },
+      {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      },
     )
   }
 }
