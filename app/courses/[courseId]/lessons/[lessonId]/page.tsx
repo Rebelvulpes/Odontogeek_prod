@@ -273,19 +273,19 @@ export default function LessonPage() {
             {/* Video player */}
             {hasAccess && lesson.video_url ? (
               <div className="mb-6">
-                <div
-                  className="relative w-full bg-black rounded-lg overflow-hidden"
-                  style={{ paddingBottom: "56.25%" }}
-                >
+                <div className="relative w-full bg-black rounded-lg overflow-hidden" style={{ height: "500px" }}>
                   <iframe
                     src={lesson.video_url}
                     title={lesson.title}
-                    className="absolute inset-0 w-full h-full"
+                    className="absolute inset-0"
                     allowFullScreen
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                     style={{
                       border: "none",
-                      minHeight: "400px",
+                      width: "100%",
+                      height: "100%",
+                      transform: "scale(1.5)",
+                      transformOrigin: "center center",
                     }}
                     frameBorder="0"
                   />
