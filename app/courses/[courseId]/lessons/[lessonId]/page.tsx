@@ -273,42 +273,39 @@ export default function LessonPage() {
             {/* Video player */}
             {hasAccess && lesson.video_url ? (
               <div className="mb-6">
-                <div
-                  className="relative w-full rounded-lg overflow-hidden shadow-lg"
-                  style={{ paddingBottom: "56.25%" /* 16:9 aspect ratio */ }}
-                >
-                  <iframe
-                    src={lesson.video_url}
-                    title={lesson.title}
-                    className="absolute inset-0 w-full h-full"
-                    allowFullScreen
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                    style={{
-                      border: "none",
-                    }}
-                    frameBorder="0"
-                  />
-                </div>
+                <iframe
+                  src={lesson.video_url}
+                  title={lesson.title}
+                  className="w-full rounded-lg shadow-lg"
+                  style={{
+                    height: "400px",
+                    minHeight: "300px",
+                  }}
+                  allowFullScreen
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  frameBorder="0"
+                />
               </div>
             ) : (
               <div className="mb-6">
                 <div
-                  className="relative w-full bg-gray-100 rounded-lg overflow-hidden shadow-lg flex items-center justify-center"
-                  style={{ paddingBottom: "56.25%" /* 16:9 aspect ratio */ }}
+                  className="w-full bg-gray-100 rounded-lg shadow-lg flex items-center justify-center"
+                  style={{
+                    height: "400px",
+                    minHeight: "300px",
+                  }}
                 >
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="text-center">
-                      <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
-                        {hasAccess ? (
-                          <Play className="w-8 h-8 text-gray-400" />
-                        ) : (
-                          <Lock className="w-8 h-8 text-gray-400" />
-                        )}
-                      </div>
-                      <p className="text-gray-600">
-                        {hasAccess ? "Video no disponible" : "Inscríbete al curso para ver el video"}
-                      </p>
+                  <div className="text-center">
+                    <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
+                      {hasAccess ? (
+                        <Play className="w-8 h-8 text-gray-400" />
+                      ) : (
+                        <Lock className="w-8 h-8 text-gray-400" />
+                      )}
                     </div>
+                    <p className="text-gray-600">
+                      {hasAccess ? "Video no disponible" : "Inscríbete al curso para ver el video"}
+                    </p>
                   </div>
                 </div>
               </div>
