@@ -273,7 +273,7 @@ export default function LessonPage() {
             {/* Video player */}
             {hasAccess && lesson.video_url ? (
               <div className="mb-6">
-                <div className="relative w-full bg-black rounded-lg overflow-hidden" style={{ height: "500px" }}>
+                <div className="relative w-full bg-black rounded-lg overflow-hidden" style={{ height: "600px" }}>
                   <iframe
                     src={lesson.video_url}
                     title={lesson.title}
@@ -284,7 +284,7 @@ export default function LessonPage() {
                       border: "none",
                       width: "100%",
                       height: "100%",
-                      transform: "scale(1.5)",
+                      transform: "scale(2.2)",
                       transformOrigin: "center center",
                     }}
                     frameBorder="0"
