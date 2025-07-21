@@ -7,18 +7,45 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Menu, BookOpen, Users, Award, Phone, LogIn, UserPlus, Settings, LogOut, User } from "lucide-react"
+import { checkAuthStatus, logout, type User as UserType } from "@/lib/auth-utils"
 
 interface NavigationProps {
-  user: any | null
+  user?: UserType | null
 }
 
 export function Navigation({ user: initialUser }: NavigationProps) {
   const [isOpen, setIsOpen] = useState(false)
-  const [user, setUser] = useState<any | null>(initialUser)
+  const [user, setUser] = useState<UserType | null>(initialUser || null)
+  const [authLoading, setAuthLoading] = useState(!initialUser)
 
-  // Sincronizar con el prop user cuando cambie
+  // Check auth status on mount and periodically
   useEffect(() => {
-    setUser(initialUser)
+    const checkAuth = async () => {
+      if (!user) {
+        setAuthLoading(true)
+        const authUser = await checkAuthStatus()
+        setUser(authUser)
+        setAuthLoading(false)
+      }
+    }
+
+    checkAuth()
+
+    // Check auth status every 30 seconds to maintain session
+    const interval = setInterval(async () => {
+      const authUser = await checkAuthStatus()
+      setUser(authUser)
+    }, 30000)
+
+    return () => clearInterval(interval)
+  }, [user])
+
+  // Update user when initialUser prop changes
+  useEffect(() => {
+    if (initialUser !== undefined) {
+      setUser(initialUser)
+      setAuthLoading(false)
+    }
   }, [initialUser])
 
   const navigationItems = [
@@ -30,12 +57,8 @@ export function Navigation({ user: initialUser }: NavigationProps) {
 
   const handleLogout = async () => {
     try {
-      const response = await fetch("/api/auth/logout", {
-        method: "POST",
-        credentials: "include",
-      })
-
-      if (response.ok) {
+      const success = await logout()
+      if (success) {
         setUser(null)
         window.location.href = "/"
       }
@@ -46,7 +69,6 @@ export function Navigation({ user: initialUser }: NavigationProps) {
 
   const getUserDisplayName = () => {
     if (!user) return ""
-    if (user.name) return user.name
     if (user.first_name && user.last_name) return `${user.first_name} ${user.last_name}`
     if (user.first_name) return user.first_name
     return user.email.split("@")[0]
@@ -88,7 +110,12 @@ export function Navigation({ user: initialUser }: NavigationProps) {
 
           {/* Desktop Auth Buttons */}
           <div className="hidden md:flex items-center space-x-3">
-            {user ? (
+            {authLoading ? (
+              <div className="flex items-center space-x-2">
+                <div className="w-8 h-8 bg-gray-200 rounded-full animate-pulse"></div>
+                <div className="w-20 h-4 bg-gray-200 rounded animate-pulse"></div>
+              </div>
+            ) : user ? (
               <div className="flex items-center space-x-3">
                 {/* Botón Mi Dashboard */}
                 <Link href={user.role === "admin" ? "/admin" : "/dashboard"}>
@@ -104,7 +131,7 @@ export function Navigation({ user: initialUser }: NavigationProps) {
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                       <Avatar className="h-8 w-8">
-                        <AvatarImage src={user.avatar_url || "/placeholder.svg"} alt={getUserDisplayName()} />
+                        <AvatarImage src="/placeholder.svg" alt={getUserDisplayName()} />
                         <AvatarFallback>{getUserInitials()}</AvatarFallback>
                       </Avatar>
                     </Button>
@@ -182,11 +209,16 @@ export function Navigation({ user: initialUser }: NavigationProps) {
 
                 {/* Mobile Auth Buttons */}
                 <div className="border-t pt-6 space-y-3">
-                  {user ? (
+                  {authLoading ? (
+                    <div className="space-y-3">
+                      <div className="w-full h-10 bg-gray-200 rounded animate-pulse"></div>
+                      <div className="w-full h-10 bg-gray-200 rounded animate-pulse"></div>
+                    </div>
+                  ) : user ? (
                     <div className="space-y-3">
                       <div className="flex items-center space-x-3 p-2">
                         <Avatar className="h-10 w-10">
-                          <AvatarImage src={user.avatar_url || "/placeholder.svg"} alt={getUserDisplayName()} />
+                          <AvatarImage src="/placeholder.svg" alt={getUserDisplayName()} />
                           <AvatarFallback>{getUserInitials()}</AvatarFallback>
                         </Avatar>
                         <div>

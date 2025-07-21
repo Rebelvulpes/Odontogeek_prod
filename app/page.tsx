@@ -10,18 +10,11 @@ import { Navigation } from "@/components/navigation"
 import { HeroCarousel } from "@/components/hero-carousel"
 import { NewsTicker } from "@/components/news-ticker"
 import { createClient } from "@supabase/supabase-js"
+import { checkAuthStatus, type User } from "@/lib/auth-utils"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 const supabase = createClient(supabaseUrl, supabaseAnonKey)
-
-interface User {
-  id: string
-  email: string
-  first_name: string
-  last_name: string
-  role: string
-}
 
 interface Course {
   id: string
@@ -124,30 +117,6 @@ async function getFeaturedCourses(): Promise<Course[]> {
   } catch (error) {
     console.error("Error fetching featured courses:", error)
     return []
-  }
-}
-
-// Función para verificar el estado de autenticación
-async function checkAuthStatus(): Promise<User | null> {
-  try {
-    const response = await fetch("/api/auth/me", {
-      method: "GET",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    })
-
-    if (response.ok) {
-      const data = await response.json()
-      if (data.success && data.user) {
-        return data.user
-      }
-    }
-    return null
-  } catch (error) {
-    console.error("Error checking auth status:", error)
-    return null
   }
 }
 
