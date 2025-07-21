@@ -1,3 +1,6 @@
+"use client"
+
+import { useState, useEffect } from "react"
 import { createClient } from "@supabase/supabase-js"
 import { notFound } from "next/navigation"
 import Link from "next/link"
@@ -5,43 +8,103 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Play, Clock, Award, CheckCircle, Lock } from "lucide-react"
-import { ClientNavigation } from "@/components/client-navigation"
+import { Navigation } from "@/components/navigation"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
-async function getCourse(courseId: string) {
-  try {
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
-
-    const { data: course, error } = await supabase
-      .from("courses")
-      .select(`
-        *,
-        lessons:lessons(*)
-      `)
-      .eq("id", courseId)
-      .single()
-
-    if (error) {
-      console.error("Error fetching course:", error)
-      return null
-    }
-
-    // Ordenar lecciones por order_index
-    if (course?.lessons) {
-      course.lessons.sort((a: any, b: any) => (a.order_index || 0) - (b.order_index || 0))
-    }
-
-    return course
-  } catch (error) {
-    console.error("Error in getCourse:", error)
-    return null
-  }
+interface Course {
+  id: string
+  title: string
+  description: string
+  price: number
+  instructor: string
+  difficulty_level: string
+  status: string
+  lessons: Array<{
+    id: string
+    title: string
+    description: string
+    duration_minutes: number
+    order_index: number
+    is_free: boolean
+  }>
 }
 
-export default async function CoursePage({ params }: { params: { courseId: string } }) {
-  const course = await getCourse(params.courseId)
+export default function CoursePage({ params }: { params: { courseId: string } }) {
+  const [course, setCourse] = useState<Course | null>(null)
+  const [user, setUser] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const response = await fetch("/api/auth/me", {
+          credentials: "include",
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success) {
+            setUser(data.user)
+          }
+        }
+      } catch (error) {
+        console.error("Error checking auth:", error)
+      }
+    }
+
+    const getCourse = async () => {
+      try {
+        const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+        const { data: courseData, error } = await supabase
+          .from("courses")
+          .select(`
+            *,
+            lessons:lessons(*)
+          `)
+          .eq("id", params.courseId)
+          .single()
+
+        if (error || !courseData) {
+          notFound()
+          return
+        }
+
+        // Ordenar lecciones por order_index
+        if (courseData.lessons) {
+          courseData.lessons.sort((a: any, b: any) => (a.order_index || 0) - (b.order_index || 0))
+        }
+
+        setCourse(courseData)
+      } catch (error) {
+        console.error("Error fetching course:", error)
+        notFound()
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    checkAuth()
+    getCourse()
+  }, [params.courseId])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navigation user={null} />
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex items-center justify-center py-20">
+            <div className="text-center">
+              <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
+              <p className="text-gray-600">Cargando curso...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   if (!course) {
     notFound()
@@ -55,7 +118,7 @@ export default async function CoursePage({ params }: { params: { courseId: strin
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Navigation with user state */}
-      <ClientNavigation />
+      <Navigation user={user} />
 
       <div className="container mx-auto px-4 py-8">
         <div className="grid lg:grid-cols-3 gap-8">

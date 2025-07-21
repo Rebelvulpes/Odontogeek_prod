@@ -1,3 +1,6 @@
+"use client"
+
+import { useState, useEffect } from "react"
 import { createClient } from "@supabase/supabase-js"
 import { notFound } from "next/navigation"
 import Link from "next/link"
@@ -5,94 +8,154 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, Play, Clock, BookOpen, Lock } from "lucide-react"
-import { ClientNavigation } from "@/components/client-navigation"
+import { Navigation } from "@/components/navigation"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
-async function getLessonData(lessonId: string) {
-  try {
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
-
-    const { data: lesson, error } = await supabase
-      .from("lessons")
-      .select(`
-        id,
-        title,
-        description,
-        content,
-        video_url,
-        duration_minutes,
-        order_index,
-        is_free,
-        created_at,
-        course_id,
-        courses (
-          id,
-          title,
-          description,
-          price,
-          instructor,
-          difficulty_level,
-          thumbnail_url
-        )
-      `)
-      .eq("id", lessonId)
-      .single()
-
-    if (error) {
-      console.error("Error fetching lesson:", error)
-      return null
-    }
-
-    return lesson
-  } catch (error) {
-    console.error("Error in getLessonData:", error)
-    return null
+interface Lesson {
+  id: string
+  title: string
+  description: string
+  content: string
+  video_url: string
+  duration_minutes: number
+  order_index: number
+  is_free: boolean
+  course_id: string
+  courses: {
+    id: string
+    title: string
+    description: string
+    price: number
+    instructor: string
+    difficulty_level: string
   }
 }
 
-async function getCourseLessons(courseId: string) {
-  try {
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
-
-    const { data: lessons, error } = await supabase
-      .from("lessons")
-      .select(`
-        id,
-        title,
-        description,
-        duration_minutes,
-        order_index,
-        is_free
-      `)
-      .eq("course_id", courseId)
-      .order("order_index", { ascending: true })
-
-    if (error) {
-      console.error("Error fetching course lessons:", error)
-      return []
-    }
-
-    return lessons || []
-  } catch (error) {
-    console.error("Error in getCourseLessons:", error)
-    return []
-  }
+interface CourseLesson {
+  id: string
+  title: string
+  description: string
+  duration_minutes: number
+  order_index: number
+  is_free: boolean
 }
 
-export default async function LessonPage({
+export default function LessonPage({
   params,
 }: {
   params: { courseId: string; lessonId: string }
 }) {
-  const lesson = await getLessonData(params.lessonId)
+  const [lesson, setLesson] = useState<Lesson | null>(null)
+  const [courseLessons, setCourseLessons] = useState<CourseLesson[]>([])
+  const [user, setUser] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const response = await fetch("/api/auth/me", {
+          credentials: "include",
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success) {
+            setUser(data.user)
+          }
+        }
+      } catch (error) {
+        console.error("Error checking auth:", error)
+      }
+    }
+
+    const getLessonData = async () => {
+      try {
+        const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+        const { data: lessonData, error } = await supabase
+          .from("lessons")
+          .select(`
+            id,
+            title,
+            description,
+            content,
+            video_url,
+            duration_minutes,
+            order_index,
+            is_free,
+            created_at,
+            course_id,
+            courses (
+              id,
+              title,
+              description,
+              price,
+              instructor,
+              difficulty_level,
+              thumbnail_url
+            )
+          `)
+          .eq("id", params.lessonId)
+          .single()
+
+        if (error || !lessonData) {
+          notFound()
+          return
+        }
+
+        setLesson(lessonData)
+
+        // Get course lessons
+        const { data: lessonsData, error: lessonsError } = await supabase
+          .from("lessons")
+          .select(`
+            id,
+            title,
+            description,
+            duration_minutes,
+            order_index,
+            is_free
+          `)
+          .eq("course_id", params.courseId)
+          .order("order_index", { ascending: true })
+
+        if (!lessonsError && lessonsData) {
+          setCourseLessons(lessonsData)
+        }
+      } catch (error) {
+        console.error("Error fetching lesson:", error)
+        notFound()
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    checkAuth()
+    getLessonData()
+  }, [params.lessonId, params.courseId])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navigation user={null} />
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex items-center justify-center py-20">
+            <div className="text-center">
+              <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
+              <p className="text-gray-600">Cargando lección...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   if (!lesson) {
     notFound()
   }
 
-  const courseLessons = await getCourseLessons(params.courseId)
   const currentLessonIndex = courseLessons.findIndex((l) => l.id === params.lessonId)
   const nextLesson = currentLessonIndex < courseLessons.length - 1 ? courseLessons[currentLessonIndex + 1] : null
   const prevLesson = currentLessonIndex > 0 ? courseLessons[currentLessonIndex - 1] : null
@@ -100,7 +163,7 @@ export default async function LessonPage({
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Navigation with user state */}
-      <ClientNavigation />
+      <Navigation user={user} />
 
       <div className="container mx-auto px-4 py-8">
         <div className="grid lg:grid-cols-4 gap-8">

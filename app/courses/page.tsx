@@ -1,3 +1,6 @@
+"use client"
+
+import { useState, useEffect } from "react"
 import { createClient } from "@supabase/supabase-js"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -6,43 +9,99 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Clock, Users, Star, BookOpen, Filter, Search } from "lucide-react"
-import { ClientNavigation } from "@/components/client-navigation"
+import { Navigation } from "@/components/navigation"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
-async function getCourses() {
-  try {
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
-
-    const { data: courses, error } = await supabase
-      .from("courses")
-      .select(`
-        *,
-        lessons:lessons(id, duration_minutes)
-      `)
-      .eq("status", "published")
-      .order("created_at", { ascending: false })
-
-    if (error) {
-      console.error("Error fetching courses:", error)
-      return []
-    }
-
-    return courses || []
-  } catch (error) {
-    console.error("Error in getCourses:", error)
-    return []
-  }
+interface Course {
+  id: string
+  title: string
+  description: string
+  price: number
+  instructor: string
+  difficulty_level: string
+  thumbnail_url: string
+  lessons: Array<{
+    id: string
+    duration_minutes: number
+  }>
 }
 
-export default async function CoursesPage() {
-  const courses = await getCourses()
+export default function CoursesPage() {
+  const [courses, setCourses] = useState<Course[]>([])
+  const [user, setUser] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const response = await fetch("/api/auth/me", {
+          credentials: "include",
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success) {
+            setUser(data.user)
+          }
+        }
+      } catch (error) {
+        console.error("Error checking auth:", error)
+      }
+    }
+
+    const getCourses = async () => {
+      try {
+        const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+        const { data: coursesData, error } = await supabase
+          .from("courses")
+          .select(`
+            *,
+            lessons:lessons(id, duration_minutes)
+          `)
+          .eq("status", "published")
+          .order("created_at", { ascending: false })
+
+        if (error) {
+          console.error("Error fetching courses:", error)
+          setCourses([])
+        } else {
+          setCourses(coursesData || [])
+        }
+      } catch (error) {
+        console.error("Error in getCourses:", error)
+        setCourses([])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    checkAuth()
+    getCourses()
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navigation user={null} />
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex items-center justify-center py-20">
+            <div className="text-center">
+              <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
+              <p className="text-gray-600">Cargando cursos...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Navigation */}
-      <ClientNavigation />
+      <Navigation user={user} />
 
       {/* Hero Section */}
       <section className="bg-gradient-to-r from-blue-600 to-blue-800 text-white py-16">
