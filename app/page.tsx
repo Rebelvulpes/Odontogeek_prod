@@ -191,8 +191,8 @@ export default function HomePage() {
           ) : featuredCourses.length > 0 ? (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
               {featuredCourses.map((course, index) => (
-                <Card 
-                  key={course.id} 
+                <Card
+                  key={course.id}
                   className="group hover:shadow-xl transition-all duration-300 hover:-translate-y-2 border-0 bg-white/80 backdrop-blur-sm animate-fade-in-up"
                   style={{ animationDelay: `${index * 200}ms` }}
                 >
@@ -285,7 +285,9 @@ export default function HomePage() {
                   Próximamente
                 </span>
               </h3>
-              <p className="text-gray-600 mb-6 leading-relaxed">Estamos preparando cursos increíbles para ti. ¡Mantente atento!</p>
+              <p className="text-gray-600 mb-6 leading-relaxed">
+                Estamos preparando cursos increíbles para ti. ¡Mantente atento!
+              </p>
               <Link href="/courses">
                 <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
                   Explorar Catálogo
@@ -298,8 +300,8 @@ export default function HomePage() {
           {featuredCourses.length > 0 && (
             <div className="text-center mt-16 animate-fade-in-up">
               <Link href="/courses">
-                <Button 
-                  size="lg" 
+                <Button
+                  size="lg"
                   className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 px-8 py-3 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
                 >
                   Ver Todos los Cursos
@@ -333,22 +335,22 @@ export default function HomePage() {
                 title: "Contenido Actualizado",
                 description: "Cursos actualizados con las últimas técnicas y tecnologías odontológicas",
                 color: "from-blue-500 to-blue-600",
-                iconColor: "text-blue-600"
+                iconColor: "text-blue-600",
               },
               {
                 icon: Award,
                 title: "Certificación Oficial",
                 description: "Obtén certificados reconocidos que validen tus conocimientos profesionales",
                 color: "from-green-500 to-green-600",
-                iconColor: "text-green-600"
+                iconColor: "text-green-600",
               },
               {
                 icon: TrendingUp,
                 title: "Progreso Personalizado",
                 description: "Sigue tu progreso y recibe recomendaciones personalizadas de aprendizaje",
                 color: "from-purple-500 to-purple-600",
-                iconColor: "text-purple-600"
-              }
+                iconColor: "text-purple-600",
+              },
             ].map((feature, index) => (
               <Card
                 key={index}
@@ -356,7 +358,9 @@ export default function HomePage() {
                 style={{ animationDelay: `${index * 200}ms` }}
               >
                 <CardContent className="p-8 text-center">
-                  <div className={`w-16 h-16 mx-auto mb-6 rounded-full bg-gradient-to-br ${feature.color} flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-lg`}>
+                  <div
+                    className={`w-16 h-16 mx-auto mb-6 rounded-full bg-gradient-to-br ${feature.color} flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-lg`}
+                  >
                     <feature.icon className="w-8 h-8 text-white" />
                   </div>
                   <h3 className="text-xl font-bold mb-4 text-gray-900 group-hover:text-blue-600 transition-colors">
@@ -374,7 +378,7 @@ export default function HomePage() {
       <section className="py-20 px-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white relative overflow-hidden">
         <div className="absolute top-10 right-10 w-24 h-24 bg-white/10 rounded-full animate-pulse" />
         <div className="absolute bottom-10 left-10 w-32 h-32 bg-white/5 rounded-full animate-pulse delay-1000" />
-        
+
         <div className="container mx-auto max-w-4xl text-center relative z-10">
           <div className="animate-fade-in-up">
             <h2 className="text-4xl font-bold mb-6">¿Listo para impulsar tu carrera odontológica?</h2>
@@ -383,7 +387,10 @@ export default function HomePage() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href="/courses">
-                <Button size="lg" className="bg-white text-blue-600 hover:bg-gray-100 font-semibold px-8 py-3 shadow-lg hover:shadow-xl transition-all duration-300">
+                <Button
+                  size="lg"
+                  className="bg-white text-blue-600 hover:bg-gray-100 font-semibold px-8 py-3 shadow-lg hover:shadow-xl transition-all duration-300"
+                >
                   Explorar Cursos
                   <ArrowRight className="w-5 h-5 ml-2" />
                 </Button>
@@ -489,7 +496,10 @@ export default function HomePage() {
               </ul>
             </div>
           </div>
-          <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400 animate-fade-in-up" style={{ animationDelay: "800ms" }}>
+          <div
+            className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400 animate-fade-in-up"
+            style={{ animationDelay: "800ms" }}
+          >
             <p>&copy; 2024 OdontoGeek. Todos los derechos reservados.</p>
           </div>
         </div>
@@ -508,4 +518,9 @@ export default function HomePage() {
         }
         
         .animate-fade-in-up {
-          animation: fade-in-up
+          animation: fade-in-up 0.6s ease-out forwards;
+        }
+      `}</style>
+    </div>
+  )
+}
