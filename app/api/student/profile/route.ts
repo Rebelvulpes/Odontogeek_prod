@@ -41,12 +41,13 @@ export async function PUT(req: NextRequest) {
     }
 
     // Get update data
-    const { first_name, last_name, email } = await req.json()
+    const { first_name, last_name, email, bio } = await req.json()
 
     console.log("=== UPDATE DATA ===")
     console.log("First name:", first_name)
     console.log("Last name:", last_name)
     console.log("Email:", email)
+    console.log("Bio provided:", !!bio)
 
     // Validation
     if (!first_name || !last_name || !email) {
@@ -54,7 +55,7 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          message: "Todos los campos son requeridos",
+          message: "Nombre, apellido y email son requeridos",
           error: "MISSING_REQUIRED_FIELDS",
         },
         { status: 400 },
@@ -72,14 +73,6 @@ export async function PUT(req: NextRequest) {
         },
         { status: 400 },
       )
-    }
-
-    // Handle avatar update if provided
-    const avatarUrl = userSession.avatar_url
-    if (req.headers.get("content-type")?.includes("multipart/form-data")) {
-      // TODO: Implement file upload for avatar
-      // For now, we'll keep the existing avatar
-      console.log("Avatar upload not implemented yet")
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
@@ -113,7 +106,7 @@ export async function PUT(req: NextRequest) {
       first_name: first_name.trim(),
       last_name: last_name.trim(),
       email: email.toLowerCase().trim(),
-      avatar_url: avatarUrl,
+      bio: bio ? bio.trim() : null,
       updated_at: new Date().toISOString(),
     }
 
@@ -164,6 +157,7 @@ export async function PUT(req: NextRequest) {
       last_name: updatedUser.last_name,
       role: updatedUser.role,
       avatar_url: updatedUser.avatar_url,
+      bio: updatedUser.bio,
       created_at: updatedUser.created_at,
     }
 
