@@ -15,6 +15,14 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
+interface User {
+  id: string
+  email: string
+  first_name: string
+  last_name: string
+  role: string
+}
+
 interface Course {
   id: string
   title: string
@@ -119,23 +127,55 @@ async function getFeaturedCourses(): Promise<Course[]> {
   }
 }
 
+// Función para verificar el estado de autenticación
+async function checkAuthStatus(): Promise<User | null> {
+  try {
+    const response = await fetch("/api/auth/me", {
+      method: "GET",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    })
+
+    if (response.ok) {
+      const data = await response.json()
+      if (data.success && data.user) {
+        return data.user
+      }
+    }
+    return null
+  } catch (error) {
+    console.error("Error checking auth status:", error)
+    return null
+  }
+}
+
 export default function HomePage() {
   const [featuredCourses, setFeaturedCourses] = useState<Course[]>([])
   const [loading, setLoading] = useState(true)
+  const [user, setUser] = useState<User | null>(null)
+  const [authLoading, setAuthLoading] = useState(true)
 
   useEffect(() => {
-    const loadFeaturedCourses = async () => {
+    const loadData = async () => {
+      // Verificar autenticación
+      const authUser = await checkAuthStatus()
+      setUser(authUser)
+      setAuthLoading(false)
+
+      // Cargar cursos destacados
       const courses = await getFeaturedCourses()
       setFeaturedCourses(courses)
       setLoading(false)
     }
 
-    loadFeaturedCourses()
+    loadData()
   }, [])
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navigation user={null} />
+      <Navigation user={user} />
 
       {/* Hero Section with Carousel */}
       <section className="relative">
@@ -327,15 +367,17 @@ export default function HomePage() {
                 Explorar Cursos
               </Button>
             </Link>
-            <Link href="/auth/register">
-              <Button
-                size="lg"
-                variant="outline"
-                className="text-white border-white hover:bg-white hover:text-blue-600 bg-transparent"
-              >
-                Crear Cuenta Gratis
-              </Button>
-            </Link>
+            {!user && (
+              <Link href="/auth/register">
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="text-white border-white hover:bg-white hover:text-blue-600 bg-transparent"
+                >
+                  Crear Cuenta Gratis
+                </Button>
+              </Link>
+            )}
           </div>
         </div>
       </section>

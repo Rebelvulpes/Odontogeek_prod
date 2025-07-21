@@ -1,23 +1,25 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { Menu, BookOpen, Users, Award, Phone, LogIn, UserPlus } from "lucide-react"
-
-interface User {
-  name: string
-  email: string
-  role?: string
-}
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Menu, BookOpen, Users, Award, Phone, LogIn, UserPlus, Settings, LogOut, User } from "lucide-react"
 
 interface NavigationProps {
-  user: User | null
+  user: any | null
 }
 
-export function Navigation({ user }: NavigationProps) {
+export function Navigation({ user: initialUser }: NavigationProps) {
   const [isOpen, setIsOpen] = useState(false)
+  const [user, setUser] = useState<any | null>(initialUser)
+
+  // Sincronizar con el prop user cuando cambie
+  useEffect(() => {
+    setUser(initialUser)
+  }, [initialUser])
 
   const navigationItems = [
     { name: "Cursos", href: "/courses", icon: BookOpen },
@@ -25,6 +27,41 @@ export function Navigation({ user }: NavigationProps) {
     { name: "Certificaciones", href: "/certifications", icon: Award },
     { name: "Contacto", href: "/contact", icon: Phone },
   ]
+
+  const handleLogout = async () => {
+    try {
+      const response = await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
+      })
+
+      if (response.ok) {
+        setUser(null)
+        window.location.href = "/"
+      }
+    } catch (error) {
+      console.error("Error during logout:", error)
+    }
+  }
+
+  const getUserDisplayName = () => {
+    if (!user) return ""
+    if (user.name) return user.name
+    if (user.first_name && user.last_name) return `${user.first_name} ${user.last_name}`
+    if (user.first_name) return user.first_name
+    return user.email.split("@")[0]
+  }
+
+  const getUserInitials = () => {
+    const displayName = getUserDisplayName()
+    if (!displayName) return "U"
+
+    const names = displayName.split(" ")
+    if (names.length >= 2) {
+      return `${names[0][0]}${names[1][0]}`.toUpperCase()
+    }
+    return displayName.substring(0, 2).toUpperCase()
+  }
 
   return (
     <header className="bg-white border-b sticky top-0 z-50">
@@ -53,19 +90,37 @@ export function Navigation({ user }: NavigationProps) {
           <div className="hidden md:flex items-center space-x-3">
             {user ? (
               <div className="flex items-center space-x-3">
-                <span className="text-gray-700">Hola, {user.name}</span>
-                {user.role === "admin" && (
-                  <Link href="/admin">
-                    <Button variant="outline" size="sm">
-                      Admin
+                <span className="text-gray-700">Hola, {getUserDisplayName()}</span>
+
+                {/* User Avatar Dropdown */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage src={user.avatar_url || "/placeholder.svg"} alt={getUserDisplayName()} />
+                        <AvatarFallback>{getUserInitials()}</AvatarFallback>
+                      </Avatar>
                     </Button>
-                  </Link>
-                )}
-                <Link href="/dashboard">
-                  <Button variant="outline" size="sm">
-                    Mi Panel
-                  </Button>
-                </Link>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-56" align="end" forceMount>
+                    <DropdownMenuItem asChild>
+                      <Link href={user.role === "admin" ? "/admin" : "/dashboard"} className="flex items-center">
+                        <User className="mr-2 h-4 w-4" />
+                        <span>{user.role === "admin" ? "Panel de Admin" : "Mi Dashboard"}</span>
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/profile" className="flex items-center">
+                        <Settings className="mr-2 h-4 w-4" />
+                        <span>Configuración</span>
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleLogout} className="flex items-center text-red-600">
+                      <LogOut className="mr-2 h-4 w-4" />
+                      <span>Cerrar Sesión</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             ) : (
               <>
@@ -122,21 +177,42 @@ export function Navigation({ user }: NavigationProps) {
                 <div className="border-t pt-6 space-y-3">
                   {user ? (
                     <div className="space-y-3">
-                      <div className="text-gray-700 font-medium">Hola, {user.name}</div>
-                      {user.role === "admin" && (
-                        <Link href="/admin" onClick={() => setIsOpen(false)}>
-                          <Button variant="outline" className="w-full justify-start bg-transparent">
-                            <Users className="w-4 h-4 mr-2" />
-                            Panel de Admin
-                          </Button>
-                        </Link>
-                      )}
-                      <Link href="/dashboard" onClick={() => setIsOpen(false)}>
+                      <div className="flex items-center space-x-3 p-2">
+                        <Avatar className="h-10 w-10">
+                          <AvatarImage src={user.avatar_url || "/placeholder.svg"} alt={getUserDisplayName()} />
+                          <AvatarFallback>{getUserInitials()}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <div className="text-gray-900 font-medium">{getUserDisplayName()}</div>
+                          <div className="text-gray-500 text-sm">{user.email}</div>
+                        </div>
+                      </div>
+
+                      <Link href={user.role === "admin" ? "/admin" : "/dashboard"} onClick={() => setIsOpen(false)}>
                         <Button variant="outline" className="w-full justify-start bg-transparent">
-                          <BookOpen className="w-4 h-4 mr-2" />
-                          Mi Panel
+                          <User className="w-4 h-4 mr-2" />
+                          {user.role === "admin" ? "Panel de Admin" : "Mi Dashboard"}
                         </Button>
                       </Link>
+
+                      <Link href="/profile" onClick={() => setIsOpen(false)}>
+                        <Button variant="outline" className="w-full justify-start bg-transparent">
+                          <Settings className="w-4 h-4 mr-2" />
+                          Configuración
+                        </Button>
+                      </Link>
+
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start bg-transparent text-red-600 border-red-200 hover:bg-red-50"
+                        onClick={() => {
+                          setIsOpen(false)
+                          handleLogout()
+                        }}
+                      >
+                        <LogOut className="w-4 h-4 mr-2" />
+                        Cerrar Sesión
+                      </Button>
                     </div>
                   ) : (
                     <>
