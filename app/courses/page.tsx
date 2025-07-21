@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { createClient } from "@supabase/supabase-js"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -10,9 +9,6 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Clock, Users, Star, BookOpen, Filter, Search } from "lucide-react"
 import { Navigation } from "@/components/navigation"
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 interface Course {
   id: string
@@ -32,6 +28,7 @@ export default function CoursesPage() {
   const [courses, setCourses] = useState<Course[]>([])
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -53,26 +50,20 @@ export default function CoursesPage() {
 
     const getCourses = async () => {
       try {
-        const supabase = createClient(supabaseUrl, supabaseServiceKey)
+        const response = await fetch("/api/student/courses", {
+          credentials: "include",
+        })
+        const data = await response.json()
 
-        const { data: coursesData, error } = await supabase
-          .from("courses")
-          .select(`
-            *,
-            lessons:lessons(id, duration_minutes)
-          `)
-          .eq("status", "published")
-          .order("created_at", { ascending: false })
-
-        if (error) {
-          console.error("Error fetching courses:", error)
-          setCourses([])
+        if (data.success) {
+          setCourses(data.courses || [])
         } else {
-          setCourses(coursesData || [])
+          setError(data.error || "Error al obtener cursos")
+          console.error("Error cargando cursos:", data.error)
         }
       } catch (error) {
-        console.error("Error in getCourses:", error)
-        setCourses([])
+        console.error("Error fetching courses:", error)
+        setError("Error al obtener cursos")
       } finally {
         setLoading(false)
       }
@@ -92,6 +83,22 @@ export default function CoursesPage() {
               <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
               <p className="text-gray-600">Cargando cursos...</p>
             </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navigation user={user} />
+        <div className="container mx-auto px-4 py-8">
+          <div className="text-center py-20">
+            <BookOpen className="w-16 h-16 mx-auto text-gray-400 mb-4" />
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">Error cargando cursos</h3>
+            <p className="text-gray-600 mb-4">{error}</p>
+            <Button onClick={() => window.location.reload()}>Intentar de nuevo</Button>
           </div>
         </div>
       </div>
