@@ -8,12 +8,21 @@ export async function GET() {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Obtener todos los cursos con lecciones
-    const { data: courses, error: coursesError } = await supabase
+    const { data: courses, error } = await supabase
       .from("courses")
       .select(`
-        *,
-        lessons (
+        id,
+        title,
+        description,
+        price,
+        instructor_name,
+        thumbnail_url,
+        duration_hours,
+        difficulty_level,
+        archived,
+        created_at,
+        status,
+        lessons:lessons!inner(
           id,
           title,
           description,
@@ -25,82 +34,74 @@ export async function GET() {
           created_at
         )
       `)
+      .eq("lessons.archived", false)
       .order("created_at", { ascending: false })
 
-    if (coursesError) {
-      console.error("Error obteniendo cursos:", coursesError)
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Error obteniendo cursos",
-          error: coursesError,
-        },
-        { status: 500 },
-      )
-    }
-
-    // Obtener el número de inscripciones por curso (sin filtro de payment_status por ahora)
-    const { data: enrollments, error: enrollmentsError } = await supabase.from("enrollments").select("course_id")
-
-    if (enrollmentsError) {
-      console.error("Error obteniendo inscripciones:", enrollmentsError)
-    }
-
-    // Crear un mapa de inscripciones por curso
-    const enrollmentsByCourse = new Map()
-    if (enrollments) {
-      enrollments.forEach((enrollment) => {
-        const courseId = enrollment.course_id
-        if (!enrollmentsByCourse.has(courseId)) {
-          enrollmentsByCourse.set(courseId, { count: 0, revenue: 0 })
-        }
-        const current = enrollmentsByCourse.get(courseId)
-        current.count += 1
+    if (error) {
+      console.error("Error fetching courses:", error)
+      return NextResponse.json({
+        success: false,
+        message: `Error fetching courses: ${error.message}`,
       })
     }
 
-    // Procesar cursos y agregar datos calculados
-    const processedCourses =
-      courses?.map((course) => {
-        const enrollmentData = enrollmentsByCourse.get(course.id) || { count: 0, revenue: 0 }
-        // Calcular revenue basado en el precio del curso y número de estudiantes
-        const revenue = enrollmentData.count * (course.price || 0)
-        const lessonsCount = course.lessons ? course.lessons.filter((lesson) => !lesson.archived).length : 0
+    // Process courses to get additional data
+    const processedCourses = await Promise.all(
+      (courses || []).map(async (course) => {
+        // Get course tags
+        const { data: courseTags } = await supabase
+          .from("course_tags")
+          .select(`
+            tags (
+              id,
+              name,
+              slug,
+              color,
+              description
+            )
+          `)
+          .eq("course_id", course.id)
+
+        // Get enrollment count
+        const { count: studentsCount } = await supabase
+          .from("enrollments")
+          .select("*", { count: "exact", head: true })
+          .eq("course_id", course.id)
+
+        // Calculate revenue (mock data for now)
+        const revenue = (studentsCount || 0) * (course.price || 0)
 
         return {
           ...course,
-          tags: [],
-          students: enrollmentData.count,
-          revenue: revenue,
-          lessonsCount: lessonsCount,
-          status: course.archived ? "archived" : "published",
+          tags: courseTags?.map((relation) => relation.tags).filter(Boolean) || [],
+          students: studentsCount || 0,
+          revenue,
+          lessonsCount: course.lessons?.length || 0,
         }
-      }) || []
+      }),
+    )
 
     return NextResponse.json({
       success: true,
       data: processedCourses,
     })
   } catch (error) {
-    console.error("Error en la ruta de cursos admin:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Error interno del servidor",
-        error: error instanceof Error ? error.message : "Error desconocido",
-      },
-      { status: 500 },
-    )
+    console.error("Internal error in GET /api/admin/courses:", error)
+    return NextResponse.json({
+      success: false,
+      message: `Internal error: ${(error as Error).message}`,
+    })
   }
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
-    const body = await request.json()
-    const { title, description, price, instructor, thumbnail_url, duration_hours, tags, difficulty_level } = body
+    const body = await req.json()
+    const { title, description, price, instructor, thumbnail_url, duration_hours, difficulty_level, tags } = body
 
-    // Crear el curso
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+    // Create the course
     const { data: course, error: courseError } = await supabase
       .from("courses")
       .insert({
@@ -112,51 +113,43 @@ export async function POST(request: NextRequest) {
         duration_hours: duration_hours ? Number.parseInt(duration_hours) : null,
         difficulty_level: difficulty_level || "principiante",
         status: "published",
-        archived: false,
       })
       .select()
       .single()
 
     if (courseError) {
-      console.error("Error creando curso:", courseError)
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Error creando curso",
-          error: courseError,
-        },
-        { status: 500 },
-      )
+      console.error("Error creating course:", courseError)
+      return NextResponse.json({
+        success: false,
+        message: `Error creating course: ${courseError.message}`,
+      })
     }
 
-    // Agregar etiquetas si se proporcionaron
-    if (tags && Array.isArray(tags) && tags.length > 0) {
-      const courseTagsData = tags.map((tagId: string) => ({
+    // Add tags if provided
+    if (tags && tags.length > 0) {
+      const tagRelations = tags.map((tagId: string) => ({
         course_id: course.id,
         tag_id: tagId,
       }))
 
-      const { error: tagsError } = await supabase.from("course_tags").insert(courseTagsData)
+      const { error: tagsError } = await supabase.from("course_tags").insert(tagRelations)
 
       if (tagsError) {
-        console.error("Error agregando etiquetas:", tagsError)
+        console.error("Error adding course tags:", tagsError)
+        // Don't fail the entire operation, just log the error
       }
     }
 
     return NextResponse.json({
       success: true,
-      message: "Curso creado exitosamente",
       data: course,
+      message: "Course created successfully",
     })
   } catch (error) {
-    console.error("Error en POST de cursos admin:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Error interno del servidor",
-        error: error instanceof Error ? error.message : "Error desconocido",
-      },
-      { status: 500 },
-    )
+    console.error("Internal error in POST /api/admin/courses:", error)
+    return NextResponse.json({
+      success: false,
+      message: `Internal error: ${(error as Error).message}`,
+    })
   }
 }

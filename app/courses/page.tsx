@@ -11,7 +11,20 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
-import { Clock, Users, Star, Search, Filter, ChevronLeft, ChevronRight, Play, BookOpen } from "lucide-react"
+import { Separator } from "@/components/ui/separator"
+import {
+  Clock,
+  Users,
+  Star,
+  Search,
+  Filter,
+  ChevronLeft,
+  ChevronRight,
+  Play,
+  BookOpen,
+  Award,
+  TrendingUp,
+} from "lucide-react"
 import { Navigation } from "@/components/navigation"
 
 interface Course {
@@ -22,6 +35,7 @@ interface Course {
   instructor_name: string
   thumbnail_url: string
   duration_hours: number
+  difficulty_level: string
   students_count: number
   tags: Array<{
     id: string
@@ -55,10 +69,37 @@ export default function CoursesPage() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedTags, setSelectedTags] = useState<string[]>([])
+  const [selectedDifficulty, setSelectedDifficulty] = useState<string[]>([])
   const [sortBy, setSortBy] = useState("newest")
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [showFilters, setShowFilters] = useState(false)
+
+  const difficultyLevels = [
+    { value: "principiante", label: "Principiante", icon: Star, color: "text-green-600" },
+    { value: "intermedio", label: "Intermedio", icon: TrendingUp, color: "text-yellow-600" },
+    { value: "experto", label: "Experto", icon: Award, color: "text-red-600" },
+  ]
+
+  const getDifficultyIcon = (level: string) => {
+    const difficulty = difficultyLevels.find((d) => d.value === level)
+    if (!difficulty) return <Star className="w-4 h-4 text-gray-500" />
+    const Icon = difficulty.icon
+    return <Icon className={`w-4 h-4 ${difficulty.color}`} />
+  }
+
+  const getDifficultyColor = (level: string) => {
+    switch (level) {
+      case "principiante":
+        return "bg-green-100 text-green-800 border-green-200"
+      case "intermedio":
+        return "bg-yellow-100 text-yellow-800 border-yellow-200"
+      case "experto":
+        return "bg-red-100 text-red-800 border-red-200"
+      default:
+        return "bg-gray-100 text-gray-800 border-gray-200"
+    }
+  }
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -89,7 +130,7 @@ export default function CoursesPage() {
 
   useEffect(() => {
     loadCourses()
-  }, [currentPage, searchTerm, selectedTags, sortBy])
+  }, [currentPage, searchTerm, selectedTags, selectedDifficulty, sortBy])
 
   const loadCourses = async () => {
     try {
@@ -99,6 +140,7 @@ export default function CoursesPage() {
         limit: "12",
         search: searchTerm,
         tags: selectedTags.join(","),
+        difficulty: selectedDifficulty.join(","),
       })
 
       const response = await fetch(`/api/courses?${params}`)
@@ -147,6 +189,13 @@ export default function CoursesPage() {
     setCurrentPage(1)
   }
 
+  const handleDifficultyToggle = (difficulty: string) => {
+    setSelectedDifficulty((prev) =>
+      prev.includes(difficulty) ? prev.filter((d) => d !== difficulty) : [...prev, difficulty],
+    )
+    setCurrentPage(1)
+  }
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
     setCurrentPage(1)
@@ -156,6 +205,7 @@ export default function CoursesPage() {
   const clearFilters = () => {
     setSearchTerm("")
     setSelectedTags([])
+    setSelectedDifficulty([])
     setSortBy("newest")
     setCurrentPage(1)
   }
@@ -172,7 +222,10 @@ export default function CoursesPage() {
             selectedTags.length === 0 ||
             (Array.isArray(course.tags) && course.tags.some((tag) => selectedTags.includes(tag.slug)))
 
-          return matchesSearch && matchesTags
+          const matchesDifficulty =
+            selectedDifficulty.length === 0 || selectedDifficulty.includes(course.difficulty_level)
+
+          return matchesSearch && matchesTags && matchesDifficulty
         })
         .sort((a, b) => {
           switch (sortBy) {
@@ -220,7 +273,7 @@ export default function CoursesPage() {
 
         {/* Search and Filters */}
         <div className="bg-white rounded-lg shadow-sm border p-6 mb-8">
-          <form onSubmit={handleSearch} className="flex flex-col lg:flex-row gap-4 mb-4">
+          <form onSubmit={handleSearch} className="flex flex-col lg:flex-row gap-4 mb-6">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <Input
@@ -249,57 +302,96 @@ export default function CoursesPage() {
             </Button>
           </form>
 
-          {/* Tags Filter */}
-          <div className={`${showFilters ? "block" : "hidden lg:block"}`}>
-            <div className="flex flex-wrap gap-2 mb-4">
-              <Label className="text-sm font-medium text-gray-700 mr-4 flex items-center">Categorías:</Label>
-              {Array.isArray(tags) &&
-                tags.map((tag) => (
-                  <div key={tag.id} className="flex items-center space-x-2">
+          {/* Filters Section */}
+          <div className={`${showFilters ? "block" : "hidden lg:block"} space-y-6`}>
+            {/* Difficulty Filters */}
+            <div>
+              <Label className="text-sm font-semibold text-gray-700 mb-3 block">Nivel de Dificultad:</Label>
+              <div className="flex flex-wrap gap-3">
+                {difficultyLevels.map((level) => (
+                  <div key={level.value} className="flex items-center space-x-2">
                     <Checkbox
-                      id={`tag-${tag.id}`}
-                      checked={selectedTags.includes(tag.slug)}
-                      onCheckedChange={() => handleTagToggle(tag.slug)}
+                      id={`difficulty-${level.value}`}
+                      checked={selectedDifficulty.includes(level.value)}
+                      onCheckedChange={() => handleDifficultyToggle(level.value)}
                     />
-                    <Label htmlFor={`tag-${tag.id}`} className="text-sm cursor-pointer flex items-center space-x-1">
-                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: tag.color }} />
-                      <span>{tag.name}</span>
+                    <Label
+                      htmlFor={`difficulty-${level.value}`}
+                      className="text-sm cursor-pointer flex items-center space-x-2"
+                    >
+                      {getDifficultyIcon(level.value)}
+                      <span className={level.color}>{level.label}</span>
                     </Label>
                   </div>
                 ))}
+              </div>
             </div>
 
-            {(searchTerm || selectedTags.length > 0) && (
-              <Button variant="ghost" onClick={clearFilters} className="text-sm">
-                Limpiar filtros
-              </Button>
+            <Separator />
+
+            {/* Software/Technology Tags */}
+            <div>
+              <Label className="text-sm font-semibold text-gray-700 mb-3 block">Software y Tecnologías:</Label>
+              <div className="flex flex-wrap gap-3">
+                {Array.isArray(tags) &&
+                  tags.map((tag) => (
+                    <div key={tag.id} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`tag-${tag.id}`}
+                        checked={selectedTags.includes(tag.slug)}
+                        onCheckedChange={() => handleTagToggle(tag.slug)}
+                      />
+                      <Label htmlFor={`tag-${tag.id}`} className="text-sm cursor-pointer flex items-center space-x-2">
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: tag.color }} />
+                        <span style={{ color: tag.color }}>{tag.name}</span>
+                      </Label>
+                    </div>
+                  ))}
+              </div>
+            </div>
+
+            {(searchTerm || selectedTags.length > 0 || selectedDifficulty.length > 0) && (
+              <div className="pt-4 border-t">
+                <Button variant="ghost" onClick={clearFilters} className="text-sm">
+                  Limpiar todos los filtros
+                </Button>
+              </div>
             )}
           </div>
         </div>
 
-        {/* Results Summary */}
+        {/* Active Filters Summary */}
         <div className="flex items-center justify-between mb-6">
           <p className="text-gray-600">
             {filteredAndSortedCourses.length} curso{filteredAndSortedCourses.length !== 1 ? "s" : ""} encontrado
             {filteredAndSortedCourses.length !== 1 ? "s" : ""}
           </p>
-          {selectedTags.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {selectedTags.map((tagSlug) => {
-                const tag = tags.find((t) => t.slug === tagSlug)
-                return tag ? (
-                  <Badge
-                    key={tag.id}
-                    variant="secondary"
-                    className="text-xs"
-                    style={{ backgroundColor: tag.color + "20", color: tag.color }}
-                  >
-                    {tag.name}
-                  </Badge>
-                ) : null
-              })}
-            </div>
-          )}
+          <div className="flex flex-wrap gap-2">
+            {selectedDifficulty.map((difficulty) => {
+              const level = difficultyLevels.find((d) => d.value === difficulty)
+              return level ? (
+                <Badge key={difficulty} variant="secondary" className={`text-xs ${getDifficultyColor(difficulty)}`}>
+                  <span className="flex items-center gap-1">
+                    {getDifficultyIcon(difficulty)}
+                    {level.label}
+                  </span>
+                </Badge>
+              ) : null
+            })}
+            {selectedTags.map((tagSlug) => {
+              const tag = tags.find((t) => t.slug === tagSlug)
+              return tag ? (
+                <Badge
+                  key={tag.id}
+                  variant="secondary"
+                  className="text-xs"
+                  style={{ backgroundColor: tag.color + "20", color: tag.color, borderColor: tag.color + "40" }}
+                >
+                  {tag.name}
+                </Badge>
+              ) : null
+            })}
+          </div>
         </div>
 
         {/* Courses Grid */}
@@ -323,6 +415,14 @@ export default function CoursesPage() {
                   <div className="absolute top-3 left-3">
                     <Badge className="bg-blue-600 text-white">${course.price}</Badge>
                   </div>
+                  <div className="absolute top-3 right-3">
+                    <Badge className={`text-xs ${getDifficultyColor(course.difficulty_level)}`}>
+                      <span className="flex items-center gap-1">
+                        {getDifficultyIcon(course.difficulty_level)}
+                        {course.difficulty_level?.charAt(0).toUpperCase() + course.difficulty_level?.slice(1)}
+                      </span>
+                    </Badge>
+                  </div>
                   <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-300 rounded-t-lg flex items-center justify-center">
                     <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                       <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-lg">
@@ -345,6 +445,11 @@ export default function CoursesPage() {
                           {tag.name}
                         </Badge>
                       ))}
+                    {course.tags && course.tags.length > 2 && (
+                      <Badge variant="secondary" className="text-xs">
+                        +{course.tags.length - 2}
+                      </Badge>
+                    )}
                   </div>
                   <CardTitle className="text-lg leading-tight line-clamp-2">{course.title}</CardTitle>
                   <CardDescription className="text-sm line-clamp-2">{course.description}</CardDescription>
