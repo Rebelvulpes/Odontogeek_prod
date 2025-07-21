@@ -5,10 +5,46 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 const jwtSecret = process.env.JWT_SECRET!
 
-export function getServerSupabaseClient() {
-  return createClient(supabaseUrl, supabaseServiceKey)
+if (!supabaseUrl || !supabaseServiceKey) {
+  throw new Error("Missing Supabase environment variables")
 }
 
+if (!jwtSecret) {
+  throw new Error("Missing JWT_SECRET environment variable")
+}
+
+// Server-side Supabase client with service role key
+export const getServerSupabaseClient = () => {
+  if (typeof window !== "undefined") {
+    throw new Error("❌ SECURITY ERROR: getServerSupabaseClient called from client-side")
+  }
+
+  return createClient(supabaseUrl, supabaseServiceKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  })
+}
+
+// Cookie configuration - 30 days for better session persistence
+export const getCookieSettings = () => {
+  const isProduction = process.env.NODE_ENV === "production"
+  const isVercel = !!process.env.VERCEL_URL
+
+  // 30 days = 30 * 24 * 60 * 60 seconds
+  const THIRTY_DAYS_IN_SECONDS = 30 * 24 * 60 * 60
+
+  return {
+    httpOnly: true,
+    secure: isProduction || isVercel, // Secure in production or Vercel
+    sameSite: "lax" as const,
+    maxAge: THIRTY_DAYS_IN_SECONDS, // 30 days for better persistence
+    path: "/",
+  }
+}
+
+// User session interface
 export interface UserSession {
   id: string
   email: string
@@ -18,14 +54,14 @@ export interface UserSession {
   created_at?: string
 }
 
-export function getUserSessionFromCookie(cookieHeader: string | null): UserSession | null {
+// Parse user session from cookie header with improved validation
+export const getUserSessionFromCookie = (cookieHeader: string | null): UserSession | null => {
   if (!cookieHeader) {
     console.log("❌ No cookie header provided")
     return null
   }
 
   try {
-    // Parse cookies
     const cookies = cookieHeader.split(";").reduce(
       (acc, cookie) => {
         const [key, value] = cookie.trim().split("=")
@@ -58,15 +94,28 @@ export function getUserSessionFromCookie(cookieHeader: string | null): UserSessi
     } catch (jwtError) {
       console.log("⚠️ JWT decode failed, trying JSON parse")
       // Fallback to JSON parsing
-      const sessionData = JSON.parse(sessionCookie)
-      return {
-        id: sessionData.id,
-        email: sessionData.email,
-        role: sessionData.role,
-        first_name: sessionData.first_name,
-        last_name: sessionData.last_name,
-        created_at: sessionData.created_at,
+      const userSession = JSON.parse(sessionCookie)
+
+      // Validate session structure
+      if (!userSession.id || !userSession.email) {
+        console.log("❌ Invalid session structure - missing id or email")
+        return null
       }
+
+      // Check if session is expired (30 days from creation)
+      if (userSession.created_at) {
+        const sessionCreated = new Date(userSession.created_at).getTime()
+        const now = Date.now()
+        const thirtyDaysInMs = 30 * 24 * 60 * 60 * 1000 // 30 days in milliseconds
+
+        if (now - sessionCreated > thirtyDaysInMs) {
+          console.log("❌ Session expired - older than 30 days")
+          return null
+        }
+      }
+
+      console.log("✅ Valid session found for user:", userSession.email)
+      return userSession
     }
   } catch (error) {
     console.error("❌ Error parsing session cookie:", error)
@@ -74,41 +123,90 @@ export function getUserSessionFromCookie(cookieHeader: string | null): UserSessi
   }
 }
 
-export async function logStudentAccess(
+// Log student access for monitoring and security
+export const logStudentAccess = async (
   userId: string | null,
   email: string,
   action: string,
   success: boolean,
-  errorCode: string | null,
-  errorMessage: string,
-  ipAddress: string,
-  userAgent: string,
-) {
+  errorCode: string | null = null,
+  details: string | null = null,
+  ipAddress = "unknown",
+  userAgent = "unknown",
+) => {
+  if (typeof window !== "undefined") {
+    throw new Error("❌ SECURITY ERROR: logStudentAccess called from client-side")
+  }
+
   try {
     const supabase = getServerSupabaseClient()
 
-    const logData = {
+    // Check if student_access_log table exists
+    const { data: tableExists } = await supabase
+      .from("information_schema.tables")
+      .select("table_name")
+      .eq("table_name", "student_access_log")
+      .single()
+
+    if (!tableExists) {
+      console.log("⚠️ student_access_log table does not exist, skipping log")
+      return
+    }
+
+    const logEntry = {
       student_id: userId,
-      email: email,
-      action: action,
-      success: success,
+      email,
+      action,
+      success,
       error_code: errorCode,
-      error_message: errorMessage,
+      error_message: details,
       ip_address: ipAddress,
       user_agent: userAgent,
-      session_data: JSON.stringify({
-        timestamp: new Date().toISOString(),
-        action: action,
-        success: success,
-      }),
+      created_at: new Date().toISOString(),
     }
 
-    const { error } = await supabase.from("student_access_log").insert([logData])
+    const { error } = await supabase.from("student_access_log").insert([logEntry])
 
     if (error) {
-      console.error("Failed to log student access:", error)
+      console.error("❌ Failed to log student access:", error)
+    } else {
+      console.log(`📝 Logged: ${action} for ${email} - ${success ? "SUCCESS" : "FAILED"}`)
     }
   } catch (error) {
-    console.error("Exception while logging student access:", error)
+    console.error("❌ Error in logStudentAccess:", error)
+  }
+}
+
+// Validate password strength
+export const validatePassword = (password: string): { isValid: boolean; errors: string[] } => {
+  const errors: string[] = []
+
+  if (password.length < 6) {
+    errors.push("La contraseña debe tener al menos 6 caracteres")
+  }
+
+  if (!/[A-Za-z]/.test(password)) {
+    errors.push("La contraseña debe contener al menos una letra")
+  }
+
+  if (!/[0-9]/.test(password)) {
+    errors.push("La contraseña debe contener al menos un número")
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+  }
+}
+
+// Generate secure session data with creation timestamp
+export const generateSessionData = (user: any) => {
+  return {
+    id: user.id,
+    email: user.email,
+    first_name: user.first_name,
+    last_name: user.last_name,
+    role: user.role,
+    created_at: new Date().toISOString(), // Track when session was created
   }
 }
