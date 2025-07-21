@@ -3,7 +3,8 @@ import { getUserSessionFromCookie, getServerSupabaseClient, logStudentAccess } f
 
 export async function GET(req: NextRequest) {
   try {
-    console.log("=== STUDENT COURSES REQUEST ===")
+    console.log("=== STUDENT COURSES REQUEST START ===")
+    console.log("Timestamp:", new Date().toISOString())
 
     // Get user session from cookie
     const cookieHeader = req.headers.get("cookie")
@@ -21,7 +22,11 @@ export async function GET(req: NextRequest) {
       )
     }
 
-    console.log("✅ User session found:", userSession.email)
+    console.log("✅ User session found:", {
+      id: userSession.id,
+      email: userSession.email,
+      role: userSession.role,
+    })
 
     const supabase = getServerSupabaseClient()
 
@@ -57,6 +62,7 @@ export async function GET(req: NextRequest) {
         {
           success: false,
           message: "Error al cargar los cursos",
+          debug: { error: coursesError.message },
         },
         { status: 500 },
       )
@@ -65,6 +71,7 @@ export async function GET(req: NextRequest) {
     console.log("✅ Found", courses?.length || 0, "courses")
 
     // Get user's enrollments
+    console.log("=== FETCHING USER ENROLLMENTS ===")
     const { data: enrollments, error: enrollmentsError } = await supabase
       .from("enrollments")
       .select("course_id, status, progress, enrolled_at")
@@ -75,7 +82,7 @@ export async function GET(req: NextRequest) {
       console.log("⚠️ Error fetching enrollments:", enrollmentsError)
     }
 
-    console.log("✅ Found", enrollments?.length || 0, "enrollments")
+    console.log("✅ Found", enrollments?.length || 0, "active enrollments")
 
     // Process courses with enrollment status and lesson counts
     const processedCourses =
@@ -90,6 +97,20 @@ export async function GET(req: NextRequest) {
         const freeLessons = lessons.filter((l) => l.is_free).length
         const premiumLessons = totalLessons - freeLessons
 
+        // Determine access level
+        const isAdmin = userSession.role === "admin"
+        const isEnrolled = !!enrollment
+        const hasFreeLessons = freeLessons > 0
+
+        let accessLevel = "none"
+        if (isAdmin) {
+          accessLevel = "full"
+        } else if (isEnrolled) {
+          accessLevel = "enrolled"
+        } else if (hasFreeLessons) {
+          accessLevel = "partial"
+        }
+
         return {
           id: course.id,
           title: course.title,
@@ -100,7 +121,15 @@ export async function GET(req: NextRequest) {
           difficulty_level: course.difficulty_level,
           status: course.status,
           created_at: course.created_at,
-          lessons: lessons,
+          lessons: lessons.map((lesson) => ({
+            id: lesson.id,
+            title: lesson.title,
+            description: lesson.description,
+            order_index: lesson.order_index,
+            is_free: lesson.is_free,
+            duration_minutes: lesson.duration_minutes,
+            can_access: isAdmin || lesson.is_free || isEnrolled,
+          })),
           enrollment: enrollment
             ? {
                 status: enrollment.status,
@@ -114,10 +143,11 @@ export async function GET(req: NextRequest) {
             premium: premiumLessons,
           },
           access_info: {
-            is_enrolled: !!enrollment,
-            can_access_free: true, // All logged-in users can access free lessons
-            can_access_premium: !!enrollment || userSession.role === "admin",
-            is_admin: userSession.role === "admin",
+            level: accessLevel,
+            is_enrolled: isEnrolled,
+            is_admin: isAdmin,
+            can_access_free: hasFreeLessons,
+            can_access_premium: isAdmin || isEnrolled,
           },
         }
       }) || []
@@ -137,6 +167,7 @@ export async function GET(req: NextRequest) {
     console.log("✅ COURSES REQUEST COMPLETED")
     console.log("Courses returned:", processedCourses.length)
     console.log("User enrollments:", enrollments?.length || 0)
+    console.log("Courses with lessons:", processedCourses.filter((c) => c.lessons.length > 0).length)
 
     return NextResponse.json({
       success: true,
@@ -147,13 +178,25 @@ export async function GET(req: NextRequest) {
         role: userSession.role,
         total_enrollments: enrollments?.length || 0,
       },
+      debug: {
+        total_courses: processedCourses.length,
+        courses_with_lessons: processedCourses.filter((c) => c.lessons.length > 0).length,
+        total_lessons: processedCourses.reduce((sum, c) => sum + c.lessons.length, 0),
+        free_lessons: processedCourses.reduce((sum, c) => sum + c.lesson_counts.free, 0),
+      },
     })
   } catch (error) {
     console.error("❌ STUDENT COURSES ERROR:", error)
+    console.error("Stack trace:", error instanceof Error ? error.stack : "No stack trace")
+
     return NextResponse.json(
       {
         success: false,
         message: "Error interno del servidor",
+        debug: {
+          error: error instanceof Error ? error.message : "Unknown error",
+          timestamp: new Date().toISOString(),
+        },
       },
       { status: 500 },
     )

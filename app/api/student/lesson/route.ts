@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
   const userAgent = req.headers.get("user-agent") || "unknown"
 
   try {
-    console.log("=== LESSON ACCESS REQUEST ===")
+    console.log("=== LESSON ACCESS REQUEST START ===")
     console.log("Timestamp:", new Date().toISOString())
 
     // Get parameters from URL
@@ -15,56 +15,59 @@ export async function GET(req: NextRequest) {
     const courseId = searchParams.get("courseId")
     const lessonId = searchParams.get("lessonId")
 
-    console.log("Request params:", { courseId, lessonId })
+    console.log("🔍 Request params:", { courseId, lessonId })
 
-    // Validate parameters
+    // Validate parameters exist
     if (!courseId || !lessonId) {
-      console.log("❌ Missing parameters")
+      console.log("❌ Missing required parameters")
       return NextResponse.json(
         {
           success: false,
           message: "Parámetros courseId y lessonId son requeridos",
+          debug: { courseId, lessonId },
         },
         { status: 400 },
       )
     }
 
-    // Validate UUID format for both IDs
+    // Validate UUID format
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-    if (!uuidRegex.test(courseId) || !uuidRegex.test(lessonId)) {
-      console.log("❌ Invalid UUID format:", { courseId, lessonId })
+    if (!uuidRegex.test(courseId)) {
+      console.log("❌ Invalid courseId UUID format:", courseId)
       return NextResponse.json(
         {
           success: false,
-          message: "IDs de curso y lección deben ser UUIDs válidos",
+          message: "courseId debe ser un UUID válido",
+          debug: { courseId, isValidUUID: false },
         },
         { status: 400 },
       )
     }
 
-    console.log("✅ Valid UUID format for both IDs")
-
-    // Get user session from cookie with better error handling
-    const cookieHeader = req.headers.get("cookie")
-    console.log("Cookie header present:", !!cookieHeader)
-
-    const userSession = getUserSessionFromCookie(cookieHeader)
-    console.log("User session found:", !!userSession)
-
-    if (userSession) {
-      console.log("User details:", {
-        id: userSession.id,
-        email: userSession.email,
-        role: userSession.role,
-        sessionAge: userSession.created_at
-          ? Math.floor((Date.now() - new Date(userSession.created_at).getTime()) / (1000 * 60 * 60 * 24)) + " days"
-          : "unknown",
-      })
+    if (!uuidRegex.test(lessonId)) {
+      console.log("❌ Invalid lessonId UUID format:", lessonId)
+      return NextResponse.json(
+        {
+          success: false,
+          message: "lessonId debe ser un UUID válido",
+          debug: { lessonId, isValidUUID: false },
+        },
+        { status: 400 },
+      )
     }
 
+    console.log("✅ Valid UUID formats confirmed")
+
+    // Get user session
+    const cookieHeader = req.headers.get("cookie")
+    console.log("🍪 Cookie header present:", !!cookieHeader)
+
+    const userSession = getUserSessionFromCookie(cookieHeader)
+    console.log("👤 User session found:", !!userSession)
+
     if (!userSession) {
-      console.log("❌ No valid session found")
+      console.log("❌ No valid session - redirecting to login")
       await logStudentAccess(
         null,
         "anonymous",
@@ -86,35 +89,65 @@ export async function GET(req: NextRequest) {
       )
     }
 
+    console.log("✅ User authenticated:", {
+      id: userSession.id,
+      email: userSession.email,
+      role: userSession.role,
+    })
+
     // Connect to database
     const supabase = getServerSupabaseClient()
 
-    // First, let's check if the lesson exists at all
-    console.log("=== CHECKING LESSON EXISTENCE ===")
-    const { data: lessonCheck, error: lessonCheckError } = await supabase
+    // STEP 1: Check if course exists
+    console.log("=== STEP 1: CHECKING COURSE EXISTENCE ===")
+    const { data: courseCheck, error: courseError } = await supabase
+      .from("courses")
+      .select("id, title, status")
+      .eq("id", courseId)
+      .single()
+
+    console.log("📚 Course check result:", { courseCheck, courseError })
+
+    if (courseError || !courseCheck) {
+      console.log("❌ Course not found")
+      return NextResponse.json(
+        {
+          success: false,
+          message: `Curso ${courseId} no encontrado`,
+          debug: { courseId, error: courseError?.message },
+        },
+        { status: 404 },
+      )
+    }
+
+    console.log("✅ Course found:", courseCheck.title)
+
+    // STEP 2: Check if lesson exists
+    console.log("=== STEP 2: CHECKING LESSON EXISTENCE ===")
+    const { data: lessonCheck, error: lessonError } = await supabase
       .from("lessons")
-      .select("id, title, course_id, is_free")
+      .select("id, title, course_id, is_free, order_index")
       .eq("id", lessonId)
       .single()
 
-    console.log("Lesson check result:", { lessonCheck, lessonCheckError })
+    console.log("📖 Lesson check result:", { lessonCheck, lessonError })
 
-    if (lessonCheckError || !lessonCheck) {
-      console.log("❌ Lesson not found in database")
+    if (lessonError || !lessonCheck) {
+      console.log("❌ Lesson not found - getting available lessons for debug")
 
-      // Let's see what lessons exist for debugging
-      const { data: allLessons } = await supabase.from("lessons").select("id, title, course_id, is_free").limit(10)
-
-      console.log("Available lessons:", allLessons)
-
-      // Also check lessons for this specific course
+      // Get all lessons for this course for debugging
       const { data: courseLessons } = await supabase
         .from("lessons")
         .select("id, title, order_index, is_free")
         .eq("course_id", courseId)
         .order("order_index")
 
-      console.log("Lessons for course", courseId, ":", courseLessons)
+      console.log("📋 Available lessons for course:", courseLessons)
+
+      // Get some random lessons for comparison
+      const { data: allLessons } = await supabase.from("lessons").select("id, title, course_id, is_free").limit(10)
+
+      console.log("📋 Sample lessons in database:", allLessons)
 
       return NextResponse.json(
         {
@@ -123,28 +156,33 @@ export async function GET(req: NextRequest) {
           debug: {
             searchedLessonId: lessonId,
             searchedCourseId: courseId,
-            availableLessons: allLessons?.map((l) => ({
-              id: l.id,
-              title: l.title,
-              course_id: l.course_id,
-              is_free: l.is_free,
-            })),
             courseLessons: courseLessons?.map((l) => ({
               id: l.id,
               title: l.title,
               order_index: l.order_index,
               is_free: l.is_free,
             })),
+            sampleLessons: allLessons?.map((l) => ({
+              id: l.id,
+              title: l.title,
+              course_id: l.course_id,
+              is_free: l.is_free,
+            })),
+            error: lessonError?.message,
           },
         },
         { status: 404 },
       )
     }
 
-    // Check if lesson belongs to the specified course
+    console.log("✅ Lesson found:", lessonCheck.title)
+
+    // STEP 3: Verify lesson belongs to course
+    console.log("=== STEP 3: VERIFYING LESSON-COURSE RELATIONSHIP ===")
     if (lessonCheck.course_id !== courseId) {
       console.log("❌ Lesson doesn't belong to specified course")
-      console.log("Lesson course_id:", lessonCheck.course_id, "Requested course_id:", courseId)
+      console.log("Lesson course_id:", lessonCheck.course_id)
+      console.log("Requested course_id:", courseId)
 
       return NextResponse.json(
         {
@@ -153,15 +191,18 @@ export async function GET(req: NextRequest) {
           debug: {
             lessonCourseId: lessonCheck.course_id,
             requestedCourseId: courseId,
+            lessonTitle: lessonCheck.title,
           },
         },
         { status: 400 },
       )
     }
 
-    // Now get the full lesson with course information
-    console.log("=== FETCHING FULL LESSON DATA ===")
-    const { data: lesson, error: lessonError } = await supabase
+    console.log("✅ Lesson belongs to correct course")
+
+    // STEP 4: Get full lesson data
+    console.log("=== STEP 4: FETCHING FULL LESSON DATA ===")
+    const { data: fullLesson, error: fullLessonError } = await supabase
       .from("lessons")
       .select(`
         id,
@@ -181,207 +222,143 @@ export async function GET(req: NextRequest) {
         )
       `)
       .eq("id", lessonId)
-      .eq("course_id", courseId)
       .single()
 
-    console.log("Full lesson query result:", { lesson, lessonError })
+    console.log("📚 Full lesson query result:", {
+      success: !!fullLesson,
+      error: fullLessonError?.message,
+      lessonTitle: fullLesson?.title,
+    })
 
-    if (lessonError || !lesson) {
-      console.log("❌ Error fetching full lesson data:", lessonError)
+    if (fullLessonError || !fullLesson) {
+      console.log("❌ Error fetching full lesson data")
       return NextResponse.json(
         {
           success: false,
-          message: "Error al cargar los datos de la lección",
+          message: "Error al cargar los datos completos de la lección",
+          debug: { error: fullLessonError?.message },
         },
         { status: 500 },
       )
     }
 
-    console.log("✅ Lesson found:", lesson.title)
+    console.log("✅ Full lesson data loaded:", fullLesson.title)
 
-    // Check access using database function
-    console.log("=== CHECKING ACCESS PERMISSIONS ===")
-    const { data: accessResult, error: accessError } = await supabase.rpc("check_lesson_access", {
-      user_id_param: userSession.id,
-      lesson_id_param: lessonId,
-      course_id_param: courseId,
-    })
+    // STEP 5: Check access permissions
+    console.log("=== STEP 5: CHECKING ACCESS PERMISSIONS ===")
 
-    console.log("Access check result:", { accessResult, accessError })
+    let hasAccess = false
+    let accessType = "no_access"
+    let accessReason = "Sin acceso"
 
-    let enrollment = null
+    // Check admin access
+    if (userSession.role === "admin") {
+      hasAccess = true
+      accessType = "admin"
+      accessReason = "Acceso de administrador"
+      console.log("✅ ADMIN ACCESS GRANTED")
+    }
+    // Check free lesson access
+    else if (fullLesson.is_free) {
+      hasAccess = true
+      accessType = "free"
+      accessReason = "Lección gratuita"
+      console.log("✅ FREE LESSON ACCESS GRANTED")
+    }
+    // Check enrollment access
+    else {
+      console.log("🔍 Checking enrollment for premium lesson...")
+      const { data: enrollment, error: enrollmentError } = await supabase
+        .from("enrollments")
+        .select("id, status")
+        .eq("user_id", userSession.id)
+        .eq("course_id", courseId)
+        .eq("status", "active")
+        .single()
 
-    if (accessError) {
-      console.log("❌ Error checking access:", accessError)
+      console.log("📝 Enrollment check:", { enrollment, enrollmentError })
 
-      // Fallback to manual access check
-      console.log("🔄 Falling back to manual access check")
-
-      let hasAccess = false
-      let accessType = "no_access"
-      let accessReason = "Error verificando acceso"
-
-      // Check if user is admin
-      if (userSession.role === "admin") {
+      if (enrollment && !enrollmentError) {
         hasAccess = true
-        accessType = "admin"
-        accessReason = "Acceso de administrador"
+        accessType = "enrolled"
+        accessReason = "Usuario inscrito en el curso"
+        console.log("✅ ENROLLMENT ACCESS GRANTED")
+      } else {
+        hasAccess = false
+        accessType = "no_access"
+        accessReason = "Requiere inscripción al curso"
+        console.log("❌ NO ENROLLMENT - ACCESS DENIED")
       }
-      // Check if lesson is free
-      else if (lesson.is_free) {
-        hasAccess = true
-        accessType = "free"
-        accessReason = "Lección gratuita"
-      }
-      // Check if user is enrolled
-      else {
-        const { data: enrollmentData } = await supabase
-          .from("enrollments")
-          .select("id")
-          .eq("user_id", userSession.id)
-          .eq("course_id", courseId)
-          .eq("status", "active")
-          .single()
-
-        enrollment = enrollmentData
-
-        if (enrollmentData) {
-          hasAccess = true
-          accessType = "enrolled"
-          accessReason = "Usuario inscrito en el curso"
-        }
-      }
-
-      const accessDetails = {
-        is_admin: userSession.role === "admin",
-        is_free: lesson.is_free,
-        is_enrolled: !!enrollment,
-        has_access: hasAccess,
-        access_reason: accessReason,
-      }
-
-      console.log("Manual access check result:", accessDetails)
-
-      if (!hasAccess) {
-        await logStudentAccess(
-          userSession.id,
-          userSession.email,
-          "lesson_access_denied",
-          false,
-          "NO_ACCESS",
-          `Access denied to lesson ${lessonId} in course ${courseId}: ${accessReason}`,
-          clientIP,
-          userAgent,
-        )
-
-        return NextResponse.json(
-          {
-            success: false,
-            message: "No tienes acceso a esta lección",
-            access_details: accessDetails,
-          },
-          { status: 403 },
-        )
-      }
-
-      // Log successful access
-      await logStudentAccess(
-        userSession.id,
-        userSession.email,
-        "lesson_access_granted",
-        true,
-        null,
-        `Access granted to lesson ${lessonId} (${lesson.title}) via ${accessType}`,
-        clientIP,
-        userAgent,
-      )
-
-      const endTime = Date.now()
-      console.log("✅ LESSON ACCESS GRANTED (manual)")
-      console.log("Processing time:", endTime - startTime, "ms")
-      console.log("Access type:", accessType)
-
-      return NextResponse.json({
-        success: true,
-        lesson,
-        access_type: accessType,
-        access_details: accessDetails,
-      })
     }
 
-    // Process RPC result
-    const access = accessResult[0]
-    if (!access.has_access) {
-      console.log("❌ Access denied:", access.access_reason)
+    const accessDetails = {
+      is_admin: userSession.role === "admin",
+      is_free: fullLesson.is_free,
+      is_enrolled: accessType === "enrolled",
+      has_access: hasAccess,
+      access_reason: accessReason,
+    }
 
-      await logStudentAccess(
-        userSession.id,
-        userSession.email,
-        "lesson_access_denied",
-        false,
-        "NO_ACCESS",
-        `Access denied to lesson ${lessonId}: ${access.access_reason}`,
-        clientIP,
-        userAgent,
-      )
+    console.log("🔐 Final access decision:", accessDetails)
 
+    // STEP 6: Log access attempt
+    await logStudentAccess(
+      userSession.id,
+      userSession.email,
+      hasAccess ? "lesson_access_granted" : "lesson_access_denied",
+      hasAccess,
+      hasAccess ? null : "NO_ACCESS",
+      `${hasAccess ? "Access granted" : "Access denied"} to lesson ${fullLesson.title} via ${accessType}`,
+      clientIP,
+      userAgent,
+    )
+
+    // STEP 7: Return result
+    if (!hasAccess) {
+      console.log("❌ FINAL RESULT: ACCESS DENIED")
       return NextResponse.json(
         {
           success: false,
           message: "No tienes acceso a esta lección",
-          access_details: {
-            is_admin: access.is_admin,
-            is_free: access.is_free,
-            is_enrolled: access.is_enrolled,
-            has_access: access.has_access,
-            access_reason: access.access_reason,
+          access_details: accessDetails,
+          lesson_info: {
+            title: fullLesson.title,
+            is_free: fullLesson.is_free,
+            course_title: fullLesson.courses.title,
           },
         },
         { status: 403 },
       )
     }
 
-    // Log successful access
-    await logStudentAccess(
-      userSession.id,
-      userSession.email,
-      "lesson_access_granted",
-      true,
-      null,
-      `Access granted to lesson ${lessonId} (${lesson.title}) via ${access.access_type}`,
-      clientIP,
-      userAgent,
-    )
-
     const endTime = Date.now()
-    console.log("✅ LESSON ACCESS GRANTED")
+    console.log("✅ FINAL RESULT: ACCESS GRANTED")
     console.log("Processing time:", endTime - startTime, "ms")
-    console.log("Access type:", access.access_type)
+    console.log("Access type:", accessType)
     console.log("User:", userSession.email)
-    console.log("Lesson:", lesson.title)
+    console.log("Lesson:", fullLesson.title)
 
     return NextResponse.json({
       success: true,
-      lesson,
-      access_type: access.access_type,
-      access_details: {
-        is_admin: access.is_admin,
-        is_free: access.is_free,
-        is_enrolled: access.is_enrolled,
-        has_access: access.has_access,
-        access_reason: access.access_reason,
-      },
+      lesson: fullLesson,
+      access_type: accessType,
+      access_details: accessDetails,
     })
   } catch (error) {
     const endTime = Date.now()
     console.error("=== LESSON ACCESS ERROR ===")
     console.error("Processing time:", endTime - startTime, "ms")
     console.error("Error details:", error)
+    console.error("Stack trace:", error instanceof Error ? error.stack : "No stack trace")
 
     return NextResponse.json(
       {
         success: false,
         message: "Error interno del servidor",
+        debug: {
+          error: error instanceof Error ? error.message : "Unknown error",
+          timestamp: new Date().toISOString(),
+        },
       },
       { status: 500 },
     )

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Skeleton } from "@/components/ui/skeleton"
-import { ArrowLeft, Lock, Gift, Crown, UserIcon, AlertCircle, Clock, Play } from "lucide-react"
+import { ArrowLeft, Lock, Gift, Crown, UserIcon, AlertCircle, Clock, Play, BookOpen } from "lucide-react"
 import Link from "next/link"
 import { Navigation } from "@/components/navigation"
 
@@ -54,44 +54,49 @@ export default function LessonPage() {
   const [error, setError] = useState<string | null>(null)
   const [accessType, setAccessType] = useState<string>("")
   const [accessDetails, setAccessDetails] = useState<AccessDetails | null>(null)
+  const [debugInfo, setDebugInfo] = useState<any>(null)
 
   const courseId = params.courseId as string
   const lessonId = params.lessonId as string
 
   useEffect(() => {
-    // First check if user is authenticated
+    console.log("🚀 LessonPage mounted with params:", { courseId, lessonId })
     checkAuthentication()
   }, [])
 
   useEffect(() => {
-    // Only fetch lesson data if user is authenticated
     if (user) {
+      console.log("👤 User authenticated, fetching lesson data")
       fetchLessonData()
     }
   }, [user, courseId, lessonId])
 
   const checkAuthentication = async () => {
     try {
-      console.log("Checking authentication...")
+      console.log("🔐 Checking authentication...")
       const response = await fetch("/api/auth/me", {
         credentials: "include",
       })
 
+      console.log("🔐 Auth response status:", response.status)
+
       if (response.ok) {
         const data = await response.json()
+        console.log("🔐 Auth response data:", data)
+
         if (data.success && data.user) {
-          console.log("User authenticated:", data.user.email)
+          console.log("✅ User authenticated:", data.user.email)
           setUser(data.user)
         } else {
-          console.log("No valid session found")
+          console.log("❌ No valid session found")
           router.push("/auth/login")
         }
       } else {
-        console.log("Authentication failed, redirecting to login")
+        console.log("❌ Authentication failed, redirecting to login")
         router.push("/auth/login")
       }
     } catch (error) {
-      console.error("Error checking authentication:", error)
+      console.error("❌ Error checking authentication:", error)
       router.push("/auth/login")
     }
   }
@@ -100,27 +105,35 @@ export default function LessonPage() {
     try {
       setLoading(true)
       setError(null)
+      setDebugInfo(null)
 
-      console.log("Fetching lesson data for:", { courseId, lessonId })
+      console.log("📚 Fetching lesson data for:", { courseId, lessonId })
 
       const response = await fetch(`/api/student/lesson?courseId=${courseId}&lessonId=${lessonId}`, {
         credentials: "include",
       })
 
+      console.log("📚 Lesson API response status:", response.status)
+
       const data = await response.json()
-      console.log("API Response:", data)
+      console.log("📚 Lesson API response data:", data)
 
       if (!response.ok) {
         if (response.status === 401) {
-          console.log("Session expired, redirecting to login")
+          console.log("🔐 Session expired, redirecting to login")
           router.push("/auth/login")
           return
         }
 
         if (data.redirect) {
-          console.log("Redirecting to:", data.redirect)
+          console.log("🔄 Redirecting to:", data.redirect)
           router.push(data.redirect)
           return
+        }
+
+        // Store debug info for display
+        if (data.debug) {
+          setDebugInfo(data.debug)
         }
 
         throw new Error(data.message || "Error al cargar la lección")
@@ -130,12 +143,12 @@ export default function LessonPage() {
         setLesson(data.lesson)
         setAccessType(data.access_type)
         setAccessDetails(data.access_details)
-        console.log("Lesson loaded successfully:", data.lesson.title)
+        console.log("✅ Lesson loaded successfully:", data.lesson.title)
       } else {
         throw new Error(data.message || "Error desconocido")
       }
     } catch (error) {
-      console.error("Error fetching lesson:", error)
+      console.error("❌ Error fetching lesson:", error)
       setError(error instanceof Error ? error.message : "Error desconocido")
     } finally {
       setLoading(false)
@@ -217,12 +230,70 @@ export default function LessonPage() {
               </Button>
             </Link>
 
-            <Alert className="border-red-200 bg-red-50">
+            <Alert className="border-red-200 bg-red-50 mb-6">
               <AlertCircle className="h-4 w-4 text-red-600" />
               <AlertDescription className="text-red-800">{error}</AlertDescription>
             </Alert>
 
-            <div className="mt-6 flex gap-4">
+            {/* Debug Information */}
+            {debugInfo && (
+              <Card className="mb-6">
+                <CardHeader>
+                  <CardTitle className="text-lg">Información de Debug</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="font-semibold mb-2">IDs Buscados:</h4>
+                      <p className="text-sm text-gray-600">Curso: {debugInfo.searchedCourseId}</p>
+                      <p className="text-sm text-gray-600">Lección: {debugInfo.searchedLessonId}</p>
+                    </div>
+
+                    {debugInfo.courseLessons && debugInfo.courseLessons.length > 0 && (
+                      <div>
+                        <h4 className="font-semibold mb-2">Lecciones Disponibles en este Curso:</h4>
+                        <div className="space-y-2">
+                          {debugInfo.courseLessons.map((lesson: any) => (
+                            <div key={lesson.id} className="p-3 bg-gray-50 rounded-lg">
+                              <p className="font-medium">{lesson.title}</p>
+                              <p className="text-sm text-gray-600">ID: {lesson.id}</p>
+                              <p className="text-sm text-gray-600">
+                                Orden: {lesson.order_index} |{lesson.is_free ? " Gratuita" : " Premium"}
+                              </p>
+                              <Link href={`/courses/${courseId}/lessons/${lesson.id}`}>
+                                <Button size="sm" className="mt-2">
+                                  <BookOpen className="w-4 h-4 mr-1" />
+                                  Ir a esta lección
+                                </Button>
+                              </Link>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {debugInfo.sampleLessons && debugInfo.sampleLessons.length > 0 && (
+                      <div>
+                        <h4 className="font-semibold mb-2">Lecciones de Ejemplo en la Base de Datos:</h4>
+                        <div className="space-y-2">
+                          {debugInfo.sampleLessons.slice(0, 5).map((lesson: any) => (
+                            <div key={lesson.id} className="p-2 bg-gray-50 rounded text-sm">
+                              <p>
+                                <strong>{lesson.title}</strong>
+                              </p>
+                              <p>ID: {lesson.id}</p>
+                              <p>Curso: {lesson.course_id}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            <div className="flex gap-4">
               <Link href={`/courses/${courseId}`}>
                 <Button variant="outline">Ver Curso</Button>
               </Link>
@@ -245,7 +316,7 @@ export default function LessonPage() {
             <Link href={`/courses/${courseId}`}>
               <Button variant="ghost" className="mb-6">
                 <ArrowLeft className="w-4 h-4 mr-2" />
-                Volver a {params.courseId}
+                Volver al Curso
               </Button>
             </Link>
 
