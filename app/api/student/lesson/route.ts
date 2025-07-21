@@ -12,7 +12,10 @@ export async function GET(req: NextRequest) {
     const lessonId = searchParams.get("lessonId")
     const courseId = searchParams.get("courseId")
 
+    console.log("Request params:", { lessonId, courseId })
+
     if (!lessonId || !courseId) {
+      console.log("❌ Missing required parameters")
       return NextResponse.json(
         {
           success: false,
@@ -41,10 +44,10 @@ export async function GET(req: NextRequest) {
     let userSession
     try {
       userSession = JSON.parse(sessionCookie.value)
-      console.log("Session parsed successfully")
-      console.log("Session user ID:", userSession.id)
-      console.log("Session email:", userSession.email)
-      console.log("Session role:", userSession.role)
+      console.log("✅ Session parsed successfully")
+      console.log("User ID:", userSession.id)
+      console.log("User email:", userSession.email)
+      console.log("User role:", userSession.role)
     } catch (parseError) {
       console.error("❌ SESSION PARSE ERROR:", parseError)
       return NextResponse.json(
@@ -59,7 +62,7 @@ export async function GET(req: NextRequest) {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Verify user still exists
+    // Verify user still exists in database
     console.log("=== VERIFYING USER IN DATABASE ===")
     const { data: user, error: userError } = await supabase
       .from("users")
@@ -68,7 +71,7 @@ export async function GET(req: NextRequest) {
       .single()
 
     if (userError || !user) {
-      console.log("❌ USER NOT FOUND IN DATABASE")
+      console.log("❌ USER NOT FOUND IN DATABASE:", userError)
       return NextResponse.json(
         {
           success: false,
@@ -81,8 +84,25 @@ export async function GET(req: NextRequest) {
 
     console.log("✅ USER VERIFIED:", user.email, "Role:", user.role)
 
-    // Get lesson details
+    // Convert IDs to integers for database queries
+    const lessonIdInt = Number.parseInt(lessonId, 10)
+    const courseIdInt = Number.parseInt(courseId, 10)
+
+    if (isNaN(lessonIdInt) || isNaN(courseIdInt)) {
+      console.log("❌ Invalid ID format:", { lessonId, courseId })
+      return NextResponse.json(
+        {
+          success: false,
+          message: "IDs de lección o curso inválidos",
+        },
+        { status: 400 },
+      )
+    }
+
     console.log("=== FETCHING LESSON DETAILS ===")
+    console.log("Looking for lesson ID:", lessonIdInt, "in course ID:", courseIdInt)
+
+    // Get lesson details with course information
     const { data: lesson, error: lessonError } = await supabase
       .from("lessons")
       .select(`
@@ -95,19 +115,50 @@ export async function GET(req: NextRequest) {
         order_index,
         is_free,
         course_id,
-        courses (
+        courses!inner (
           id,
           title,
           description,
-          instructor
+          instructor,
+          status
         )
       `)
-      .eq("id", lessonId)
-      .eq("course_id", courseId)
+      .eq("id", lessonIdInt)
+      .eq("course_id", courseIdInt)
       .single()
 
-    if (lessonError || !lesson) {
-      console.error("❌ LESSON NOT FOUND:", lessonError)
+    if (lessonError) {
+      console.error("❌ LESSON QUERY ERROR:", lessonError)
+
+      // Check if lesson exists with different course_id
+      const { data: lessonCheck, error: checkError } = await supabase
+        .from("lessons")
+        .select("id, course_id, title")
+        .eq("id", lessonIdInt)
+        .single()
+
+      if (lessonCheck) {
+        console.log("❌ LESSON EXISTS BUT IN DIFFERENT COURSE:", lessonCheck)
+        return NextResponse.json(
+          {
+            success: false,
+            message: `La lección ${lessonIdInt} pertenece al curso ${lessonCheck.course_id}, no al curso ${courseIdInt}`,
+          },
+          { status: 404 },
+        )
+      }
+
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Lección no encontrada",
+        },
+        { status: 404 },
+      )
+    }
+
+    if (!lesson) {
+      console.log("❌ LESSON NOT FOUND")
       return NextResponse.json(
         {
           success: false,
@@ -118,12 +169,20 @@ export async function GET(req: NextRequest) {
     }
 
     console.log("✅ LESSON FOUND:", lesson.title)
-    console.log("Is free lesson:", lesson.is_free)
+    console.log("Lesson details:", {
+      id: lesson.id,
+      title: lesson.title,
+      is_free: lesson.is_free,
+      course_id: lesson.course_id,
+      course_title: lesson.courses.title,
+    })
 
     // Check access permissions
     let hasAccess = false
     let accessType = "denied"
     let accessReason = ""
+
+    console.log("=== CHECKING ACCESS PERMISSIONS ===")
 
     // 1. Admin users have access to ALL lessons
     if (user.role === "admin") {
@@ -146,8 +205,10 @@ export async function GET(req: NextRequest) {
         .from("enrollments")
         .select("id, status, progress")
         .eq("user_id", user.id)
-        .eq("course_id", courseId)
+        .eq("course_id", courseIdInt)
         .single()
+
+      console.log("Enrollment query result:", { enrollment, enrollmentError })
 
       if (enrollment && !enrollmentError && enrollment.status === "active") {
         hasAccess = true
@@ -164,31 +225,39 @@ export async function GET(req: NextRequest) {
 
     // Log the access attempt
     try {
-      await supabase.from("student_access_log").insert([
-        {
-          student_id: user.id,
-          email: user.email,
-          action: "lesson_access",
-          success: hasAccess,
-          error_code: hasAccess ? null : "ACCESS_DENIED",
-          error_message: `Lesson access ${hasAccess ? "granted" : "denied"} - ${accessReason}`,
-          ip_address: req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown",
-          user_agent: req.headers.get("user-agent") || "unknown",
-          session_data: JSON.stringify({
-            lessonId,
-            courseId,
-            lessonTitle: lesson.title,
-            accessType,
-            isFree: lesson.is_free,
-          }),
+      const logData = {
+        student_id: user.id,
+        email: user.email,
+        action: "lesson_access",
+        success: hasAccess,
+        error_code: hasAccess ? null : "ACCESS_DENIED",
+        error_message: `Lesson access ${hasAccess ? "granted" : "denied"} - ${accessReason}`,
+        ip_address: req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown",
+        user_agent: req.headers.get("user-agent") || "unknown",
+        session_data: {
+          lessonId: lessonIdInt,
+          courseId: courseIdInt,
+          lessonTitle: lesson.title,
+          accessType,
+          isFree: lesson.is_free,
         },
-      ])
+      }
+
+      console.log("Logging access attempt:", logData)
+
+      const { error: logError } = await supabase.from("student_access_log").insert([logData])
+
+      if (logError) {
+        console.error("Failed to log lesson access:", logError)
+      } else {
+        console.log("✅ Access attempt logged successfully")
+      }
     } catch (logError) {
-      console.error("Failed to log lesson access:", logError)
+      console.error("Exception while logging lesson access:", logError)
     }
 
     if (!hasAccess) {
-      console.log("❌ ACCESS DENIED")
+      console.log("❌ ACCESS DENIED - Returning 403")
       return NextResponse.json(
         {
           success: false,
@@ -201,11 +270,22 @@ export async function GET(req: NextRequest) {
       )
     }
 
-    console.log("✅ ACCESS GRANTED")
+    console.log("✅ ACCESS GRANTED - Returning lesson data")
 
     return NextResponse.json({
       success: true,
-      lesson: lesson,
+      lesson: {
+        id: lesson.id,
+        title: lesson.title,
+        description: lesson.description,
+        content: lesson.content,
+        video_url: lesson.video_url,
+        duration_minutes: lesson.duration_minutes,
+        order_index: lesson.order_index,
+        is_free: lesson.is_free,
+        course_id: lesson.course_id,
+        courses: lesson.courses,
+      },
       access_type: accessType,
       access_details: {
         is_admin: user.role === "admin",
