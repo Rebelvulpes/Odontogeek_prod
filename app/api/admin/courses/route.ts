@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
     const body = await request.json()
-    const { title, description, price, instructor, thumbnail_url, duration_hours, tags } = body
+    const { title, description, price, instructor, thumbnail_url, duration_hours, tags, difficulty_level } = body
 
     // Crear el curso
     const { data: course, error: courseError } = await supabase
@@ -110,6 +110,7 @@ export async function POST(request: NextRequest) {
         instructor_name: instructor,
         thumbnail_url,
         duration_hours: duration_hours ? Number.parseInt(duration_hours) : null,
+        difficulty_level: difficulty_level || "principiante",
         status: "published",
         archived: false,
       })
@@ -126,6 +127,20 @@ export async function POST(request: NextRequest) {
         },
         { status: 500 },
       )
+    }
+
+    // Agregar etiquetas si se proporcionaron
+    if (tags && Array.isArray(tags) && tags.length > 0) {
+      const courseTagsData = tags.map((tagId: string) => ({
+        course_id: course.id,
+        tag_id: tagId,
+      }))
+
+      const { error: tagsError } = await supabase.from("course_tags").insert(courseTagsData)
+
+      if (tagsError) {
+        console.error("Error agregando etiquetas:", tagsError)
+      }
     }
 
     return NextResponse.json({

@@ -63,7 +63,8 @@ export async function PUT(request: NextRequest, { params }: { params: { courseId
     const { courseId } = params
     const body = await request.json()
 
-    const { title, description, price, instructor, thumbnail_url, duration_hours, tags, archived } = body
+    const { title, description, price, instructor, thumbnail_url, duration_hours, tags, archived, difficulty_level } =
+      body
 
     // Actualizar el curso
     const { data: course, error: courseError } = await supabase
@@ -77,6 +78,7 @@ export async function PUT(request: NextRequest, { params }: { params: { courseId
         ...(duration_hours !== undefined && {
           duration_hours: duration_hours ? Number.parseInt(duration_hours) : null,
         }),
+        ...(difficulty_level && { difficulty_level }),
         ...(archived !== undefined && { archived }),
         updated_at: new Date().toISOString(),
       })

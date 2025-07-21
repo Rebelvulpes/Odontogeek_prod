@@ -11,8 +11,9 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Switch } from "@/components/ui/switch"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   Video,
   Users,
@@ -28,9 +29,11 @@ import {
   Archive,
   Tag,
   ImageIcon,
+  ExternalLink,
   Presentation,
-  AlertCircle,
-  RefreshCw,
+  Star,
+  TrendingUp,
+  Award,
 } from "lucide-react"
 import { Navigation } from "@/components/navigation"
 import {
@@ -52,6 +55,7 @@ interface Course {
   instructor_name: string
   thumbnail_url: string
   duration_hours: number
+  difficulty_level: string
   archived: boolean
   created_at: string
   lessons: Lesson[]
@@ -140,7 +144,6 @@ const AdminPage = () => {
   })
   const [loading, setLoading] = useState(true)
   const [usersLoading, setUsersLoading] = useState(false)
-  const [usersError, setUsersError] = useState<string | null>(null)
   const [newCourse, setNewCourse] = useState({
     title: "",
     description: "",
@@ -148,6 +151,7 @@ const AdminPage = () => {
     instructor: "",
     thumbnailUrl: "",
     durationHours: "",
+    difficultyLevel: "principiante",
     tags: [] as string[],
   })
   const [selectedCourse, setSelectedCourse] = useState<string | null>(null)
@@ -192,6 +196,32 @@ const AdminPage = () => {
     slide_type: "general",
   })
 
+  const getDifficultyIcon = (level: string) => {
+    switch (level) {
+      case "principiante":
+        return <Star className="w-4 h-4 text-green-500" />
+      case "intermedio":
+        return <TrendingUp className="w-4 h-4 text-yellow-500" />
+      case "experto":
+        return <Award className="w-4 h-4 text-red-500" />
+      default:
+        return <Star className="w-4 h-4 text-gray-500" />
+    }
+  }
+
+  const getDifficultyColor = (level: string) => {
+    switch (level) {
+      case "principiante":
+        return "bg-green-100 text-green-800"
+      case "intermedio":
+        return "bg-yellow-100 text-yellow-800"
+      case "experto":
+        return "bg-red-100 text-red-800"
+      default:
+        return "bg-gray-100 text-gray-800"
+    }
+  }
+
   const loadStats = async () => {
     try {
       const response = await fetch("/api/admin/stats")
@@ -222,33 +252,14 @@ const AdminPage = () => {
     try {
       console.log("=== LOADING USERS ===")
       setUsersLoading(true)
-      setUsersError(null)
 
-      const response = await fetch("/api/admin/users", {
-        method: "GET",
-        credentials: "include", // Include cookies
-        headers: {
-          "Content-Type": "application/json",
-        },
-      })
-
+      const response = await fetch("/api/admin/users")
       console.log("Users API response status:", response.status)
-      console.log("Users API response headers:", Object.fromEntries(response.headers.entries()))
 
       if (!response.ok) {
-        const errorText = await response.text()
         console.error("Users API error:", response.status, response.statusText)
+        const errorText = await response.text()
         console.error("Error response:", errorText)
-
-        let errorMessage = "Error desconocido"
-        try {
-          const errorData = JSON.parse(errorText)
-          errorMessage = errorData.message || errorMessage
-        } catch {
-          errorMessage = `Error ${response.status}: ${response.statusText}`
-        }
-
-        setUsersError(errorMessage)
         setUsers([])
         return
       }
@@ -260,15 +271,12 @@ const AdminPage = () => {
         const usersData = result.data || result.users || []
         console.log("Setting users data:", usersData.length, "users")
         setUsers(usersData)
-        setUsersError(null)
       } else {
         console.error("Error loading users:", result.message)
-        setUsersError(result.message || "Error cargando usuarios")
         setUsers([])
       }
     } catch (error) {
       console.error("Error cargando usuarios:", error)
-      setUsersError("Error de conexión al cargar usuarios")
       setUsers([])
     } finally {
       setUsersLoading(false)
@@ -336,6 +344,7 @@ const AdminPage = () => {
         body: JSON.stringify({
           ...newCourse,
           duration_hours: newCourse.durationHours ? Number.parseInt(newCourse.durationHours) : null,
+          difficulty_level: newCourse.difficultyLevel,
         }),
       })
       const result = await response.json()
@@ -347,6 +356,7 @@ const AdminPage = () => {
           instructor: "",
           thumbnailUrl: "",
           durationHours: "",
+          difficultyLevel: "principiante",
           tags: [],
         })
         setIsCreateCourseDialogOpen(false)
@@ -633,6 +643,7 @@ const AdminPage = () => {
       instructor: course.instructor_name || "",
       thumbnailUrl: course.thumbnail_url || "",
       durationHours: course.duration_hours?.toString() || "",
+      difficultyLevel: course.difficulty_level || "principiante",
       tags: course.tags?.map((tag) => tag.id) || [],
     })
     setIsEditCourseDialogOpen(true)
@@ -653,6 +664,7 @@ const AdminPage = () => {
           instructor: newCourse.instructor,
           thumbnail_url: newCourse.thumbnailUrl,
           duration_hours: newCourse.durationHours ? Number.parseInt(newCourse.durationHours) : null,
+          difficulty_level: newCourse.difficultyLevel,
           tags: newCourse.tags,
         }),
       })
@@ -665,6 +677,7 @@ const AdminPage = () => {
           instructor: "",
           thumbnailUrl: "",
           durationHours: "",
+          difficultyLevel: "principiante",
           tags: [],
         })
         setIsEditCourseDialogOpen(false)
@@ -978,6 +991,13 @@ const AdminPage = () => {
                                   )}
                                 </div>
                                 <div className="flex flex-wrap gap-1 mt-1">
+                                  <Badge className={`text-xs ${getDifficultyColor(course.difficulty_level)}`}>
+                                    <span className="flex items-center gap-1">
+                                      {getDifficultyIcon(course.difficulty_level)}
+                                      {course.difficulty_level?.charAt(0).toUpperCase() +
+                                        course.difficulty_level?.slice(1)}
+                                    </span>
+                                  </Badge>
                                   {course.tags?.slice(0, 2).map((tag) => (
                                     <Badge
                                       key={tag.id}
@@ -1089,6 +1109,12 @@ const AdminPage = () => {
                               Archivado
                             </Badge>
                           )}
+                          <Badge className={`text-xs ${getDifficultyColor(course.difficulty_level)}`}>
+                            <span className="flex items-center gap-1">
+                              {getDifficultyIcon(course.difficulty_level)}
+                              {course.difficulty_level?.charAt(0).toUpperCase() + course.difficulty_level?.slice(1)}
+                            </span>
+                          </Badge>
                         </div>
                         <CardDescription className="text-sm">
                           {course.lessons?.length || 0} lecciones configuradas
@@ -1300,30 +1326,43 @@ const AdminPage = () => {
               </Button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {tags.map((tag) => (
-                <Card key={tag.id}>
+                <Card key={tag.id} className="hover:shadow-md transition-shadow">
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between mb-3">
-                      <Badge style={{ backgroundColor: tag.color + "20", color: tag.color }} className="text-xs">
+                      <Badge
+                        variant="secondary"
+                        className="text-sm font-medium"
+                        style={{ backgroundColor: tag.color + "20", color: tag.color }}
+                      >
                         {tag.name}
                       </Badge>
-                      <div className="flex items-center space-x-1">
-                        <Button variant="ghost" size="sm" onClick={() => openEditTagDialog(tag)}>
-                          <Edit className="w-3 h-3" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => openDeleteTagDialog(tag)}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </Button>
-                      </div>
+                      <div className="w-4 h-4 rounded-full border" style={{ backgroundColor: tag.color }} />
                     </div>
-                    <p className="text-sm text-gray-600">{tag.description || "Sin descripción"}</p>
-                    <p className="text-xs text-gray-400 mt-2">Slug: {tag.slug}</p>
+                    <p className="text-sm text-gray-600 mb-2">{tag.description}</p>
+                    <p className="text-xs text-gray-400 mb-3">Slug: {tag.slug}</p>
+
+                    <div className="flex items-center justify-end space-x-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openEditTagDialog(tag)}
+                        className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                        title="Editar etiqueta"
+                      >
+                        <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openDeleteTagDialog(tag)}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        title="Eliminar etiqueta"
+                      >
+                        <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               ))}
@@ -1332,87 +1371,88 @@ const AdminPage = () => {
 
           <TabsContent value="users" className="space-y-4 sm:space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Gestión de Usuarios</h2>
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Usuarios Registrados</h2>
               <Button size="sm" className="w-full sm:w-auto" onClick={loadUsers} disabled={usersLoading}>
-                <RefreshCw className={`w-4 h-4 mr-2 ${usersLoading ? "animate-spin" : ""}`} />
-                {usersLoading ? "Cargando..." : "Actualizar"}
+                {usersLoading ? (
+                  <>
+                    <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2" />
+                    Cargando...
+                  </>
+                ) : (
+                  <>
+                    <Users className="w-4 h-4 mr-2" />
+                    Actualizar Usuarios
+                  </>
+                )}
               </Button>
             </div>
 
-            {usersError && (
-              <Alert className="border-red-200 bg-red-50">
-                <AlertCircle className="h-4 w-4 text-red-600" />
-                <AlertDescription className="text-red-800">
-                  <strong>Error cargando usuarios:</strong> {usersError}
-                </AlertDescription>
-              </Alert>
-            )}
-
             <Card>
               <CardContent className="p-0">
-                {usersLoading ? (
-                  <div className="flex items-center justify-center py-12">
-                    <div className="text-center">
-                      <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
-                      <p className="text-gray-600">Cargando usuarios...</p>
-                    </div>
-                  </div>
-                ) : users.length === 0 ? (
-                  <div className="text-center py-12">
-                    <Users className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-                    <p className="text-gray-600">No se encontraron usuarios</p>
-                    <p className="text-sm text-gray-500 mt-2">
-                      {usersError
-                        ? "Verifica la conexión y permisos"
-                        : "Los usuarios aparecerán aquí cuando se registren"}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="min-w-[150px]">Usuario</TableHead>
+                        <TableHead className="min-w-[200px]">Email</TableHead>
+                        <TableHead className="min-w-[80px]">Rol</TableHead>
+                        <TableHead className="min-w-[80px]">Cursos</TableHead>
+                        <TableHead className="min-w-[100px]">Total Gastado</TableHead>
+                        <TableHead className="min-w-[120px]">Fecha de Registro</TableHead>
+                        <TableHead className="min-w-[100px]">Acciones</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {usersLoading ? (
                         <TableRow>
-                          <TableHead className="min-w-[250px]">Usuario</TableHead>
-                          <TableHead className="min-w-[100px]">Rol</TableHead>
-                          <TableHead className="min-w-[100px]">Cursos</TableHead>
-                          <TableHead className="min-w-[100px]">Gastado</TableHead>
-                          <TableHead className="min-w-[120px]">Fecha Registro</TableHead>
-                          <TableHead className="min-w-[100px]">Estado</TableHead>
+                          <TableCell colSpan={7} className="text-center py-8">
+                            <div className="flex items-center justify-center space-x-2">
+                              <div className="animate-spin w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full" />
+                              <span className="text-gray-500">Cargando usuarios...</span>
+                            </div>
+                          </TableCell>
                         </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {users.map((user) => (
+                      ) : users.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center py-8 text-gray-500">
+                            <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                            <p className="text-sm sm:text-base">No hay usuarios registrados</p>
+                            <p className="text-xs sm:text-sm">Los usuarios aparecerán aquí cuando se registren</p>
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        users.map((user) => (
                           <TableRow key={user.id}>
                             <TableCell>
                               <div className="flex items-center space-x-3">
-                                <div className="w-10 h-10 bg-gray-100 rounded-full overflow-hidden flex-shrink-0">
+                                <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
                                   {user.avatar_url ? (
                                     <img
                                       src={user.avatar_url || "/placeholder.svg"}
                                       alt={user.name}
-                                      className="w-full h-full object-cover"
+                                      className="w-8 h-8 rounded-full object-cover"
                                       onError={(e) => {
                                         const target = e.target as HTMLImageElement
-                                        target.src = "/placeholder-user.jpg"
+                                        target.style.display = "none"
                                       }}
                                     />
                                   ) : (
-                                    <div className="w-full h-full flex items-center justify-center bg-gray-200">
-                                      <Users className="w-5 h-5 text-gray-400" />
-                                    </div>
+                                    <span className="text-xs font-medium text-gray-600">
+                                      {user.name.charAt(0).toUpperCase()}
+                                    </span>
                                   )}
                                 </div>
-                                <div className="min-w-0">
-                                  <p className="font-medium text-sm truncate">{user.name}</p>
-                                  <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                                <div>
+                                  <p className="font-medium text-sm sm:text-base">{user.name}</p>
                                   {user.is_test_user && (
-                                    <Badge variant="outline" className="text-xs mt-1">
-                                      Usuario de prueba
+                                    <Badge variant="secondary" className="text-xs">
+                                      Test
                                     </Badge>
                                   )}
                                 </div>
                               </div>
                             </TableCell>
+                            <TableCell className="text-sm sm:text-base">{user.email}</TableCell>
                             <TableCell>
                               <Badge
                                 variant={user.role === "admin" ? "default" : "secondary"}
@@ -1421,352 +1461,612 @@ const AdminPage = () => {
                                 {user.role}
                               </Badge>
                             </TableCell>
-                            <TableCell className="text-sm">{user.courses}</TableCell>
-                            <TableCell className="text-sm">${user.spent.toLocaleString()}</TableCell>
-                            <TableCell className="text-sm">{user.joinDate}</TableCell>
+                            <TableCell className="text-sm sm:text-base">{user.courses}</TableCell>
+                            <TableCell className="text-sm sm:text-base">${user.spent.toLocaleString()}</TableCell>
+                            <TableCell className="text-sm sm:text-base">{user.joinDate}</TableCell>
                             <TableCell>
-                              <Badge variant="outline" className="text-xs text-green-600">
-                                Activo
-                              </Badge>
+                              <div className="flex items-center space-x-2">
+                                <Button variant="ghost" size="sm" title="Ver detalles">
+                                  <Eye className="w-3 h-3 sm:w-4 sm:h-4" />
+                                </Button>
+                                <Button variant="ghost" size="sm" title="Editar usuario">
+                                  <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
       </div>
 
-      {/* Create Course Dialog */}
-      <Dialog open={isCreateCourseDialogOpen} onOpenChange={setIsCreateCourseDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Crear Nuevo Curso</DialogTitle>
-            <DialogDescription>Completa la información para crear un nuevo curso</DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleCreateCourse} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="title">Título del Curso</Label>
-                <Input
-                  id="title"
-                  value={newCourse.title}
-                  onChange={(e) => setNewCourse({ ...newCourse, title: e.target.value })}
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="instructor">Instructor</Label>
-                <Input
-                  id="instructor"
-                  value={newCourse.instructor}
-                  onChange={(e) => setNewCourse({ ...newCourse, instructor: e.target.value })}
-                  required
-                />
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="description">Descripción</Label>
-              <Textarea
-                id="description"
-                value={newCourse.description}
-                onChange={(e) => setNewCourse({ ...newCourse, description: e.target.value })}
-                rows={3}
-                required
-              />
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
-                <Label htmlFor="price">Precio ($)</Label>
-                <Input
-                  id="price"
-                  type="number"
-                  step="0.01"
-                  value={newCourse.price}
-                  onChange={(e) => setNewCourse({ ...newCourse, price: e.target.value })}
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="durationHours">Duración (horas)</Label>
-                <Input
-                  id="durationHours"
-                  type="number"
-                  value={newCourse.durationHours}
-                  onChange={(e) => setNewCourse({ ...newCourse, durationHours: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label htmlFor="thumbnailUrl">URL de Imagen</Label>
-                <Input
-                  id="thumbnailUrl"
-                  type="url"
-                  value={newCourse.thumbnailUrl}
-                  onChange={(e) => setNewCourse({ ...newCourse, thumbnailUrl: e.target.value })}
-                />
-              </div>
-            </div>
-
-            <div>
-              <Label>Etiquetas</Label>
-              <div className="flex flex-wrap gap-2 mt-2">
-                {tags.map((tag) => (
-                  <div key={tag.id} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={`tag-${tag.id}`}
-                      checked={newCourse.tags.includes(tag.id)}
-                      onCheckedChange={() => handleTagToggle(tag.id)}
-                    />
-                    <Label htmlFor={`tag-${tag.id}`} className="text-sm cursor-pointer" style={{ color: tag.color }}>
-                      {tag.name}
-                    </Label>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex justify-end space-x-2 pt-4">
-              <Button type="button" variant="outline" onClick={() => setIsCreateCourseDialogOpen(false)}>
-                Cancelar
-              </Button>
-              <Button type="submit">Crear Curso</Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Course Dialog */}
-      <Dialog open={isEditCourseDialogOpen} onOpenChange={setIsEditCourseDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Editar Curso</DialogTitle>
-            <DialogDescription>Modifica la información del curso</DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleUpdateCourse} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="edit-title">Título del Curso</Label>
-                <Input
-                  id="edit-title"
-                  value={newCourse.title}
-                  onChange={(e) => setNewCourse({ ...newCourse, title: e.target.value })}
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="edit-instructor">Instructor</Label>
-                <Input
-                  id="edit-instructor"
-                  value={newCourse.instructor}
-                  onChange={(e) => setNewCourse({ ...newCourse, instructor: e.target.value })}
-                  required
-                />
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="edit-description">Descripción</Label>
-              <Textarea
-                id="edit-description"
-                value={newCourse.description}
-                onChange={(e) => setNewCourse({ ...newCourse, description: e.target.value })}
-                rows={3}
-                required
-              />
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
-                <Label htmlFor="edit-price">Precio ($)</Label>
-                <Input
-                  id="edit-price"
-                  type="number"
-                  step="0.01"
-                  value={newCourse.price}
-                  onChange={(e) => setNewCourse({ ...newCourse, price: e.target.value })}
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="edit-durationHours">Duración (horas)</Label>
-                <Input
-                  id="edit-durationHours"
-                  type="number"
-                  value={newCourse.durationHours}
-                  onChange={(e) => setNewCourse({ ...newCourse, durationHours: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label htmlFor="edit-thumbnailUrl">URL de Imagen</Label>
-                <Input
-                  id="edit-thumbnailUrl"
-                  type="url"
-                  value={newCourse.thumbnailUrl}
-                  onChange={(e) => setNewCourse({ ...newCourse, thumbnailUrl: e.target.value })}
-                />
-              </div>
-            </div>
-
-            <div>
-              <Label>Etiquetas</Label>
-              <div className="flex flex-wrap gap-2 mt-2">
-                {tags.map((tag) => (
-                  <div key={tag.id} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={`edit-tag-${tag.id}`}
-                      checked={newCourse.tags.includes(tag.id)}
-                      onCheckedChange={() => handleTagToggle(tag.id)}
-                    />
-                    <Label
-                      htmlFor={`edit-tag-${tag.id}`}
-                      className="text-sm cursor-pointer"
-                      style={{ color: tag.color }}
-                    >
-                      {tag.name}
-                    </Label>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex justify-end space-x-2 pt-4">
-              <Button type="button" variant="outline" onClick={() => setIsEditCourseDialogOpen(false)}>
-                Cancelar
-              </Button>
-              <Button type="submit">Actualizar Curso</Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Create/Edit Lesson Dialog */}
+      {/* Dialog para crear/editar lecciones */}
       <Dialog open={isLessonDialogOpen} onOpenChange={setIsLessonDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingLesson ? "Editar Lección" : "Crear Nueva Lección"}</DialogTitle>
-            <DialogDescription>{selectedCourseData && `Curso: ${selectedCourseData.title}`}</DialogDescription>
+            <DialogTitle className="text-base sm:text-lg">
+              {editingLesson ? "Editar Lección" : "Agregar Nueva Lección"}
+            </DialogTitle>
+            <DialogDescription className="text-sm">
+              Configura los detalles de la lección con el enlace directo de Bunny.net
+              {selectedCourseData && ` para el curso "${selectedCourseData.title}"`}
+            </DialogDescription>
           </DialogHeader>
+
           <form onSubmit={handleCreateLesson} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="lesson-title">Título de la Lección</Label>
+              <div className="space-y-2">
+                <Label htmlFor="lessonTitle" className="text-sm">
+                  Título de la Lección
+                </Label>
                 <Input
-                  id="lesson-title"
+                  id="lessonTitle"
+                  placeholder="Ej: Introducción a la Implantología"
                   value={newLesson.title}
                   onChange={(e) => setNewLesson({ ...newLesson, title: e.target.value })}
                   required
+                  className="text-sm"
                 />
               </div>
-              <div>
-                <Label htmlFor="lesson-order">Orden</Label>
+              <div className="space-y-2">
+                <Label htmlFor="lessonOrder" className="text-sm">
+                  Orden
+                </Label>
                 <Input
-                  id="lesson-order"
+                  id="lessonOrder"
                   type="number"
+                  placeholder="1"
                   value={newLesson.order}
                   onChange={(e) => setNewLesson({ ...newLesson, order: e.target.value })}
                   required
+                  className="text-sm"
                 />
               </div>
             </div>
 
-            <div>
-              <Label htmlFor="lesson-description">Descripción</Label>
+            <div className="space-y-2">
+              <Label htmlFor="lessonDescription" className="text-sm">
+                Descripción
+              </Label>
               <Textarea
-                id="lesson-description"
+                id="lessonDescription"
+                placeholder="Describe el contenido de esta lección..."
                 value={newLesson.description}
                 onChange={(e) => setNewLesson({ ...newLesson, description: e.target.value })}
-                rows={3}
+                className="text-sm"
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="videoUrl" className="text-sm">
+                URL del Video (Bunny.net)
+              </Label>
+              <Input
+                id="videoUrl"
+                placeholder="https://vz-12345.b-cdn.net/mi-video.mp4"
+                value={newLesson.videoUrl}
+                onChange={(e) => setNewLesson({ ...newLesson, videoUrl: e.target.value })}
+                required
+                className="text-sm"
+              />
+              <p className="text-xs text-gray-500">Copia el enlace directo desde tu panel de Bunny.net</p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="lesson-video">URL del Video</Label>
+              <div className="space-y-2">
+                <Label htmlFor="duration" className="text-sm">
+                  Duración (minutos)
+                </Label>
                 <Input
-                  id="lesson-video"
-                  type="url"
-                  value={newLesson.videoUrl}
-                  onChange={(e) => setNewLesson({ ...newLesson, videoUrl: e.target.value })}
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="lesson-duration">Duración (minutos)</Label>
-                <Input
-                  id="lesson-duration"
+                  id="duration"
                   type="number"
+                  placeholder="45"
                   value={newLesson.duration}
                   onChange={(e) => setNewLesson({ ...newLesson, duration: e.target.value })}
                   required
+                  className="text-sm"
                 />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="isFree" className="text-sm">
+                  Acceso
+                </Label>
+                <div className="flex items-center space-x-2 pt-2">
+                  <Switch
+                    id="isFree"
+                    checked={newLesson.isFree}
+                    onCheckedChange={(checked) => setNewLesson({ ...newLesson, isFree: checked })}
+                  />
+                  <Label htmlFor="isFree" className="text-sm">
+                    Lección gratuita
+                  </Label>
+                </div>
               </div>
             </div>
 
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="lesson-free"
-                checked={newLesson.isFree}
-                onCheckedChange={(checked) => setNewLesson({ ...newLesson, isFree: checked as boolean })}
-              />
-              <Label htmlFor="lesson-free">Lección gratuita</Label>
-            </div>
-
-            <div className="flex justify-end space-x-2 pt-4">
-              <Button type="button" variant="outline" onClick={() => setIsLessonDialogOpen(false)}>
+            <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-2 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsLessonDialogOpen(false)}
+                className="w-full sm:w-auto"
+              >
                 Cancelar
               </Button>
-              <Button type="submit">{editingLesson ? "Actualizar" : "Crear"} Lección</Button>
+              <Button type="submit" className="w-full sm:w-auto">
+                {editingLesson ? "Actualizar Lección" : "Crear Lección"}
+              </Button>
             </div>
           </form>
         </DialogContent>
       </Dialog>
 
-      {/* Create Tag Dialog */}
+      {/* Dialog para crear curso */}
+      <Dialog open={isCreateCourseDialogOpen} onOpenChange={setIsCreateCourseDialogOpen}>
+        <DialogContent className="max-w-[95vw] sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-base sm:text-lg">Crear Nuevo Curso</DialogTitle>
+            <DialogDescription className="text-sm">
+              Completa los detalles básicos del curso. Las lecciones se configuran después.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleCreateCourse} className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="title" className="text-sm sm:text-base">
+                    Título del Curso
+                  </Label>
+                  <Input
+                    id="title"
+                    placeholder="Ej: Implantología Avanzada"
+                    value={newCourse.title}
+                    onChange={(e) => setNewCourse({ ...newCourse, title: e.target.value })}
+                    className="text-sm sm:text-base"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="description" className="text-sm sm:text-base">
+                    Descripción
+                  </Label>
+                  <Textarea
+                    id="description"
+                    placeholder="Describe el contenido del curso..."
+                    value={newCourse.description}
+                    onChange={(e) => setNewCourse({ ...newCourse, description: e.target.value })}
+                    className="text-sm sm:text-base"
+                    rows={4}
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="price" className="text-sm sm:text-base">
+                      Precio ($)
+                    </Label>
+                    <Input
+                      id="price"
+                      type="number"
+                      placeholder="299"
+                      value={newCourse.price}
+                      onChange={(e) => setNewCourse({ ...newCourse, price: e.target.value })}
+                      className="text-sm sm:text-base"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="durationHours" className="text-sm sm:text-base">
+                      Duración (horas)
+                    </Label>
+                    <Input
+                      id="durationHours"
+                      type="number"
+                      placeholder="12"
+                      value={newCourse.durationHours}
+                      onChange={(e) => setNewCourse({ ...newCourse, durationHours: e.target.value })}
+                      className="text-sm sm:text-base"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="instructor" className="text-sm sm:text-base">
+                    Instructor
+                  </Label>
+                  <Input
+                    id="instructor"
+                    placeholder="Dr. Juan Pérez"
+                    value={newCourse.instructor}
+                    onChange={(e) => setNewCourse({ ...newCourse, instructor: e.target.value })}
+                    className="text-sm sm:text-base"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="difficultyLevel" className="text-sm sm:text-base">
+                    Nivel de Dificultad
+                  </Label>
+                  <Select
+                    value={newCourse.difficultyLevel}
+                    onValueChange={(value) => setNewCourse({ ...newCourse, difficultyLevel: value })}
+                  >
+                    <SelectTrigger className="text-sm sm:text-base">
+                      <SelectValue placeholder="Selecciona el nivel" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="principiante">
+                        <div className="flex items-center gap-2">
+                          <Star className="w-4 h-4 text-green-500" />
+                          Principiante
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="intermedio">
+                        <div className="flex items-center gap-2">
+                          <TrendingUp className="w-4 h-4 text-yellow-500" />
+                          Intermedio
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="experto">
+                        <div className="flex items-center gap-2">
+                          <Award className="w-4 h-4 text-red-500" />
+                          Experto
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="thumbnailUrl" className="text-sm sm:text-base flex items-center">
+                    <ImageIcon className="w-4 h-4 mr-2" />
+                    Imagen del Curso
+                  </Label>
+                  <Input
+                    id="thumbnailUrl"
+                    type="url"
+                    placeholder="https://res.cloudinary.com/tu-cuenta/image/upload/v123/curso.jpg"
+                    value={newCourse.thumbnailUrl}
+                    onChange={(e) => setNewCourse({ ...newCourse, thumbnailUrl: e.target.value })}
+                    className="text-sm sm:text-base"
+                  />
+                  <div className="flex items-start space-x-2 text-xs text-gray-500">
+                    <ExternalLink className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p>Sube tu imagen a Cloudinary, Imgur, o cualquier servicio de hosting de imágenes.</p>
+                      <p className="mt-1">Tamaño recomendado: 1080x1080px (1:1)</p>
+                    </div>
+                  </div>
+                </div>
+
+                {newCourse.thumbnailUrl && (
+                  <div className="space-y-2">
+                    <Label className="text-sm">Vista Previa</Label>
+                    <div className="w-full max-w-sm">
+                      <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden border">
+                        <img
+                          src={newCourse.thumbnailUrl || "/placeholder.svg"}
+                          alt="Vista previa del curso"
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement
+                            target.src = "/placeholder.svg?height=300&width=300&text=Error+cargando+imagen"
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label className="text-sm sm:text-base">Etiquetas del Curso</Label>
+                  <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-3 border rounded-md bg-gray-50">
+                    {tags.map((tag) => (
+                      <div key={tag.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`tag-${tag.id}`}
+                          checked={newCourse.tags.includes(tag.id)}
+                          onCheckedChange={() => handleTagToggle(tag.id)}
+                        />
+                        <Label htmlFor={`tag-${tag.id}`} className="text-xs cursor-pointer flex items-center space-x-1">
+                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: tag.color }} />
+                          <span style={{ color: tag.color }}>{tag.name}</span>
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-500">Selecciona las etiquetas que mejor describan este curso</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-2 pt-6 border-t">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsCreateCourseDialogOpen(false)}
+                className="w-full sm:w-auto"
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" className="w-full sm:w-auto">
+                <Plus className="w-4 h-4 mr-2" />
+                Crear Curso
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para editar curso */}
+      <Dialog open={isEditCourseDialogOpen} onOpenChange={setIsEditCourseDialogOpen}>
+        <DialogContent className="max-w-[95vw] sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-base sm:text-lg">Editar Curso</DialogTitle>
+            <DialogDescription className="text-sm">
+              Modifica los detalles del curso "{editingCourse?.title}"
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleUpdateCourse} className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="editTitle" className="text-sm sm:text-base">
+                    Título del Curso
+                  </Label>
+                  <Input
+                    id="editTitle"
+                    placeholder="Ej: Implantología Avanzada"
+                    value={newCourse.title}
+                    onChange={(e) => setNewCourse({ ...newCourse, title: e.target.value })}
+                    className="text-sm sm:text-base"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="editDescription" className="text-sm sm:text-base">
+                    Descripción
+                  </Label>
+                  <Textarea
+                    id="editDescription"
+                    placeholder="Describe el contenido del curso..."
+                    value={newCourse.description}
+                    onChange={(e) => setNewCourse({ ...newCourse, description: e.target.value })}
+                    className="text-sm sm:text-base"
+                    rows={4}
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="editPrice" className="text-sm sm:text-base">
+                      Precio ($)
+                    </Label>
+                    <Input
+                      id="editPrice"
+                      type="number"
+                      placeholder="299"
+                      value={newCourse.price}
+                      onChange={(e) => setNewCourse({ ...newCourse, price: e.target.value })}
+                      className="text-sm sm:text-base"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="editDurationHours" className="text-sm sm:text-base">
+                      Duración (horas)
+                    </Label>
+                    <Input
+                      id="editDurationHours"
+                      type="number"
+                      placeholder="12"
+                      value={newCourse.durationHours}
+                      onChange={(e) => setNewCourse({ ...newCourse, durationHours: e.target.value })}
+                      className="text-sm sm:text-base"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="editInstructor" className="text-sm sm:text-base">
+                    Instructor
+                  </Label>
+                  <Input
+                    id="editInstructor"
+                    placeholder="Dr. Juan Pérez"
+                    value={newCourse.instructor}
+                    onChange={(e) => setNewCourse({ ...newCourse, instructor: e.target.value })}
+                    className="text-sm sm:text-base"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="editDifficultyLevel" className="text-sm sm:text-base">
+                    Nivel de Dificultad
+                  </Label>
+                  <Select
+                    value={newCourse.difficultyLevel}
+                    onValueChange={(value) => setNewCourse({ ...newCourse, difficultyLevel: value })}
+                  >
+                    <SelectTrigger className="text-sm sm:text-base">
+                      <SelectValue placeholder="Selecciona el nivel" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="principiante">
+                        <div className="flex items-center gap-2">
+                          <Star className="w-4 h-4 text-green-500" />
+                          Principiante
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="intermedio">
+                        <div className="flex items-center gap-2">
+                          <TrendingUp className="w-4 h-4 text-yellow-500" />
+                          Intermedio
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="experto">
+                        <div className="flex items-center gap-2">
+                          <Award className="w-4 h-4 text-red-500" />
+                          Experto
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="editThumbnailUrl" className="text-sm sm:text-base flex items-center">
+                    <ImageIcon className="w-4 h-4 mr-2" />
+                    Imagen del Curso
+                  </Label>
+                  <Input
+                    id="editThumbnailUrl"
+                    type="url"
+                    placeholder="https://res.cloudinary.com/tu-cuenta/image/upload/v123/curso.jpg"
+                    value={newCourse.thumbnailUrl}
+                    onChange={(e) => setNewCourse({ ...newCourse, thumbnailUrl: e.target.value })}
+                    className="text-sm sm:text-base"
+                  />
+                  <div className="flex items-start space-x-2 text-xs text-gray-500">
+                    <ExternalLink className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p>Sube tu imagen a Cloudinary, Imgur, o cualquier servicio de hosting de imágenes.</p>
+                      <p className="mt-1">Tamaño recomendado: 1080x1080px (1:1)</p>
+                    </div>
+                  </div>
+                </div>
+
+                {newCourse.thumbnailUrl && (
+                  <div className="space-y-2">
+                    <Label className="text-sm">Vista Previa</Label>
+                    <div className="w-full max-w-sm">
+                      <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden border">
+                        <img
+                          src={newCourse.thumbnailUrl || "/placeholder.svg"}
+                          alt="Vista previa del curso"
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement
+                            target.src = "/placeholder.svg?height=300&width=300&text=Error+cargando+imagen"
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label className="text-sm sm:text-base">Etiquetas del Curso</Label>
+                  <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-3 border rounded-md bg-gray-50">
+                    {tags.map((tag) => (
+                      <div key={tag.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`edit-tag-${tag.id}`}
+                          checked={newCourse.tags.includes(tag.id)}
+                          onCheckedChange={() => handleTagToggle(tag.id)}
+                        />
+                        <Label
+                          htmlFor={`edit-tag-${tag.id}`}
+                          className="text-xs cursor-pointer flex items-center space-x-1"
+                        >
+                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: tag.color }} />
+                          <span style={{ color: tag.color }}>{tag.name}</span>
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-500">Selecciona las etiquetas que mejor describan este curso</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-2 pt-6 border-t">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setIsEditCourseDialogOpen(false)
+                  setEditingCourse(null)
+                  setNewCourse({
+                    title: "",
+                    description: "",
+                    price: "",
+                    instructor: "",
+                    thumbnailUrl: "",
+                    durationHours: "",
+                    difficultyLevel: "principiante",
+                    tags: [],
+                  })
+                }}
+                className="w-full sm:w-auto"
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" className="w-full sm:w-auto">
+                <Edit className="w-4 h-4 mr-2" />
+                Actualizar Curso
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para crear etiqueta */}
       <Dialog open={isCreateTagDialogOpen} onOpenChange={setIsCreateTagDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-[95vw] sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Crear Nueva Etiqueta</DialogTitle>
-            <DialogDescription>Crea una nueva etiqueta para categorizar cursos</DialogDescription>
+            <DialogDescription>Crea una nueva etiqueta para clasificar tus cursos.</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleCreateTag} className="space-y-4">
-            <div>
-              <Label htmlFor="tag-name">Nombre de la Etiqueta</Label>
+            <div className="space-y-2">
+              <Label htmlFor="tagName">Nombre de la Etiqueta</Label>
               <Input
-                id="tag-name"
+                id="tagName"
+                placeholder="Ej: Implantología"
                 value={newTag.name}
                 onChange={(e) => setNewTag({ ...newTag, name: e.target.value })}
                 required
               />
             </div>
-
-            <div>
-              <Label htmlFor="tag-color">Color</Label>
+            <div className="space-y-2">
+              <Label htmlFor="tagColor">Color de la Etiqueta</Label>
               <Input
-                id="tag-color"
                 type="color"
+                id="tagColor"
                 value={newTag.color}
                 onChange={(e) => setNewTag({ ...newTag, color: e.target.value })}
-                className="h-10"
+                required
               />
             </div>
-
-            <div>
-              <Label htmlFor="tag-description">Descripción</Label>
+            <div className="space-y-2">
+              <Label htmlFor="tagDescription">Descripción</Label>
               <Textarea
-                id="tag-description"
+                id="tagDescription"
+                placeholder="Describe esta etiqueta..."
                 value={newTag.description}
                 onChange={(e) => setNewTag({ ...newTag, description: e.target.value })}
-                rows={2}
               />
             </div>
-
-            <div className="flex justify-end space-x-2 pt-4">
+            <div className="flex justify-end space-x-2">
               <Button type="button" variant="outline" onClick={() => setIsCreateTagDialogOpen(false)}>
                 Cancelar
               </Button>
@@ -1776,311 +2076,68 @@ const AdminPage = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Edit Tag Dialog */}
+      {/* Dialog para editar etiqueta */}
       <Dialog open={isEditTagDialogOpen} onOpenChange={setIsEditTagDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-[95vw] sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Editar Etiqueta</DialogTitle>
-            <DialogDescription>Modifica la información de la etiqueta</DialogDescription>
+            <DialogDescription>Edita los detalles de la etiqueta "{editingTag?.name}".</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleEditTag} className="space-y-4">
-            <div>
-              <Label htmlFor="edit-tag-name">Nombre de la Etiqueta</Label>
+            <div className="space-y-2">
+              <Label htmlFor="editTagName">Nombre de la Etiqueta</Label>
               <Input
-                id="edit-tag-name"
+                id="editTagName"
+                placeholder="Ej: Implantología"
                 value={editingTag?.name || ""}
-                onChange={(e) => setEditingTag(editingTag ? { ...editingTag, name: e.target.value } : null)}
+                onChange={(e) => setEditingTag({ ...editingTag!, name: e.target.value })}
                 required
               />
             </div>
-
-            <div>
-              <Label htmlFor="edit-tag-color">Color</Label>
+            <div className="space-y-2">
+              <Label htmlFor="editTagColor">Color de la Etiqueta</Label>
               <Input
-                id="edit-tag-color"
                 type="color"
+                id="editTagColor"
                 value={editingTag?.color || "#3B82F6"}
-                onChange={(e) => setEditingTag(editingTag ? { ...editingTag, color: e.target.value } : null)}
-                className="h-10"
+                onChange={(e) => setEditingTag({ ...editingTag!, color: e.target.value })}
+                required
               />
             </div>
-
-            <div>
-              <Label htmlFor="edit-tag-description">Descripción</Label>
+            <div className="space-y-2">
+              <Label htmlFor="editTagDescription">Descripción</Label>
               <Textarea
-                id="edit-tag-description"
+                id="editTagDescription"
+                placeholder="Describe esta etiqueta..."
                 value={editingTag?.description || ""}
-                onChange={(e) => setEditingTag(editingTag ? { ...editingTag, description: e.target.value } : null)}
-                rows={2}
+                onChange={(e) => setEditingTag({ ...editingTag!, description: e.target.value })}
               />
             </div>
-
-            <div className="flex justify-end space-x-2 pt-4">
+            <div className="flex justify-end space-x-2">
               <Button type="button" variant="outline" onClick={() => setIsEditTagDialogOpen(false)}>
                 Cancelar
               </Button>
-              <Button type="submit">Actualizar Etiqueta</Button>
+              <Button type="submit">Guardar Cambios</Button>
             </div>
           </form>
         </DialogContent>
       </Dialog>
 
-      {/* Delete Tag Dialog */}
+      {/* Alert Dialog para eliminar etiqueta */}
       <AlertDialog open={isDeleteTagDialogOpen} onOpenChange={setIsDeleteTagDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar etiqueta?</AlertDialogTitle>
+            <AlertDialogTitle>¿Eliminar Etiqueta?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción eliminará permanentemente la etiqueta "{tagToDelete?.name}". Los cursos que usen esta etiqueta
-              ya no la tendrán asociada.
+              ¿Estás seguro de que quieres eliminar la etiqueta "{tagToDelete?.name}"? Esta acción no se puede deshacer.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteTag} className="bg-red-600 hover:bg-red-700">
-              Eliminar
-            </AlertDialogAction>
+            <AlertDialogCancel onClick={() => setIsDeleteTagDialogOpen(false)}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteTag}>Eliminar</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {/* Create Slide Dialog */}
-      <Dialog open={isCreateSlideDialogOpen} onOpenChange={setIsCreateSlideDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Crear Nuevo Slide</DialogTitle>
-            <DialogDescription>Crea un nuevo slide para el carrusel de la página principal</DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleCreateSlide} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="slide-title">Título</Label>
-                <Input
-                  id="slide-title"
-                  value={newSlide.title}
-                  onChange={(e) => setNewSlide({ ...newSlide, title: e.target.value })}
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="slide-subtitle">Subtítulo</Label>
-                <Input
-                  id="slide-subtitle"
-                  value={newSlide.subtitle}
-                  onChange={(e) => setNewSlide({ ...newSlide, subtitle: e.target.value })}
-                />
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="slide-description">Descripción</Label>
-              <Textarea
-                id="slide-description"
-                value={newSlide.description}
-                onChange={(e) => setNewSlide({ ...newSlide, description: e.target.value })}
-                rows={3}
-              />
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="slide-image">URL de Imagen</Label>
-                <Input
-                  id="slide-image"
-                  type="url"
-                  value={newSlide.image_url}
-                  onChange={(e) => setNewSlide({ ...newSlide, image_url: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label htmlFor="slide-type">Tipo de Slide</Label>
-                <select
-                  id="slide-type"
-                  value={newSlide.slide_type}
-                  onChange={(e) => setNewSlide({ ...newSlide, slide_type: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="general">General</option>
-                  <option value="course">Curso</option>
-                  <option value="promotion">Promoción</option>
-                  <option value="announcement">Anuncio</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="slide-cta-text">Texto del Botón</Label>
-                <Input
-                  id="slide-cta-text"
-                  value={newSlide.cta_text}
-                  onChange={(e) => setNewSlide({ ...newSlide, cta_text: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label htmlFor="slide-cta-link">Enlace del Botón</Label>
-                <Input
-                  id="slide-cta-link"
-                  value={newSlide.cta_link}
-                  onChange={(e) => setNewSlide({ ...newSlide, cta_link: e.target.value })}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="slide-badge-text">Texto del Badge</Label>
-                <Input
-                  id="slide-badge-text"
-                  value={newSlide.badge_text}
-                  onChange={(e) => setNewSlide({ ...newSlide, badge_text: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label htmlFor="slide-background">Color de Fondo</Label>
-                <select
-                  id="slide-background"
-                  value={newSlide.background_color}
-                  onChange={(e) => setNewSlide({ ...newSlide, background_color: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="from-blue-900 to-indigo-900">Azul a Índigo</option>
-                  <option value="from-purple-900 to-pink-900">Púrpura a Rosa</option>
-                  <option value="from-green-900 to-teal-900">Verde a Teal</option>
-                  <option value="from-orange-900 to-red-900">Naranja a Rojo</option>
-                  <option value="from-gray-900 to-black">Gris a Negro</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="flex justify-end space-x-2 pt-4">
-              <Button type="button" variant="outline" onClick={() => setIsCreateSlideDialogOpen(false)}>
-                Cancelar
-              </Button>
-              <Button type="submit">Crear Slide</Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Slide Dialog */}
-      <Dialog open={isEditSlideDialogOpen} onOpenChange={setIsEditSlideDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Editar Slide</DialogTitle>
-            <DialogDescription>Modifica la información del slide del carrusel</DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleUpdateSlide} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="edit-slide-title">Título</Label>
-                <Input
-                  id="edit-slide-title"
-                  value={newSlide.title}
-                  onChange={(e) => setNewSlide({ ...newSlide, title: e.target.value })}
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="edit-slide-subtitle">Subtítulo</Label>
-                <Input
-                  id="edit-slide-subtitle"
-                  value={newSlide.subtitle}
-                  onChange={(e) => setNewSlide({ ...newSlide, subtitle: e.target.value })}
-                />
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="edit-slide-description">Descripción</Label>
-              <Textarea
-                id="edit-slide-description"
-                value={newSlide.description}
-                onChange={(e) => setNewSlide({ ...newSlide, description: e.target.value })}
-                rows={3}
-              />
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="edit-slide-image">URL de Imagen</Label>
-                <Input
-                  id="edit-slide-image"
-                  type="url"
-                  value={newSlide.image_url}
-                  onChange={(e) => setNewSlide({ ...newSlide, image_url: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label htmlFor="edit-slide-type">Tipo de Slide</Label>
-                <select
-                  id="edit-slide-type"
-                  value={newSlide.slide_type}
-                  onChange={(e) => setNewSlide({ ...newSlide, slide_type: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="general">General</option>
-                  <option value="course">Curso</option>
-                  <option value="promotion">Promoción</option>
-                  <option value="announcement">Anuncio</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="edit-slide-cta-text">Texto del Botón</Label>
-                <Input
-                  id="edit-slide-cta-text"
-                  value={newSlide.cta_text}
-                  onChange={(e) => setNewSlide({ ...newSlide, cta_text: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label htmlFor="edit-slide-cta-link">Enlace del Botón</Label>
-                <Input
-                  id="edit-slide-cta-link"
-                  value={newSlide.cta_link}
-                  onChange={(e) => setNewSlide({ ...newSlide, cta_link: e.target.value })}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="edit-slide-badge-text">Texto del Badge</Label>
-                <Input
-                  id="edit-slide-badge-text"
-                  value={newSlide.badge_text}
-                  onChange={(e) => setNewSlide({ ...newSlide, badge_text: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label htmlFor="edit-slide-background">Color de Fondo</Label>
-                <select
-                  id="edit-slide-background"
-                  value={newSlide.background_color}
-                  onChange={(e) => setNewSlide({ ...newSlide, background_color: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="from-blue-900 to-indigo-900">Azul a Índigo</option>
-                  <option value="from-purple-900 to-pink-900">Púrpura a Rosa</option>
-                  <option value="from-green-900 to-teal-900">Verde a Teal</option>
-                  <option value="from-orange-900 to-red-900">Naranja a Rojo</option>
-                  <option value="from-gray-900 to-black">Gris a Negro</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="flex justify-end space-x-2 pt-4">
-              <Button type="button" variant="outline" onClick={() => setIsEditSlideDialogOpen(false)}>
-                Cancelar
-              </Button>
-              <Button type="submit">Actualizar Slide</Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
