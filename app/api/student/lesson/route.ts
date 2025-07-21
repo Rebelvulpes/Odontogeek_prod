@@ -35,7 +35,6 @@ function getUserFromCookies(cookieHeader: string | null): { id: string; email: s
 
 export async function GET(request: NextRequest) {
   try {
-    // Set headers first
     const headers = {
       "Content-Type": "application/json",
       "Cache-Control": "no-cache",
@@ -65,8 +64,30 @@ export async function GET(request: NextRequest) {
 
     console.log("👤 User session:", userSession ? `${userSession.email} (${userSession.role})` : "No session")
 
-    // Fetch lesson with course information - simplified query to avoid missing columns
-    console.log("🔍 Fetching lesson from database...")
+    // First check if lesson exists at all (including archived/draft)
+    console.log("🔍 Checking if lesson exists...")
+    const { data: lessonCheck, error: checkError } = await supabase
+      .from("lessons")
+      .select("id, title, status, archived")
+      .eq("id", lessonId)
+      .single()
+
+    if (checkError || !lessonCheck) {
+      console.log("❌ Lesson does not exist in database:", checkError?.message)
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Lesson not found",
+          debug: `Lesson ID ${lessonId} does not exist`,
+        },
+        { status: 404, headers },
+      )
+    }
+
+    console.log("✅ Lesson exists:", lessonCheck.title, "Status:", lessonCheck.status)
+
+    // Now fetch full lesson data with proper status filtering
+    console.log("🔍 Fetching full lesson data...")
     const { data: lesson, error: lessonError } = await supabase
       .from("lessons")
       .select(`
@@ -79,48 +100,41 @@ export async function GET(request: NextRequest) {
         order_index,
         is_free,
         status,
+        archived,
         course_id,
         courses!inner (
           id,
           title,
           description,
-          status
+          status,
+          archived
         )
       `)
       .eq("id", lessonId)
       .eq("status", "published")
+      .eq("archived", false)
+      .eq("courses.status", "published")
+      .eq("courses.archived", false)
       .single()
 
-    if (lessonError) {
-      console.log("❌ Database error fetching lesson:", lessonError)
+    if (lessonError || !lesson) {
+      console.log("❌ Lesson not available (may be draft/archived):", lessonError?.message)
       return NextResponse.json(
         {
           success: false,
           error: "Lesson not found or not available",
-          debug: lessonError.message,
+          debug: `Lesson exists but is not published or is archived. Status: ${lessonCheck.status}, Archived: ${lessonCheck.archived}`,
         },
         { status: 404, headers },
       )
     }
 
-    if (!lesson) {
-      console.log("❌ Lesson not found in database")
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Lesson not found",
-        },
-        { status: 404, headers },
-      )
-    }
+    console.log("✅ Lesson found and available:", lesson.title)
 
-    console.log("✅ Lesson found:", lesson.title)
-
-    // Check if lesson is free or user has access
+    // Check access permissions
     let hasAccess = false
     let accessReason = ""
 
-    // If no user session, only allow free lessons
     if (!userSession) {
       if (lesson.is_free) {
         hasAccess = true
@@ -149,7 +163,6 @@ export async function GET(request: NextRequest) {
         )
       }
     } else {
-      // User is authenticated
       if (userSession.role === "admin") {
         hasAccess = true
         accessReason = "admin_access"
@@ -159,7 +172,6 @@ export async function GET(request: NextRequest) {
         accessReason = "free_lesson"
         console.log("✅ Free lesson access granted")
       } else {
-        // Check enrollment for paid lessons
         console.log("🔍 Checking user enrollment...")
         const { data: enrollment, error: enrollmentError } = await supabase
           .from("enrollments")
@@ -169,11 +181,7 @@ export async function GET(request: NextRequest) {
           .eq("status", "active")
           .single()
 
-        if (enrollmentError) {
-          console.log("❌ Enrollment check error:", enrollmentError)
-          hasAccess = false
-          accessReason = "enrollment_check_failed"
-        } else if (enrollment) {
+        if (enrollment) {
           console.log("✅ User has active enrollment")
           hasAccess = true
           accessReason = "enrolled"
@@ -206,7 +214,6 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Prepare response data
     const responseData = {
       success: true,
       lesson: {
@@ -234,7 +241,6 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("💥 Unexpected error in lesson API:", error)
 
-    // Always return JSON, never plain text
     return NextResponse.json(
       {
         success: false,

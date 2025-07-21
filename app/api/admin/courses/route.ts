@@ -8,6 +8,8 @@ export async function GET() {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
+    console.log("🔍 Fetching courses for admin dashboard...")
+
     const { data: courses, error } = await supabase
       .from("courses")
       .select(`
@@ -31,10 +33,12 @@ export async function GET() {
           order_index,
           is_free,
           archived,
-          created_at
+          created_at,
+          status
         )
       `)
       .eq("lessons.archived", false)
+      .eq("lessons.status", "published")
       .order("created_at", { ascending: false })
 
     if (error) {
@@ -44,6 +48,8 @@ export async function GET() {
         message: `Error fetching courses: ${error.message}`,
       })
     }
+
+    console.log(`✅ Found ${courses?.length || 0} courses`)
 
     // Process courses to get additional data
     const processedCourses = await Promise.all(
@@ -68,7 +74,7 @@ export async function GET() {
           .select("*", { count: "exact", head: true })
           .eq("course_id", course.id)
 
-        // Calculate revenue (mock data for now)
+        // Calculate revenue
         const revenue = (studentsCount || 0) * (course.price || 0)
 
         return {
@@ -80,6 +86,8 @@ export async function GET() {
         }
       }),
     )
+
+    console.log("✅ Processed courses with additional data")
 
     return NextResponse.json({
       success: true,
@@ -113,6 +121,7 @@ export async function POST(req: NextRequest) {
         duration_hours: duration_hours ? Number.parseInt(duration_hours) : null,
         difficulty_level: difficulty_level || "principiante",
         status: "published",
+        archived: false,
       })
       .select()
       .single()
@@ -136,7 +145,6 @@ export async function POST(req: NextRequest) {
 
       if (tagsError) {
         console.error("Error adding course tags:", tagsError)
-        // Don't fail the entire operation, just log the error
       }
     }
 

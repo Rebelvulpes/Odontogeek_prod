@@ -1,13 +1,13 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useParams } from "next/navigation"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Skeleton } from "@/components/ui/skeleton"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Play, Lock, Clock, BookOpen } from "lucide-react"
+import { Navigation } from "@/components/navigation"
+import { ArrowLeft, Play, Clock, BookOpen, Lock, AlertCircle, Loader2 } from "lucide-react"
 
 interface Lesson {
   id: string
@@ -21,15 +21,15 @@ interface Lesson {
   course: {
     id: string
     title: string
-    description?: string
+    description: string
   }
 }
 
 interface LessonResponse {
   success: boolean
-  lesson: Lesson
+  lesson?: Lesson
   hasAccess: boolean
-  accessReason?: string
+  accessReason: string
   message: string
   error?: string
   debug?: string
@@ -37,19 +37,40 @@ interface LessonResponse {
 
 export default function LessonPage() {
   const params = useParams()
+  const router = useRouter()
+  const [lesson, setLesson] = useState<Lesson | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [hasAccess, setHasAccess] = useState(false)
+  const [user, setUser] = useState<any>(null)
+
   const lessonId = params.lessonId as string
   const courseId = params.courseId as string
 
-  const [lesson, setLesson] = useState<Lesson | null>(null)
-  const [hasAccess, setHasAccess] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  // Get user session
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const response = await fetch("/api/auth/me", {
+          credentials: "include",
+        })
+        if (response.ok) {
+          const userData = await response.json()
+          setUser(userData.user)
+        }
+      } catch (error) {
+        console.error("Error checking auth:", error)
+      }
+    }
+    checkAuth()
+  }, [])
 
   const fetchLesson = async () => {
     try {
-      console.log("🔍 Fetching lesson:", lessonId)
       setLoading(true)
       setError(null)
+
+      console.log("🔍 Fetching lesson:", lessonId)
 
       const response = await fetch(`/api/student/lesson?lessonId=${lessonId}`, {
         method: "GET",
@@ -59,47 +80,30 @@ export default function LessonPage() {
         },
       })
 
-      console.log("📊 Response status:", response.status)
-      console.log("📊 Response headers:", Object.fromEntries(response.headers.entries()))
+      console.log("📊 Lesson API Response status:", response.status)
 
       if (!response.ok) {
         const errorText = await response.text()
-        console.log("❌ Error response text:", errorText)
-
-        try {
-          const errorData = JSON.parse(errorText)
-          console.log("📊 Lesson API Response:", errorData)
-          setError(errorData.error || `HTTP ${response.status}`)
-
-          // If we have lesson data even in error response, use it
-          if (errorData.lesson) {
-            setLesson(errorData.lesson)
-            setHasAccess(false)
-          }
-        } catch (parseError) {
-          console.log("❌ Failed to parse error response as JSON")
-          setError(`HTTP ${response.status}: ${errorText}`)
-        }
-        return
+        console.error("❌ API Error:", response.status, errorText)
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
       }
 
       const data: LessonResponse = await response.json()
       console.log("📊 Lesson API Response:", data)
 
-      if (data.success && data.lesson) {
+      if (!data.success) {
+        throw new Error(data.error || "Failed to load lesson")
+      }
+
+      if (data.lesson) {
         setLesson(data.lesson)
         setHasAccess(data.hasAccess)
-        setError(null)
       } else {
-        setError(data.error || "Failed to load lesson")
-        if (data.lesson) {
-          setLesson(data.lesson)
-          setHasAccess(false)
-        }
+        throw new Error("No lesson data received")
       }
     } catch (err) {
       console.error("❌ Error fetching lesson:", err)
-      setError(err instanceof Error ? err.message : "An unexpected error occurred")
+      setError(err instanceof Error ? err.message : "Failed to load lesson")
     } finally {
       setLoading(false)
     }
@@ -111,22 +115,19 @@ export default function LessonPage() {
     }
   }, [lessonId])
 
+  const handleBackToCourse = () => {
+    router.push(`/courses/${courseId}`)
+  }
+
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="max-w-4xl mx-auto">
-          <Skeleton className="h-8 w-3/4 mb-4" />
-          <Skeleton className="h-4 w-1/2 mb-8" />
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2">
-              <Skeleton className="aspect-video w-full mb-6" />
-              <Skeleton className="h-6 w-1/3 mb-4" />
-              <Skeleton className="h-4 w-full mb-2" />
-              <Skeleton className="h-4 w-full mb-2" />
-              <Skeleton className="h-4 w-3/4" />
-            </div>
-            <div>
-              <Skeleton className="h-48 w-full" />
+      <div className="min-h-screen bg-gray-50">
+        <Navigation user={user} />
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-600" />
+              <p className="text-gray-600">Cargando lección...</p>
             </div>
           </div>
         </div>
@@ -134,16 +135,28 @@ export default function LessonPage() {
     )
   }
 
-  if (error && !lesson) {
+  if (error) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="max-w-4xl mx-auto">
-          <Alert className="mb-6">
-            <AlertDescription>Error loading lesson: {error}</AlertDescription>
-          </Alert>
-          <Button onClick={fetchLesson} variant="outline">
-            Try Again
+      <div className="min-h-screen bg-gray-50">
+        <Navigation user={user} />
+        <div className="container mx-auto px-4 py-8">
+          <Button variant="ghost" onClick={handleBackToCourse} className="mb-6">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Volver al curso
           </Button>
+
+          <Alert className="border-red-200 bg-red-50">
+            <AlertCircle className="h-4 w-4 text-red-600" />
+            <AlertDescription className="text-red-800">
+              <strong>Error cargando la lección:</strong> {error}
+            </AlertDescription>
+          </Alert>
+
+          <div className="mt-6 text-center">
+            <Button onClick={fetchLesson} variant="outline">
+              Intentar de nuevo
+            </Button>
+          </div>
         </div>
       </div>
     )
@@ -151,10 +164,17 @@ export default function LessonPage() {
 
   if (!lesson) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="max-w-4xl mx-auto">
+      <div className="min-h-screen bg-gray-50">
+        <Navigation user={user} />
+        <div className="container mx-auto px-4 py-8">
+          <Button variant="ghost" onClick={handleBackToCourse} className="mb-6">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Volver al curso
+          </Button>
+
           <Alert>
-            <AlertDescription>Lesson not found</AlertDescription>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>No se encontró la lección solicitada.</AlertDescription>
           </Alert>
         </div>
       </div>
@@ -162,64 +182,88 @@ export default function LessonPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="max-w-4xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-            <BookOpen className="h-4 w-4" />
-            <span>{lesson.course.title}</span>
-          </div>
-          <h1 className="text-3xl font-bold mb-4">{lesson.title}</h1>
-          <div className="flex items-center gap-4">
+    <div className="min-h-screen bg-gray-50">
+      <Navigation user={user} />
+
+      <div className="container mx-auto px-4 py-8">
+        {/* Back button */}
+        <Button variant="ghost" onClick={handleBackToCourse} className="mb-6">
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Volver al curso
+        </Button>
+
+        {/* Course info */}
+        <div className="mb-6">
+          <p className="text-sm text-gray-600 mb-2">
+            <BookOpen className="w-4 h-4 inline mr-1" />
+            {lesson.course.title}
+          </p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">{lesson.title}</h1>
+          <div className="flex items-center gap-4 text-sm text-gray-600">
+            <div className="flex items-center">
+              <Clock className="w-4 h-4 mr-1" />
+              {lesson.duration_minutes} minutos
+            </div>
+            <div className="flex items-center">
+              <span className="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
+              Lección {lesson.order_index}
+            </div>
             {lesson.is_free && (
               <Badge variant="secondary" className="bg-green-100 text-green-800">
-                Gratis
+                Gratuita
               </Badge>
             )}
-            <div className="flex items-center gap-1 text-sm text-muted-foreground">
-              <Clock className="h-4 w-4" />
-              <span>{lesson.duration_minutes} minutos</span>
-            </div>
           </div>
         </div>
 
-        {/* Error Alert */}
-        {error && (
-          <Alert className="mb-6">
-            <AlertDescription>{error}</AlertDescription>
+        {/* Access check */}
+        {!hasAccess ? (
+          <Alert className="mb-6 border-orange-200 bg-orange-50">
+            <Lock className="h-4 w-4 text-orange-600" />
+            <AlertDescription className="text-orange-800">
+              <strong>Acceso restringido:</strong> Necesitas estar inscrito en este curso para acceder a esta lección.
+            </AlertDescription>
           </Alert>
-        )}
+        ) : null}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Main Content */}
+          {/* Main content */}
           <div className="lg:col-span-2">
-            {/* Video Player */}
-            <div className="aspect-video bg-black rounded-lg mb-6 relative overflow-hidden">
-              {hasAccess && lesson.video_url ? (
-                <iframe
-                  src={lesson.video_url}
-                  title={lesson.title}
-                  className="w-full h-full"
-                  allowFullScreen
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                />
-              ) : (
-                <div className="flex items-center justify-center h-full">
-                  <div className="text-center text-white">
-                    <Lock className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p className="text-lg mb-2">{lesson.is_free ? "Video no disponible" : "Contenido bloqueado"}</p>
-                    <p className="text-sm opacity-75">
-                      {lesson.is_free
-                        ? "El video para esta lección aún no está disponible"
-                        : "Necesitas inscribirte al curso para ver este contenido"}
+            {/* Video player */}
+            {hasAccess && lesson.video_url ? (
+              <Card className="mb-6">
+                <CardContent className="p-0">
+                  <div className="aspect-video bg-black rounded-t-lg overflow-hidden">
+                    <iframe
+                      src={lesson.video_url}
+                      title={lesson.title}
+                      className="w-full h-full"
+                      allowFullScreen
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card className="mb-6">
+                <CardContent className="p-8">
+                  <div className="text-center">
+                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      {hasAccess ? (
+                        <Play className="w-8 h-8 text-gray-400" />
+                      ) : (
+                        <Lock className="w-8 h-8 text-gray-400" />
+                      )}
+                    </div>
+                    <p className="text-gray-600">
+                      {hasAccess ? "Video no disponible" : "Inscríbete al curso para ver el video"}
                     </p>
                   </div>
-                </div>
-              )}
-            </div>
+                </CardContent>
+              </Card>
+            )}
 
-            {/* Lesson Content */}
+            {/* Lesson content */}
             <Card>
               <CardHeader>
                 <CardTitle>Contenido de la lección</CardTitle>
@@ -227,16 +271,13 @@ export default function LessonPage() {
               </CardHeader>
               <CardContent>
                 {hasAccess && lesson.content ? (
-                  <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: lesson.content }} />
+                  <div className="prose max-w-none" dangerouslySetInnerHTML={{ __html: lesson.content }} />
                 ) : (
                   <div className="text-center py-8">
-                    <Lock className="h-8 w-8 mx-auto mb-4 text-muted-foreground" />
-                    <p className="text-muted-foreground mb-4">
-                      {lesson.is_free
-                        ? "El contenido de esta lección estará disponible pronto"
-                        : "Inscríbete al curso para acceder al contenido completo"}
+                    <Lock className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-600">
+                      {hasAccess ? "Contenido no disponible" : "Inscríbete al curso para acceder al contenido completo"}
                     </p>
-                    {!lesson.is_free && <Button>Inscribirse al curso</Button>}
                   </div>
                 )}
               </CardContent>
@@ -244,37 +285,34 @@ export default function LessonPage() {
           </div>
 
           {/* Sidebar */}
-          <div>
+          <div className="lg:col-span-1">
             <Card>
               <CardHeader>
                 <CardTitle>Información del curso</CardTitle>
               </CardHeader>
               <CardContent>
                 <h3 className="font-semibold mb-2">{lesson.course.title}</h3>
-                {lesson.course.description && (
-                  <p className="text-sm text-muted-foreground mb-4">{lesson.course.description}</p>
-                )}
+                <p className="text-sm text-gray-600 mb-4">{lesson.course.description}</p>
 
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Lección:</span>
-                    <span>{lesson.order_index}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Duración:</span>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Duración:</span>
                     <span>{lesson.duration_minutes} min</span>
                   </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Tipo:</span>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Lección:</span>
+                    <span>#{lesson.order_index}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Tipo:</span>
                     <span>{lesson.is_free ? "Gratuita" : "Premium"}</span>
                   </div>
                 </div>
 
-                {!hasAccess && !lesson.is_free && (
+                {!hasAccess && (
                   <div className="mt-6">
-                    <Button className="w-full">
-                      <Play className="h-4 w-4 mr-2" />
-                      Inscribirse al curso
+                    <Button className="w-full" onClick={() => router.push(`/courses/${courseId}`)}>
+                      Ver curso completo
                     </Button>
                   </div>
                 )}
