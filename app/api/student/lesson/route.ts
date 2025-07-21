@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
 
     console.log("👤 User session:", userSession ? `${userSession.email} (${userSession.role})` : "No session")
 
-    // Fetch lesson with course information
+    // Fetch lesson with course information - simplified query to avoid missing columns
     console.log("🔍 Fetching lesson from database...")
     const { data: lesson, error: lessonError } = await supabase
       .from("lessons")
@@ -84,8 +84,7 @@ export async function GET(request: NextRequest) {
           id,
           title,
           description,
-          status,
-          is_free
+          status
         )
       `)
       .eq("id", lessonId)
@@ -98,6 +97,7 @@ export async function GET(request: NextRequest) {
         {
           success: false,
           error: "Lesson not found or not available",
+          debug: lessonError.message,
         },
         { status: 404, headers },
       )
@@ -240,6 +240,7 @@ export async function GET(request: NextRequest) {
         success: false,
         error: "Internal server error",
         message: "An unexpected error occurred while fetching the lesson",
+        debug: error instanceof Error ? error.message : "Unknown error",
       },
       {
         status: 500,
