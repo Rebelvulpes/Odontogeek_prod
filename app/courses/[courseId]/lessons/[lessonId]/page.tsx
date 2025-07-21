@@ -187,9 +187,7 @@ export default function LessonPage() {
           <div className="flex items-start justify-between">
             <div className="space-y-2">
               <h1 className="text-3xl font-bold">{lesson.title}</h1>
-              {lesson.description && (
-                <p className="text-lg text-muted-foreground">{lesson.description}</p>
-              )}
+              {lesson.description && <p className="text-lg text-muted-foreground">{lesson.description}</p>}
             </div>
             <div className="flex items-center gap-2">
               {lesson.is_free ? (
@@ -257,5 +255,27 @@ export default function LessonPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Contenido de la Lección</CardTitle>
-                <CardDescription>
-                  Duración estim\
+                <CardDescription>Duración estimada: {lesson.duration_minutes} minutos</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="prose prose-lg max-w-none" dangerouslySetInnerHTML={{ __html: lesson.content }} />
+              </CardContent>
+            </Card>
+          </>
+        )}
+
+        {/* Debug Information (only in development) */}
+        {process.env.NODE_ENV === "development" && debugInfo && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Debug Information</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <pre className="text-xs bg-gray-100 p-4 rounded overflow-auto">{JSON.stringify(debugInfo, null, 2)}</pre>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    </div>
+  )
+}
