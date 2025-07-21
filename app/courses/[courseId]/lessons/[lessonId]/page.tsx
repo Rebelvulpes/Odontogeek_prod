@@ -272,24 +272,25 @@ export default function LessonPage() {
           <div className="lg:col-span-2">
             {/* Video player */}
             {hasAccess && lesson.video_url ? (
-              <Card className="mb-6">
-                <CardContent className="p-0">
-                  <div className="relative w-full" style={{ paddingBottom: "56.25%" /* 16:9 aspect ratio */ }}>
-                    <iframe
-                      src={lesson.video_url}
-                      title={lesson.title}
-                      className="absolute top-0 left-0 w-full h-full rounded-t-lg"
-                      allowFullScreen
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                      style={{
-                        border: "none",
-                        width: "100%",
-                        height: "100%",
-                      }}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
+              <div className="mb-6">
+                <div
+                  className="relative w-full bg-black rounded-lg overflow-hidden"
+                  style={{ paddingBottom: "56.25%" }}
+                >
+                  <iframe
+                    src={lesson.video_url}
+                    title={lesson.title}
+                    className="absolute inset-0 w-full h-full"
+                    allowFullScreen
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    style={{
+                      border: "none",
+                      minHeight: "400px",
+                    }}
+                    frameBorder="0"
+                  />
+                </div>
+              </div>
             ) : (
               <Card className="mb-6">
                 <CardContent className="p-8">
