@@ -7,19 +7,25 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Skeleton } from "@/components/ui/skeleton"
-import { ArrowLeft, Play, Lock, Gift, Crown, User, AlertCircle } from "lucide-react"
+import { ArrowLeft, Lock, Gift, Crown, User, AlertCircle, Clock } from "lucide-react"
 import Link from "next/link"
 
 interface Lesson {
-  id: number
+  id: string
   title: string
   description: string
   content: string
   video_url?: string
-  duration?: number
+  duration_minutes?: number
   order_index: number
   is_free: boolean
-  course_id: number
+  course_id: string
+  courses: {
+    id: string
+    title: string
+    description: string
+    instructor: string
+  }
 }
 
 interface AccessDetails {
@@ -27,6 +33,7 @@ interface AccessDetails {
   is_free: boolean
   is_enrolled: boolean
   has_access: boolean
+  access_reason: string
 }
 
 export default function LessonPage() {
@@ -50,23 +57,32 @@ export default function LessonPage() {
       setLoading(true)
       setError(null)
 
+      console.log("Fetching lesson data for:", { courseId, lessonId })
+
       const response = await fetch(`/api/student/lesson?courseId=${courseId}&lessonId=${lessonId}`, {
         credentials: "include",
       })
 
       const data = await response.json()
+      console.log("API Response:", data)
 
       if (!response.ok) {
         if (data.redirect) {
+          console.log("Redirecting to:", data.redirect)
           router.push(data.redirect)
           return
         }
         throw new Error(data.message || "Error al cargar la lección")
       }
 
-      setLesson(data.lesson)
-      setAccessType(data.access_type)
-      setAccessDetails(data.access_details)
+      if (data.success) {
+        setLesson(data.lesson)
+        setAccessType(data.access_type)
+        setAccessDetails(data.access_details)
+        console.log("Lesson loaded successfully:", data.lesson.title)
+      } else {
+        throw new Error(data.message || "Error desconocido")
+      }
     } catch (error) {
       console.error("Error fetching lesson:", error)
       setError(error instanceof Error ? error.message : "Error desconocido")
@@ -149,6 +165,15 @@ export default function LessonPage() {
             <AlertCircle className="h-4 w-4 text-red-600" />
             <AlertDescription className="text-red-800">{error}</AlertDescription>
           </Alert>
+
+          <div className="mt-6 flex gap-4">
+            <Link href={`/courses/${courseId}`}>
+              <Button variant="outline">Ver Curso</Button>
+            </Link>
+            <Link href="/courses">
+              <Button>Explorar Cursos</Button>
+            </Link>
+          </div>
         </div>
       </div>
     )
@@ -178,60 +203,83 @@ export default function LessonPage() {
     <div className="container mx-auto px-4 py-8">
       <div className="max-w-4xl mx-auto">
         {/* Navigation */}
-        <Link href={`/courses/${courseId}`}>
-          <Button variant="ghost" className="mb-6">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Volver al Curso
-          </Button>
-        </Link>
+        <div className="flex items-center justify-between mb-6">
+          <Link href={`/courses/${courseId}`}>
+            <Button variant="ghost">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Volver a {lesson.courses.title}
+            </Button>
+          </Link>
+          {getAccessBadge()}
+        </div>
 
-        {/* Lesson Content */}
-        <Card>
+        {/* Lesson Header */}
+        <Card className="mb-6">
           <CardHeader>
             <div className="flex items-start justify-between">
               <div className="flex-1">
                 <CardTitle className="text-2xl mb-2">{lesson.title}</CardTitle>
                 <p className="text-gray-600 mb-4">{lesson.description}</p>
-              </div>
-              <div className="ml-4">{getAccessBadge()}</div>
-            </div>
-
-            {lesson.duration && (
-              <div className="flex items-center text-sm text-gray-500">
-                <Play className="w-4 h-4 mr-1" />
-                {Math.floor(lesson.duration / 60)} min
-              </div>
-            )}
-          </CardHeader>
-
-          <CardContent>
-            {/* Video Player */}
-            {lesson.video_url && (
-              <div className="mb-6">
-                <div className="aspect-video bg-black rounded-lg overflow-hidden">
-                  <video controls className="w-full h-full" poster="/placeholder.svg?height=400&width=600&text=Video">
-                    <source src={lesson.video_url} type="video/mp4" />
-                    Tu navegador no soporta el elemento de video.
-                  </video>
+                <div className="flex items-center space-x-4 text-sm text-gray-500">
+                  <span>Lección {lesson.order_index}</span>
+                  {lesson.duration_minutes && (
+                    <>
+                      <span>•</span>
+                      <div className="flex items-center">
+                        <Clock className="w-4 h-4 mr-1" />
+                        {lesson.duration_minutes} min
+                      </div>
+                    </>
+                  )}
+                  <span>•</span>
+                  <span>Instructor: {lesson.courses.instructor}</span>
                 </div>
               </div>
-            )}
+            </div>
+          </CardHeader>
+        </Card>
 
-            {/* Lesson Content */}
+        {/* Video Player */}
+        {lesson.video_url && (
+          <Card className="mb-6">
+            <CardContent className="p-0">
+              <div className="aspect-video bg-black rounded-lg overflow-hidden">
+                <video controls className="w-full h-full" poster="/placeholder.svg?height=400&width=600&text=Video">
+                  <source src={lesson.video_url} type="video/mp4" />
+                  Tu navegador no soporta el elemento de video.
+                </video>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Lesson Content */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Contenido de la Lección</CardTitle>
+          </CardHeader>
+          <CardContent>
             <div className="prose max-w-none">
-              <div dangerouslySetInnerHTML={{ __html: lesson.content }} />
+              <div dangerouslySetInnerHTML={{ __html: lesson.content || "Contenido no disponible" }} />
             </div>
 
             {/* Access Information */}
-            <div className="mt-8 p-4 bg-gray-50 rounded-lg">
-              <h4 className="font-semibold mb-2">Información de Acceso</h4>
-              <div className="flex items-center space-x-4 text-sm text-gray-600">
-                <span>Tipo de acceso: {accessType}</span>
-                {accessDetails?.is_free && <span>• Lección gratuita</span>}
-                {accessDetails?.is_admin && <span>• Acceso de administrador</span>}
-                {accessDetails?.is_enrolled && <span>• Inscrito al curso</span>}
+            {accessDetails && (
+              <div className="mt-8 p-4 bg-gray-50 rounded-lg">
+                <h4 className="font-semibold mb-2">Información de Acceso</h4>
+                <div className="flex items-center space-x-4 text-sm text-gray-600">
+                  <span>Tipo: {accessType}</span>
+                  <span>•</span>
+                  <span>{accessDetails.access_reason}</span>
+                  {accessDetails.is_free && (
+                    <>
+                      <span>•</span>
+                      <span className="text-green-600">Lección gratuita</span>
+                    </>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
           </CardContent>
         </Card>
       </div>
