@@ -162,7 +162,7 @@ export function HeroCarousel() {
       <div className="relative z-10 container mx-auto px-4 h-full min-h-[500px] sm:min-h-[600px] lg:min-h-[700px] flex items-center">
         <div className="w-full lg:grid lg:grid-cols-2 lg:gap-12 lg:items-center">
           {/* Text Content */}
-          <div className="text-white space-y-4 sm:space-y-6 text-center lg:text-left">
+          <div className="text-white space-y-4 sm:space-y-6 text-center lg:text-left mx-16">
             {/* Badge */}
             <div className="flex justify-center lg:justify-start">
               <Badge className={`${currentSlideData.badgeColor} text-white border-0 text-xs sm:text-sm px-3 py-1`}>

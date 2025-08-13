@@ -1,29 +1,30 @@
 import { createClient } from "@supabase/supabase-js"
-import { cookies } from "next/headers"
-import type { User } from "@/lib/auth-utils"
+import jwt from "jsonwebtoken"
 
-// This is a singleton pattern for the server client
-let serverSupabaseClient: ReturnType<typeof createClient> | null = null
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+const jwtSecret = process.env.JWT_SECRET!
+
+if (!supabaseUrl || !supabaseServiceKey) {
+  throw new Error("Missing Supabase environment variables")
+}
+
+if (!jwtSecret) {
+  throw new Error("Missing JWT_SECRET environment variable")
+}
 
 // Server-side Supabase client with service role key
 export const getServerSupabaseClient = () => {
-  if (serverSupabaseClient) {
-    return serverSupabaseClient
+  if (typeof window !== "undefined") {
+    throw new Error("❌ SECURITY ERROR: getServerSupabaseClient called from client-side")
   }
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-  if (!supabaseUrl || !supabaseServiceKey) {
-    console.error("Missing Supabase environment variables:", {
-      supabaseUrl: !!supabaseUrl,
-      supabaseServiceKey: !!supabaseServiceKey,
-    })
-    throw new Error("Missing Supabase server environment variables")
-  }
-
-  serverSupabaseClient = createClient(supabaseUrl, supabaseServiceKey)
-  return serverSupabaseClient
+  return createClient(supabaseUrl, supabaseServiceKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  })
 }
 
 // Cookie configuration - 30 days for better session persistence
@@ -78,8 +79,21 @@ export const getUserSessionFromCookie = (cookieHeader: string | null): UserSessi
       return null
     }
 
-    // Simple JSON parsing without JWT
+    // Try to parse as JWT first
     try {
+      const decoded = jwt.verify(sessionCookie, jwtSecret) as any
+      console.log("✅ JWT session decoded successfully")
+      return {
+        id: decoded.id,
+        email: decoded.email,
+        role: decoded.role,
+        first_name: decoded.first_name,
+        last_name: decoded.last_name,
+        created_at: decoded.created_at,
+      }
+    } catch (jwtError) {
+      console.log("⚠️ JWT decode failed, trying JSON parse")
+      // Fallback to JSON parsing
       const userSession = JSON.parse(sessionCookie)
 
       // Validate session structure
@@ -102,9 +116,6 @@ export const getUserSessionFromCookie = (cookieHeader: string | null): UserSessi
 
       console.log("✅ Valid session found for user:", userSession.email)
       return userSession
-    } catch (parseError) {
-      console.error("❌ Error parsing session cookie:", parseError)
-      return null
     }
   } catch (error) {
     console.error("❌ Error parsing session cookie:", error)
@@ -200,44 +211,5 @@ export const generateSessionData = (user: any) => {
     last_name: user.last_name,
     role: user.role,
     created_at: new Date().toISOString(), // Track when session was created
-  }
-}
-
-// Get server user from cookies (simplified approach without JWT)
-export const getServerUser = async (): Promise<User | null> => {
-  try {
-    const cookieStore = cookies()
-    const sessionCookie = cookieStore.get("user-session")
-
-    if (!sessionCookie) {
-      return null
-    }
-
-    const userSession = getUserSessionFromCookie(`user-session=${sessionCookie.value}`)
-
-    if (!userSession) {
-      return null
-    }
-
-    // Get full user profile from database
-    const supabase = getServerSupabaseClient()
-    const { data: user, error } = await supabase.from("users").select("*").eq("id", userSession.id).single()
-
-    if (error || !user) {
-      console.error("Error fetching user profile:", error)
-      // Fallback to basic user data from session
-      return {
-        id: userSession.id,
-        email: userSession.email,
-        first_name: userSession.first_name,
-        last_name: userSession.last_name,
-        role: userSession.role,
-      } as User
-    }
-
-    return user as User
-  } catch (error) {
-    console.error("Error in getServerUser:", error)
-    return null
   }
 }
