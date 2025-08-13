@@ -90,7 +90,7 @@ export function Navigation({ user: initialUser }: NavigationProps) {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link href="/" className="flex items-center space-x-2">
+          <Link href="/" className="flex items-center space-x-2 mx-16">
             <img src="/images/odontogeek-logo-new.png" alt="OdontoGeek" className="h-8 w-auto" />
           </Link>
 
